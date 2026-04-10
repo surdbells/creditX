@@ -73,6 +73,34 @@ composer serve
 ### Audit Logs
 - `GET    /api/audit-logs` — List audit logs
 
+### Record Types
+- `GET    /api/record-types` — List record types
+- `POST   /api/record-types` — Create record type
+- `GET    /api/record-types/{id}` — Get record type
+- `PUT    /api/record-types/{id}` — Update record type
+- `DELETE /api/record-types/{id}` — Delete record type
+
+### Government Records
+- `GET    /api/government-records` — List records (filter: record_type_id, is_active)
+- `POST   /api/government-records` — Create record
+- `GET    /api/government-records/lookup/{staffId}` — Lookup by staff ID with eligibility check
+- `POST   /api/government-records/bulk-import` — Bulk CSV import (multipart: file + record_type_id)
+- `GET    /api/government-records/{id}` — Get record
+- `PUT    /api/government-records/{id}` — Update record
+- `DELETE /api/government-records/{id}` — Delete record
+
+### Customers
+- `GET    /api/customers` — List customers (search: staff_id, name, phone, BVN)
+- `POST   /api/customers` — Create customer (supports nested next_of_kin array)
+- `GET    /api/customers/{id}` — Get customer with relations
+- `PUT    /api/customers/{id}` — Update customer
+
+### Documents
+- `GET    /api/documents` — List documents (filter: customer_id or loan_id)
+- `POST   /api/documents/upload` — Upload document (multipart: file + customer_id + type)
+- `PUT    /api/documents/{id}/verify` — Verify or reject document
+- `DELETE /api/documents/{id}` — Delete document
+
 ### Health
 - `GET    /api/health` — Health check
 

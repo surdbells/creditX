@@ -305,3 +305,57 @@ if ($existingAdmin === null) {
 }
 
 echo "\n=== Seeding complete ===\n";
+
+// ─── 6. Record Types ───
+echo "[6/6] Seeding record types...\n";
+
+use App\Domain\Entity\RecordType;
+
+$recordTypesDef = [
+    [
+        'name' => 'IPPIS',
+        'code' => 'IPPIS',
+        'description' => 'Integrated Payroll and Personnel Information System — Federal government employees',
+        'field_config' => ['label_overrides' => ['staff_id' => 'IPPIS Number'], 'required_fields' => ['gross_pay', 'organization']],
+        'eligibility_rules' => ['max_age' => 57, 'max_service_years' => 33],
+    ],
+    [
+        'name' => 'TESCOM',
+        'code' => 'TESCOM',
+        'description' => 'Teaching Service Commission — State teaching staff',
+        'field_config' => ['label_overrides' => ['staff_id' => 'TESCOM Staff ID'], 'required_fields' => ['organization']],
+        'eligibility_rules' => ['max_age' => 57, 'max_service_years' => 33],
+    ],
+    [
+        'name' => 'Lagos State',
+        'code' => 'LASG',
+        'description' => 'Lagos State Government employees',
+        'field_config' => ['label_overrides' => ['staff_id' => 'LASG Staff ID'], 'required_fields' => ['ministry']],
+        'eligibility_rules' => ['max_age' => 57, 'max_service_years' => 33],
+    ],
+    [
+        'name' => 'SUBEB',
+        'code' => 'SUBEB',
+        'description' => 'State Universal Basic Education Board employees',
+        'field_config' => ['label_overrides' => ['staff_id' => 'SUBEB Staff ID'], 'required_fields' => ['organization']],
+        'eligibility_rules' => ['max_age' => 57, 'max_service_years' => 33],
+    ],
+];
+
+$rtCount = 0;
+foreach ($recordTypesDef as $rtDef) {
+    $existing = $em->getRepository(RecordType::class)->findOneBy(['code' => $rtDef['code']]);
+    if ($existing !== null) continue;
+    $rt = new RecordType();
+    $rt->setName($rtDef['name']);
+    $rt->setCode($rtDef['code']);
+    $rt->setDescription($rtDef['description']);
+    $rt->setFieldConfig($rtDef['field_config']);
+    $rt->setEligibilityRules($rtDef['eligibility_rules']);
+    $em->persist($rt);
+    $rtCount++;
+}
+$em->flush();
+echo "  Created {$rtCount} record types\n";
+
+echo "\n=== Seeding complete (all phases) ===\n";

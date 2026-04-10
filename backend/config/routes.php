@@ -8,6 +8,10 @@ use App\Action\Location;
 use App\Action\Role;
 use App\Action\Setting;
 use App\Action\Audit;
+use App\Action\RecordType;
+use App\Action\GovRecord;
+use App\Action\Customer;
+use App\Action\Document;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -100,6 +104,62 @@ return function (App $app): void {
         // ─── Audit Logs ───
         $api->get('/audit-logs', Audit\ListAuditLogsAction::class)
             ->add(new RbacMiddleware('audit.view'));
+
+        // ─── Record Types ───
+        $api->group('/record-types', function (RouteCollectorProxy $group) {
+            $group->get('', RecordType\ListRecordTypesAction::class)
+                ->add(new RbacMiddleware('record_types.view'));
+            $group->post('', RecordType\CreateRecordTypeAction::class)
+                ->add(new RbacMiddleware('record_types.create'));
+            $group->get('/{id}', RecordType\GetRecordTypeAction::class)
+                ->add(new RbacMiddleware('record_types.view'));
+            $group->put('/{id}', RecordType\UpdateRecordTypeAction::class)
+                ->add(new RbacMiddleware('record_types.edit'));
+            $group->delete('/{id}', RecordType\DeleteRecordTypeAction::class)
+                ->add(new RbacMiddleware('record_types.delete'));
+        });
+
+        // ─── Government Records ───
+        $api->group('/government-records', function (RouteCollectorProxy $group) {
+            $group->get('', GovRecord\ListGovRecordsAction::class)
+                ->add(new RbacMiddleware('records.view'));
+            $group->post('', GovRecord\CreateGovRecordAction::class)
+                ->add(new RbacMiddleware('records.create'));
+            $group->get('/lookup/{staffId}', GovRecord\LookupStaffAction::class)
+                ->add(new RbacMiddleware('records.view'));
+            $group->post('/bulk-import', GovRecord\BulkImportAction::class)
+                ->add(new RbacMiddleware('records.import'));
+            $group->get('/{id}', GovRecord\GetGovRecordAction::class)
+                ->add(new RbacMiddleware('records.view'));
+            $group->put('/{id}', GovRecord\UpdateGovRecordAction::class)
+                ->add(new RbacMiddleware('records.edit'));
+            $group->delete('/{id}', GovRecord\DeleteGovRecordAction::class)
+                ->add(new RbacMiddleware('records.delete'));
+        });
+
+        // ─── Customers ───
+        $api->group('/customers', function (RouteCollectorProxy $group) {
+            $group->get('', Customer\ListCustomersAction::class)
+                ->add(new RbacMiddleware('customers.view'));
+            $group->post('', Customer\CreateCustomerAction::class)
+                ->add(new RbacMiddleware('customers.create'));
+            $group->get('/{id}', Customer\GetCustomerAction::class)
+                ->add(new RbacMiddleware('customers.view'));
+            $group->put('/{id}', Customer\UpdateCustomerAction::class)
+                ->add(new RbacMiddleware('customers.edit'));
+        });
+
+        // ─── Documents ───
+        $api->group('/documents', function (RouteCollectorProxy $group) {
+            $group->get('', Document\ListDocumentsAction::class)
+                ->add(new RbacMiddleware('customers.view'));
+            $group->post('/upload', Document\UploadDocumentAction::class)
+                ->add(new RbacMiddleware('customers.create'));
+            $group->put('/{id}/verify', Document\VerifyDocumentAction::class)
+                ->add(new RbacMiddleware('customers.edit'));
+            $group->delete('/{id}', Document\DeleteDocumentAction::class)
+                ->add(new RbacMiddleware('customers.edit'));
+        });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
 };
