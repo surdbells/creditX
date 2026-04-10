@@ -1,44 +1,135 @@
-<div class="layout" [class.sidebar-collapsed]="sidebarCollapsed()">
-  <!-- Sidebar -->
-  <aside class="sidebar">
+<div class="cx-layout" [class.sidebar-collapsed]="collapsed()">
+  <!-- Desktop Sidebar -->
+  <aside class="cx-sidebar" [class.collapsed]="collapsed()">
     <div class="sidebar-header">
-      <h2>CreditX</h2>
-      <button class="toggle-btn" (click)="toggleSidebar()">☰</button>
+      @if (!collapsed()) {
+        <span class="text-lg font-bold text-[var(--cx-accent)]">Credit<span class="text-white">X</span></span>
+      } @else {
+        <span class="text-lg font-bold text-[var(--cx-accent)]">CX</span>
+      }
+      <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="collapsed.set(!collapsed())">
+        <lucide-icon [name]="collapsed() ? 'menu' : 'chevron-left'" [size]="18" class="text-white/70"></lucide-icon>
+      </button>
     </div>
 
     <nav class="sidebar-nav">
-      @for (item of visibleNavItems; track item.route) {
-        <a
-          [routerLink]="item.route"
-          routerLinkActive="active"
-          class="nav-item"
-        >
-          <span class="nav-icon">{{ item.icon }}</span>
-          <span class="nav-label">{{ item.label }}</span>
-        </a>
+      @for (group of filteredGroups; track group.label) {
+        @if (!collapsed()) {
+          <div class="nav-group-label">{{ group.label }}</div>
+        }
+        @for (item of group.items; track item.route) {
+          <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label"
+             (click)="mobileMenuOpen.set(false)">
+            <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
+            @if (!collapsed()) { <span class="nav-label">{{ item.label }}</span> }
+          </a>
+        }
       }
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-info">
-        <span class="user-name">{{ authService.user()?.full_name }}</span>
-        <span class="user-role">{{ authService.user()?.roles?.[0]?.name || 'User' }}</span>
-      </div>
-      <button class="logout-btn" (click)="logout()">Logout</button>
+      <button class="nav-item w-full" (click)="theme.toggle()">
+        <lucide-icon [name]="theme.isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
+        @if (!collapsed()) { <span class="nav-label">{{ theme.isDark() ? 'Light Mode' : 'Dark Mode' }}</span> }
+      </button>
+      <button class="nav-item w-full text-red-400" (click)="logout()">
+        <lucide-icon name="log-out" [size]="18"></lucide-icon>
+        @if (!collapsed()) { <span class="nav-label">Logout</span> }
+      </button>
     </div>
   </aside>
 
+  <!-- Mobile Overlay Menu -->
+  @if (mobileMenuOpen()) {
+    <div class="mobile-overlay" (click)="mobileMenuOpen.set(false)">
+      <aside class="mobile-menu cx-animate-in" (click)="$event.stopPropagation()">
+        <div class="flex items-center justify-between p-4 border-b border-[var(--cx-border)]">
+          <span class="text-lg font-bold text-[var(--cx-primary)]">CreditX</span>
+          <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="mobileMenuOpen.set(false)">
+            <lucide-icon name="x" [size]="20"></lucide-icon>
+          </button>
+        </div>
+        <div class="p-2 overflow-y-auto flex-1">
+          @for (group of filteredGroups; track group.label) {
+            <div class="text-xs font-medium text-[var(--cx-text-muted)] px-3 pt-3 pb-1 uppercase tracking-wider">{{ group.label }}</div>
+            @for (item of group.items; track item.route) {
+              <a [routerLink]="item.route" routerLinkActive="active" class="mobile-nav-item"
+                 (click)="mobileMenuOpen.set(false)">
+                <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
+                {{ item.label }}
+              </a>
+            }
+          }
+        </div>
+        <div class="p-4 border-t border-[var(--cx-border)]">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-8 h-8 rounded-full bg-[var(--cx-primary)] flex items-center justify-center text-white font-medium text-sm">
+              {{ auth.user()?.first_name?.[0] }}{{ auth.user()?.last_name?.[0] }}
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium truncate">{{ auth.user()?.full_name }}</div>
+              <div class="text-xs text-[var(--cx-text-muted)] truncate">{{ auth.user()?.email }}</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="cx-btn cx-btn-outline cx-btn-sm flex-1" (click)="theme.toggle(); mobileMenuOpen.set(false)">
+              <lucide-icon [name]="theme.isDark() ? 'sun' : 'moon'" [size]="14"></lucide-icon>
+              {{ theme.isDark() ? 'Light' : 'Dark' }}
+            </button>
+            <button class="cx-btn cx-btn-danger cx-btn-sm flex-1" (click)="logout()">
+              <lucide-icon name="log-out" [size]="14"></lucide-icon>
+              Logout
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  }
+
   <!-- Main Content -->
-  <main class="main-content">
-    <header class="top-bar">
-      <button class="mobile-toggle" (click)="toggleSidebar()">☰</button>
-      <div class="top-bar-right">
-        <span class="welcome">Welcome, {{ authService.user()?.first_name }}</span>
+  <main class="cx-main">
+    <!-- Topbar -->
+    <header class="cx-topbar">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-[var(--cx-text-secondary)]">Welcome, <strong class="text-[var(--cx-text)]">{{ auth.user()?.first_name }}</strong></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="cx-btn cx-btn-ghost cx-btn-icon hidden sm:flex" (click)="theme.toggle()">
+          <lucide-icon [name]="theme.isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
+        </button>
+        <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-[var(--cx-border)]">
+          <div class="w-8 h-8 rounded-full bg-[var(--cx-primary)] flex items-center justify-center text-white font-medium text-xs">
+            {{ auth.user()?.first_name?.[0] }}{{ auth.user()?.last_name?.[0] }}
+          </div>
+          <div class="text-sm">
+            <div class="font-medium text-[var(--cx-text)] leading-tight">{{ auth.user()?.full_name }}</div>
+            <div class="text-xs text-[var(--cx-text-muted)]">{{ auth.user()?.roles?.[0]?.name }}</div>
+          </div>
+        </div>
       </div>
     </header>
 
-    <div class="content-area">
+    <!-- Page Content -->
+    <div class="cx-content">
       <router-outlet />
     </div>
   </main>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="cx-bottom-nav">
+    @for (item of filteredMobileNav; track item.label) {
+      @if (item.route) {
+        <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{exact: item.route === '/dashboard'}"
+           class="bottom-nav-item">
+          <lucide-icon [name]="item.icon" [size]="20"></lucide-icon>
+          <span>{{ item.label }}</span>
+        </a>
+      } @else {
+        <button class="bottom-nav-item" (click)="onMobileNavClick(item)">
+          <lucide-icon [name]="item.icon" [size]="20"></lucide-icon>
+          <span>{{ item.label }}</span>
+        </button>
+      }
+    }
+  </nav>
 </div>

@@ -1,52 +1,54 @@
-<div class="login-container">
-  <div class="login-card">
-    <div class="login-header">
-      <h1>CreditX</h1>
-      <p>Loan Management System</p>
-    </div>
-
-    @if (error()) {
-      <div class="alert alert-error">{{ error() }}</div>
-    }
-
-    <form (ngSubmit)="onSubmit()" class="login-form">
-      <div class="form-group">
-        <label for="email">Email Address</label>
-        <input
-          id="email"
-          type="email"
-          [(ngModel)]="email"
-          name="email"
-          placeholder="admin@creditx.com"
-          [disabled]="loading()"
-          autocomplete="email"
-        />
+<div class="min-h-screen flex items-center justify-center bg-[var(--cx-bg)] p-4">
+  <div class="w-full max-w-md">
+    <div class="cx-card !p-8">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold">
+          <span class="text-[var(--cx-primary)]">Credit</span><span class="text-[var(--cx-accent)]">X</span>
+        </h1>
+        <p class="text-sm text-[var(--cx-text-muted)] mt-1">Loan Management System</p>
       </div>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          [(ngModel)]="password"
-          name="password"
-          placeholder="Enter your password"
-          [disabled]="loading()"
-          autocomplete="current-password"
-        />
-      </div>
+      @if (error()) {
+        <div class="mb-4 p-3 rounded-lg bg-[var(--cx-danger-light)] text-[var(--cx-danger)] text-sm">
+          {{ error() }}
+        </div>
+      }
 
-      <button type="submit" class="btn-primary" [disabled]="loading()">
-        @if (loading()) {
-          <span class="spinner"></span> Signing in...
-        } @else {
-          Sign In
-        }
-      </button>
-    </form>
+      <form (ngSubmit)="onSubmit()" class="space-y-5">
+        <div>
+          <label class="cx-label" for="email">Email Address</label>
+          <input id="email" type="email" class="cx-input" [(ngModel)]="email" name="email"
+                 placeholder="admin@creditx.com" [disabled]="loading()" autocomplete="email" />
+        </div>
 
-    <div class="login-footer">
-      <p>&copy; {{ currentYear }} Kodek Innovations Limited</p>
+        <div>
+          <label class="cx-label" for="password">Password</label>
+          <div class="relative">
+            <input id="password" [type]="showPassword() ? 'text' : 'password'" class="cx-input !pr-10"
+                   [(ngModel)]="password" name="password" placeholder="Enter password"
+                   [disabled]="loading()" autocomplete="current-password" />
+            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]"
+                    (click)="showPassword.set(!showPassword())">
+              <lucide-icon [name]="showPassword() ? 'eye-off' : 'eye'" [size]="16"></lucide-icon>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="cx-btn cx-btn-primary cx-btn-lg w-full" [disabled]="loading()">
+          @if (loading()) {
+            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Signing in...
+          } @else {
+            <lucide-icon name="log-in" [size]="18"></lucide-icon>
+            Sign In
+          }
+        </button>
+      </form>
     </div>
+
+    <p class="text-center text-xs text-[var(--cx-text-muted)] mt-6">
+      &copy; {{ currentYear }} Kodek Innovations Limited
+    </p>
   </div>
 </div>

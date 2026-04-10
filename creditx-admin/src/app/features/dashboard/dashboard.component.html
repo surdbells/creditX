@@ -1,39 +1,94 @@
-<div class="dashboard">
-  <h1>Dashboard</h1>
-  <p>Welcome to CreditX v2.0, {{ authService.user()?.first_name }}.</p>
+<div class="cx-animate-in">
+  <div class="mb-6">
+    <h1 class="text-xl font-semibold text-[var(--cx-text)]">Dashboard</h1>
+    <p class="text-sm text-[var(--cx-text-muted)]">Welcome back, {{ auth.user()?.first_name }}. Here's your loan portfolio overview.</p>
+  </div>
 
-  <div class="cards">
-    <div class="card">
-      <div class="card-icon">📋</div>
-      <div class="card-content">
-        <h3>Loan Applications</h3>
-        <p class="card-value">—</p>
-        <p class="card-label">Phase 3 module</p>
-      </div>
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <cx-stat-card
+      label="Active Loans"
+      [value]="loading() ? '—' : (getStatusCount('active') + getStatusCount('overdue'))"
+      icon="file-text"
+      iconBg="var(--cx-primary-50)" iconColor="var(--cx-primary)"
+    ></cx-stat-card>
+    <cx-stat-card
+      label="Total Disbursed"
+      [value]="loading() ? '—' : '₦' + (portfolio?.total_disbursed || '0.00')"
+      icon="banknote"
+      iconBg="var(--cx-success-light)" iconColor="var(--cx-success)"
+    ></cx-stat-card>
+    <cx-stat-card
+      label="Total Collected"
+      [value]="loading() ? '—' : '₦' + (portfolio?.total_collected || '0.00')"
+      icon="credit-card"
+      iconBg="var(--cx-info-light)" iconColor="var(--cx-info)"
+    ></cx-stat-card>
+    <cx-stat-card
+      label="Collection Rate"
+      [value]="loading() ? '—' : (portfolio?.collection_rate || 0) + '%'"
+      icon="trending-up"
+      iconBg="var(--cx-accent-50)" iconColor="var(--cx-accent)"
+    ></cx-stat-card>
+  </div>
+
+  <!-- Status Breakdown + Recent Loans -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <!-- Status Breakdown -->
+    <div class="cx-card">
+      <h2 class="text-sm font-semibold text-[var(--cx-text)] mb-4">Loan Status Breakdown</h2>
+      @if (loading()) {
+        <div class="flex items-center justify-center py-8">
+          <div class="w-5 h-5 border-2 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      } @else if (portfolio?.status_breakdown?.length) {
+        <div class="space-y-3">
+          @for (item of portfolio.status_breakdown; track item.status) {
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <cx-status-badge [status]="item.status"></cx-status-badge>
+              </div>
+              <span class="text-sm font-medium text-[var(--cx-text)]">{{ item.count }}</span>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="text-sm text-[var(--cx-text-muted)] text-center py-4">No loan data yet</p>
+      }
     </div>
-    <div class="card">
-      <div class="card-icon">💰</div>
-      <div class="card-content">
-        <h3>Disbursements</h3>
-        <p class="card-value">—</p>
-        <p class="card-label">Phase 5 module</p>
+
+    <!-- Recent Loans -->
+    <div class="cx-card lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-[var(--cx-text)]">Recent Loan Applications</h2>
+        <a routerLink="/loans" class="text-xs text-[var(--cx-primary)] font-medium hover:underline">View All</a>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-icon">📈</div>
-      <div class="card-content">
-        <h3>Collections</h3>
-        <p class="card-value">—</p>
-        <p class="card-label">Phase 6 module</p>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-icon">👥</div>
-      <div class="card-content">
-        <h3>Active Users</h3>
-        <p class="card-value">—</p>
-        <p class="card-label">System users</p>
-      </div>
+      @if (recentLoans.length) {
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-[var(--cx-text-muted)] border-b border-[var(--cx-border)]">
+                <th class="pb-2 font-medium">App ID</th>
+                <th class="pb-2 font-medium">Customer</th>
+                <th class="pb-2 font-medium">Amount</th>
+                <th class="pb-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (loan of recentLoans; track loan.id) {
+                <tr class="border-b border-[var(--cx-border)] last:border-0">
+                  <td class="py-2.5 font-mono text-xs">{{ loan.application_id }}</td>
+                  <td class="py-2.5">{{ loan.customer_name }}</td>
+                  <td class="py-2.5">₦{{ loan.amount_requested | number:'1.2-2' }}</td>
+                  <td class="py-2.5"><cx-status-badge [status]="loan.status"></cx-status-badge></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="text-sm text-[var(--cx-text-muted)] text-center py-8">No loan applications yet</p>
+      }
     </div>
   </div>
 </div>
