@@ -22,6 +22,8 @@ use App\Action\Disbursement;
 use App\Action\MakerChecker;
 use App\Action\Payment;
 use App\Action\Penalty;
+use App\Action\Notification;
+use App\Action\Messaging;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -299,6 +301,38 @@ return function (App $app): void {
             ->add(new RbacMiddleware('loans.write_off'));
         $api->post('/loans/{id}/restructure', Loan\RestructureLoanAction::class)
             ->add(new RbacMiddleware('loans.restructure'));
+
+        // ─── Notification Templates ───
+        $api->group('/notification-templates', function (RouteCollectorProxy $group) {
+            $group->get('', Notification\ListTemplatesAction::class)
+                ->add(new RbacMiddleware('notifications.manage'));
+            $group->post('', Notification\CreateTemplateAction::class)
+                ->add(new RbacMiddleware('notifications.manage'));
+            $group->put('/{id}', Notification\UpdateTemplateAction::class)
+                ->add(new RbacMiddleware('notifications.manage'));
+        });
+
+        // ─── User Notifications (in-app) ───
+        $api->group('/notifications', function (RouteCollectorProxy $group) {
+            $group->get('', Notification\UserNotificationsAction::class)
+                ->add(new RbacMiddleware('notifications.view'));
+            $group->post('/mark-read', Notification\MarkNotificationsReadAction::class)
+                ->add(new RbacMiddleware('notifications.view'));
+        });
+
+        // ─── Messaging (Agent ↔ Backoffice) ───
+        $api->group('/conversations', function (RouteCollectorProxy $group) {
+            $group->get('', Messaging\ListConversationsAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
+            $group->post('', Messaging\CreateConversationAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+            $group->get('/{id}', Messaging\GetConversationAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
+            $group->post('/{id}/messages', Messaging\SendMessageAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+            $group->post('/{id}/resolve', Messaging\ResolveConversationAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+        });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
 };

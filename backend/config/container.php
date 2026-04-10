@@ -9,6 +9,7 @@ use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\LoanLifecycleService;
+use App\Infrastructure\Service\NotificationDispatchService;
 use App\Infrastructure\Service\OverdueService;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
@@ -35,6 +36,9 @@ use App\Domain\Repository\MakerCheckerRepository;
 use App\Domain\Repository\PaymentRepository;
 use App\Domain\Repository\PenaltyRuleRepository;
 use App\Domain\Repository\BulkUploadRepository;
+use App\Domain\Repository\ConversationRepository;
+use App\Domain\Repository\NotificationRepository;
+use App\Domain\Repository\NotificationTemplateRepository;
 use App\Domain\Repository\PermissionRepository;
 use App\Domain\Repository\RecordTypeRepository;
 use App\Domain\Repository\RepaymentScheduleRepository;
@@ -167,6 +171,15 @@ return [
     BulkUploadRepository::class => function (ContainerInterface $c): BulkUploadRepository {
         return new BulkUploadRepository($c->get(EntityManagerInterface::class));
     },
+    NotificationTemplateRepository::class => function (ContainerInterface $c): NotificationTemplateRepository {
+        return new NotificationTemplateRepository($c->get(EntityManagerInterface::class));
+    },
+    NotificationRepository::class => function (ContainerInterface $c): NotificationRepository {
+        return new NotificationRepository($c->get(EntityManagerInterface::class));
+    },
+    ConversationRepository::class => function (ContainerInterface $c): ConversationRepository {
+        return new ConversationRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -239,6 +252,15 @@ return [
             $c->get(CustomerLedgerRepository::class),
             $c->get(RepaymentScheduleRepository::class),
             $c->get(LoanCalculationService::class)
+        );
+    },
+    NotificationDispatchService::class => function (ContainerInterface $c): NotificationDispatchService {
+        return new NotificationDispatchService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(NotificationTemplateRepository::class),
+            $c->get(NotificationRepository::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(\Psr\Log\LoggerInterface::class)
         );
     },
 ];
