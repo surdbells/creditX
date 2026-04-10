@@ -11,6 +11,9 @@ use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\LoanLifecycleService;
 use App\Infrastructure\Service\NotificationDispatchService;
 use App\Infrastructure\Service\OverdueService;
+use App\Infrastructure\Service\ReportingService;
+use App\Infrastructure\Service\ReconciliationService;
+use App\Infrastructure\Service\ExportService;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
@@ -39,6 +42,7 @@ use App\Domain\Repository\BulkUploadRepository;
 use App\Domain\Repository\ConversationRepository;
 use App\Domain\Repository\NotificationRepository;
 use App\Domain\Repository\NotificationTemplateRepository;
+use App\Domain\Repository\ReconciliationRepository;
 use App\Domain\Repository\PermissionRepository;
 use App\Domain\Repository\RecordTypeRepository;
 use App\Domain\Repository\RepaymentScheduleRepository;
@@ -180,6 +184,9 @@ return [
     ConversationRepository::class => function (ContainerInterface $c): ConversationRepository {
         return new ConversationRepository($c->get(EntityManagerInterface::class));
     },
+    ReconciliationRepository::class => function (ContainerInterface $c): ReconciliationRepository {
+        return new ReconciliationRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -262,5 +269,18 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(\Psr\Log\LoggerInterface::class)
         );
+    },
+    ReportingService::class => function (ContainerInterface $c): ReportingService {
+        return new ReportingService($c->get(EntityManagerInterface::class));
+    },
+    ReconciliationService::class => function (ContainerInterface $c): ReconciliationService {
+        return new ReconciliationService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(ReconciliationRepository::class),
+            $c->get(LedgerTransactionRepository::class)
+        );
+    },
+    ExportService::class => function (ContainerInterface $c): ExportService {
+        return new ExportService();
     },
 ];

@@ -24,6 +24,8 @@ use App\Action\Payment;
 use App\Action\Penalty;
 use App\Action\Notification;
 use App\Action\Messaging;
+use App\Action\Report;
+use App\Action\Reconciliation;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -332,6 +334,42 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('messaging.send'));
             $group->post('/{id}/resolve', Messaging\ResolveConversationAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
+        });
+
+        // ─── Reports ───
+        $api->group('/reports', function (RouteCollectorProxy $group) {
+            $group->get('/portfolio', Report\PortfolioDashboardAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
+            $group->get('/par', Report\ParReportAction::class)
+                ->add(new RbacMiddleware('reports.par'));
+            $group->get('/agent-performance', Report\AgentPerformanceAction::class)
+                ->add(new RbacMiddleware('reports.performance'));
+            $group->get('/branch-performance', Report\BranchPerformanceAction::class)
+                ->add(new RbacMiddleware('reports.performance'));
+            $group->get('/product-performance', Report\ProductPerformanceAction::class)
+                ->add(new RbacMiddleware('reports.performance'));
+            $group->get('/receivables', Report\ReceivablesReportAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
+            $group->get('/closed-loans', Report\ClosedLoansReportAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
+            $group->get('/cbn/portfolio', Report\CbnPortfolioReportAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/cbn/npl', Report\CbnNplReportAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/cbn/aging', Report\CbnAgingReportAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+        });
+
+        // ─── Reconciliation ───
+        $api->group('/reconciliations', function (RouteCollectorProxy $group) {
+            $group->get('', Reconciliation\ListReconciliationsAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
+            $group->post('', Reconciliation\RunReconciliationAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
+            $group->get('/{id}', Reconciliation\GetReconciliationAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
+            $group->post('/{id}/resolve', Reconciliation\ResolveReconciliationAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
