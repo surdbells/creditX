@@ -8,6 +8,10 @@ use App\Infrastructure\Service\ApprovalEngineService;
 use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
+use App\Infrastructure\Service\LoanLifecycleService;
+use App\Infrastructure\Service\OverdueService;
+use App\Infrastructure\Service\RepaymentService;
+use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
 use App\Infrastructure\Service\EligibilityService;
 use App\Infrastructure\Service\JwtService;
@@ -28,6 +32,9 @@ use App\Domain\Repository\LocationRepository;
 use App\Domain\Repository\LoanProductRepository;
 use App\Domain\Repository\LoanRepository;
 use App\Domain\Repository\MakerCheckerRepository;
+use App\Domain\Repository\PaymentRepository;
+use App\Domain\Repository\PenaltyRuleRepository;
+use App\Domain\Repository\BulkUploadRepository;
 use App\Domain\Repository\PermissionRepository;
 use App\Domain\Repository\RecordTypeRepository;
 use App\Domain\Repository\RepaymentScheduleRepository;
@@ -151,6 +158,15 @@ return [
     MakerCheckerRepository::class => function (ContainerInterface $c): MakerCheckerRepository {
         return new MakerCheckerRepository($c->get(EntityManagerInterface::class));
     },
+    PaymentRepository::class => function (ContainerInterface $c): PaymentRepository {
+        return new PaymentRepository($c->get(EntityManagerInterface::class));
+    },
+    PenaltyRuleRepository::class => function (ContainerInterface $c): PenaltyRuleRepository {
+        return new PenaltyRuleRepository($c->get(EntityManagerInterface::class));
+    },
+    BulkUploadRepository::class => function (ContainerInterface $c): BulkUploadRepository {
+        return new BulkUploadRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -186,6 +202,43 @@ return [
             $c->get(CustomerLedgerRepository::class),
             $c->get(LoanCalculationService::class),
             $c->get(SettingsCacheService::class)
+        );
+    },
+    RepaymentService::class => function (ContainerInterface $c): RepaymentService {
+        return new RepaymentService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(RepaymentScheduleRepository::class),
+            $c->get(SettingsCacheService::class)
+        );
+    },
+    BulkRepaymentService::class => function (ContainerInterface $c): BulkRepaymentService {
+        return new BulkRepaymentService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(BulkUploadRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(LoanRepository::class),
+            $c->get(RepaymentService::class)
+        );
+    },
+    OverdueService::class => function (ContainerInterface $c): OverdueService {
+        return new OverdueService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(RepaymentScheduleRepository::class),
+            $c->get(PenaltyRuleRepository::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(SettingsCacheService::class)
+        );
+    },
+    LoanLifecycleService::class => function (ContainerInterface $c): LoanLifecycleService {
+        return new LoanLifecycleService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(RepaymentScheduleRepository::class),
+            $c->get(LoanCalculationService::class)
         );
     },
 ];

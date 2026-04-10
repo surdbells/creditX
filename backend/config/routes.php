@@ -20,6 +20,8 @@ use App\Action\ApprovalWorkflow;
 use App\Action\Accounting;
 use App\Action\Disbursement;
 use App\Action\MakerChecker;
+use App\Action\Payment;
+use App\Action\Penalty;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -44,6 +46,9 @@ return function (App $app): void {
         $group->post('/login', Auth\LoginAction::class);
         $group->post('/refresh', Auth\RefreshTokenAction::class);
     });
+
+    // ─── Paystack Webhook (public, signature-verified) ───
+    $app->post('/api/payments/webhook/paystack', Payment\PaystackWebhookAction::class);
 
     // ─── Authenticated routes ───
     $app->group('/api', function (RouteCollectorProxy $api) {
@@ -268,6 +273,32 @@ return function (App $app): void {
             $group->post('/{id}/decide', MakerChecker\DecideMcAction::class)
                 ->add(new RbacMiddleware('maker_checker.check'));
         });
+
+        // ─── Payments ───
+        $api->group('/payments', function (RouteCollectorProxy $group) {
+            $group->get('', Payment\ListPaymentsAction::class)
+                ->add(new RbacMiddleware('payments.view'));
+            $group->post('/repayment', Payment\PostRepaymentAction::class)
+                ->add(new RbacMiddleware('payments.create'));
+            $group->post('/bulk-upload', Payment\BulkRepaymentAction::class)
+                ->add(new RbacMiddleware('payments.bulk_upload'));
+        });
+
+        // ─── Penalty Rules ───
+        $api->group('/penalty-rules', function (RouteCollectorProxy $group) {
+            $group->get('', Penalty\ListPenaltyRulesAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->post('', Penalty\CreatePenaltyRuleAction::class)
+                ->add(new RbacMiddleware('products.create'));
+            $group->put('/{id}', Penalty\UpdatePenaltyRuleAction::class)
+                ->add(new RbacMiddleware('products.edit'));
+        });
+
+        // ─── Loan Lifecycle (write-off, restructure) ───
+        $api->post('/loans/{id}/write-off', Loan\WriteOffLoanAction::class)
+            ->add(new RbacMiddleware('loans.write_off'));
+        $api->post('/loans/{id}/restructure', Loan\RestructureLoanAction::class)
+            ->add(new RbacMiddleware('loans.restructure'));
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
 };
