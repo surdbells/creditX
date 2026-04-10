@@ -17,6 +17,9 @@ use App\Action\LoanProduct;
 use App\Action\Loan;
 use App\Action\Approval;
 use App\Action\ApprovalWorkflow;
+use App\Action\Accounting;
+use App\Action\Disbursement;
+use App\Action\MakerChecker;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -228,6 +231,42 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('loans.view'));
             $group->post('/loan/{id}/decide', Approval\DecideApprovalAction::class)
                 ->add(new RbacMiddleware('loans.approve'));
+        });
+
+        // ─── GL Accounts (Chart of Accounts) ───
+        $api->group('/gl-accounts', function (RouteCollectorProxy $group) {
+            $group->get('', Accounting\ListGlAccountsAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->post('', Accounting\CreateGlAccountAction::class)
+                ->add(new RbacMiddleware('accounting.create'));
+            $group->get('/{id}', Accounting\GetGlAccountAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->put('/{id}', Accounting\UpdateGlAccountAction::class)
+                ->add(new RbacMiddleware('accounting.edit'));
+            $group->get('/{id}/transactions', Accounting\GlTransactionsAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->get('/{id}/summary', Accounting\GlSummaryAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+        });
+
+        // ─── Customer Ledgers ───
+        $api->get('/customer-ledgers/{id}/transactions', Accounting\CustomerLedgerTransactionsAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+
+        // ─── Repayment Schedule ───
+        $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
+            ->add(new RbacMiddleware('loans.view'));
+
+        // ─── Disbursement ───
+        $api->post('/loans/{id}/disburse', Disbursement\DisburseLoanAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
+
+        // ─── Maker-Checker ───
+        $api->group('/maker-checker', function (RouteCollectorProxy $group) {
+            $group->get('', MakerChecker\ListMcRequestsAction::class)
+                ->add(new RbacMiddleware('maker_checker.check'));
+            $group->post('/{id}/decide', MakerChecker\DecideMcAction::class)
+                ->add(new RbacMiddleware('maker_checker.check'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));

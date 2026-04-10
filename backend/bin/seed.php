@@ -389,3 +389,45 @@ $em->flush();
 echo "  Created {$ftCount} fee types\n";
 
 echo "\n=== All seeding complete ===\n";
+
+// ─── 8. Default GL Accounts (Chart of Accounts) ───
+echo "[8/8] Seeding chart of accounts...\n";
+
+use App\Domain\Entity\GeneralLedger;
+use App\Domain\Enum\AccountType;
+use App\Domain\Enum\LedgerType;
+
+$glDef = [
+    ['Loan Receivable', '1001', 'LR', AccountType::ASSET, LedgerType::GENERAL, 'Total loan portfolio receivable'],
+    ['Customer Balance', '1002', 'CUBGL', AccountType::ASSET, LedgerType::CUSTOMER, 'Customer loan balance accounts'],
+    ['Bank/Cash', '1003', 'BANK', AccountType::ASSET, LedgerType::GENERAL, 'Bank and cash accounts'],
+    ['Insurance Income', '4001', 'IA', AccountType::INCOME, LedgerType::GENERAL, 'Insurance fee income'],
+    ['Admin Fee Income', '4002', 'AA', AccountType::INCOME, LedgerType::GENERAL, 'Administrative fee income'],
+    ['Management Fee Income', '4003', 'MFA', AccountType::INCOME, LedgerType::GENERAL, 'Management fee income'],
+    ['Bank Statement Fee Income', '4004', 'BSA', AccountType::INCOME, LedgerType::GENERAL, 'Bank statement fee income'],
+    ['Interest Income', '4005', 'II', AccountType::INCOME, LedgerType::GENERAL, 'Loan interest income'],
+    ['Penalty Income', '4006', 'PI', AccountType::INCOME, LedgerType::GENERAL, 'Late payment penalty income'],
+    ['Top-Up Balance', '2001', 'TUGL', AccountType::LIABILITY, LedgerType::GENERAL, 'Previous loan balance carried forward'],
+    ['Bad Debt Expense', '5001', 'BDE', AccountType::EXPENSE, LedgerType::GENERAL, 'Written-off loan expense'],
+    ['Processing Fee Income', '4007', 'PFI', AccountType::INCOME, LedgerType::GENERAL, 'Processing fee income'],
+    ['Settlement Account', '1004', 'SETTLE', AccountType::ASSET, LedgerType::GENERAL, 'Loan settlement disbursement account'],
+];
+
+$glCount = 0;
+foreach ($glDef as [$name, $number, $code, $type, $ledgerType, $desc]) {
+    $existing = $em->getRepository(GeneralLedger::class)->findOneBy(['accountCode' => $code]);
+    if ($existing !== null) continue;
+    $gl = new GeneralLedger();
+    $gl->setAccountName($name);
+    $gl->setAccountNumber($number);
+    $gl->setAccountCode($code);
+    $gl->setAccountType($type);
+    $gl->setLedgerType($ledgerType);
+    $gl->setDescription($desc);
+    $em->persist($gl);
+    $glCount++;
+}
+$em->flush();
+echo "  Created {$glCount} GL accounts\n";
+
+echo "\n=== All seeding complete (Phases 1-5) ===\n";

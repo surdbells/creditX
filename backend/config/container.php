@@ -7,6 +7,7 @@ use App\Infrastructure\Persistence\DoctrineEntityManagerFactory;
 use App\Infrastructure\Service\ApprovalEngineService;
 use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BulkImportService;
+use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\DocumentService;
 use App\Infrastructure\Service\EligibilityService;
 use App\Infrastructure\Service\JwtService;
@@ -17,14 +18,19 @@ use App\Domain\Repository\AuditLogRepository;
 use App\Domain\Repository\ApprovalWorkflowRepository;
 use App\Domain\Repository\LoanApprovalRepository;
 use App\Domain\Repository\CustomerRepository;
+use App\Domain\Repository\CustomerLedgerRepository;
 use App\Domain\Repository\DocumentRepository;
 use App\Domain\Repository\FeeTypeRepository;
+use App\Domain\Repository\GeneralLedgerRepository;
 use App\Domain\Repository\GovernmentRecordRepository;
+use App\Domain\Repository\LedgerTransactionRepository;
 use App\Domain\Repository\LocationRepository;
 use App\Domain\Repository\LoanProductRepository;
 use App\Domain\Repository\LoanRepository;
+use App\Domain\Repository\MakerCheckerRepository;
 use App\Domain\Repository\PermissionRepository;
 use App\Domain\Repository\RecordTypeRepository;
+use App\Domain\Repository\RepaymentScheduleRepository;
 use App\Domain\Repository\RoleRepository;
 use App\Domain\Repository\SystemSettingRepository;
 use App\Domain\Repository\UserRepository;
@@ -130,6 +136,21 @@ return [
     LoanApprovalRepository::class => function (ContainerInterface $c): LoanApprovalRepository {
         return new LoanApprovalRepository($c->get(EntityManagerInterface::class));
     },
+    GeneralLedgerRepository::class => function (ContainerInterface $c): GeneralLedgerRepository {
+        return new GeneralLedgerRepository($c->get(EntityManagerInterface::class));
+    },
+    CustomerLedgerRepository::class => function (ContainerInterface $c): CustomerLedgerRepository {
+        return new CustomerLedgerRepository($c->get(EntityManagerInterface::class));
+    },
+    LedgerTransactionRepository::class => function (ContainerInterface $c): LedgerTransactionRepository {
+        return new LedgerTransactionRepository($c->get(EntityManagerInterface::class));
+    },
+    RepaymentScheduleRepository::class => function (ContainerInterface $c): RepaymentScheduleRepository {
+        return new RepaymentScheduleRepository($c->get(EntityManagerInterface::class));
+    },
+    MakerCheckerRepository::class => function (ContainerInterface $c): MakerCheckerRepository {
+        return new MakerCheckerRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -155,6 +176,15 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(ApprovalWorkflowRepository::class),
             $c->get(LoanApprovalRepository::class),
+            $c->get(SettingsCacheService::class)
+        );
+    },
+    DisbursementService::class => function (ContainerInterface $c): DisbursementService {
+        return new DisbursementService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(LoanCalculationService::class),
             $c->get(SettingsCacheService::class)
         );
     },
