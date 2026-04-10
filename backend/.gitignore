@@ -1,0 +1,8 @@
+/vendor/
+.env
+/var/
+/storage/uploads/*
+!/storage/uploads/.gitkeep
+/storage/exports/*
+!/storage/exports/.gitkeep
+composer.lock

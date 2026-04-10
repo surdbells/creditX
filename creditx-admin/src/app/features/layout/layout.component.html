@@ -1,0 +1,44 @@
+<div class="layout" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>CreditX</h2>
+      <button class="toggle-btn" (click)="toggleSidebar()">☰</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      @for (item of visibleNavItems; track item.route) {
+        <a
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          class="nav-item"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <span class="user-name">{{ authService.user()?.full_name }}</span>
+        <span class="user-role">{{ authService.user()?.roles?.[0]?.name || 'User' }}</span>
+      </div>
+      <button class="logout-btn" (click)="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header class="top-bar">
+      <button class="mobile-toggle" (click)="toggleSidebar()">☰</button>
+      <div class="top-bar-right">
+        <span class="welcome">Welcome, {{ authService.user()?.first_name }}</span>
+      </div>
+    </header>
+
+    <div class="content-area">
+      <router-outlet />
+    </div>
+  </main>
+</div>

@@ -1,0 +1,129 @@
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0A4F2A 0%, #0d6b3a 50%, #C9A227 100%);
+  padding: 1rem;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0A4F2A;
+    margin: 0 0 0.25rem;
+  }
+
+  p {
+    color: #666;
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.alert-error {
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c00;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+
+  label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #333;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: #0A4F2A;
+      box-shadow: 0 0 0 3px rgba(10, 79, 42, 0.1);
+    }
+
+    &:disabled {
+      background: #f5f5f5;
+    }
+  }
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.85rem;
+  background: #0A4F2A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover:not(:disabled) {
+    background: #0d6b3a;
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+
+  p {
+    color: #999;
+    font-size: 0.8rem;
+    margin: 0;
+  }
+}

@@ -1,0 +1,52 @@
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <h1>CreditX</h1>
+      <p>Loan Management System</p>
+    </div>
+
+    @if (error()) {
+      <div class="alert alert-error">{{ error() }}</div>
+    }
+
+    <form (ngSubmit)="onSubmit()" class="login-form">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input
+          id="email"
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          placeholder="admin@creditx.com"
+          [disabled]="loading()"
+          autocomplete="email"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          placeholder="Enter your password"
+          [disabled]="loading()"
+          autocomplete="current-password"
+        />
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span> Signing in...
+        } @else {
+          Sign In
+        }
+      </button>
+    </form>
+
+    <div class="login-footer">
+      <p>&copy; {{ currentYear }} Kodek Innovations Limited</p>
+    </div>
+  </div>
+</div>

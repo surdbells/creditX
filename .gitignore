@@ -1,0 +1,12 @@
+# ─── IDE ───
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── OS ───
+.DS_Store
+*.log

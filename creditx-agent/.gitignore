@@ -1,0 +1,9 @@
+/node_modules/
+/dist/
+/.angular/
+/www/
+/android/
+/ios/
+.env
+*.local
+creditx-agent/package-lock.json
