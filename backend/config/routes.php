@@ -15,6 +15,8 @@ use App\Action\Document;
 use App\Action\FeeType;
 use App\Action\LoanProduct;
 use App\Action\Loan;
+use App\Action\Approval;
+use App\Action\ApprovalWorkflow;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -202,6 +204,30 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('loans.create'));
             $group->post('/{id}/cancel', Loan\CancelLoanAction::class)
                 ->add(new RbacMiddleware('loans.edit'));
+        });
+
+        // ─── Approval Workflows ───
+        $api->group('/approval-workflows', function (RouteCollectorProxy $group) {
+            $group->get('', ApprovalWorkflow\ListWorkflowsAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->post('', ApprovalWorkflow\CreateWorkflowAction::class)
+                ->add(new RbacMiddleware('products.create'));
+            $group->get('/{id}', ApprovalWorkflow\GetWorkflowAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->put('/{id}', ApprovalWorkflow\UpdateWorkflowAction::class)
+                ->add(new RbacMiddleware('products.edit'));
+            $group->delete('/{id}', ApprovalWorkflow\DeleteWorkflowAction::class)
+                ->add(new RbacMiddleware('products.delete'));
+        });
+
+        // ─── Approvals ───
+        $api->group('/approvals', function (RouteCollectorProxy $group) {
+            $group->get('/queue', Approval\ApprovalQueueAction::class)
+                ->add(new RbacMiddleware('loans.approve'));
+            $group->get('/loan/{id}', Approval\LoanApprovalsAction::class)
+                ->add(new RbacMiddleware('loans.view'));
+            $group->post('/loan/{id}/decide', Approval\DecideApprovalAction::class)
+                ->add(new RbacMiddleware('loans.approve'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));

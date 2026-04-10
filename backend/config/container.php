@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Infrastructure\Logger\AppLogger;
 use App\Infrastructure\Persistence\DoctrineEntityManagerFactory;
+use App\Infrastructure\Service\ApprovalEngineService;
 use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DocumentService;
@@ -13,6 +14,8 @@ use App\Infrastructure\Service\LoanCalculationService;
 use App\Infrastructure\Service\RedisService;
 use App\Infrastructure\Service\SettingsCacheService;
 use App\Domain\Repository\AuditLogRepository;
+use App\Domain\Repository\ApprovalWorkflowRepository;
+use App\Domain\Repository\LoanApprovalRepository;
 use App\Domain\Repository\CustomerRepository;
 use App\Domain\Repository\DocumentRepository;
 use App\Domain\Repository\FeeTypeRepository;
@@ -121,6 +124,12 @@ return [
     LoanRepository::class => function (ContainerInterface $c): LoanRepository {
         return new LoanRepository($c->get(EntityManagerInterface::class));
     },
+    ApprovalWorkflowRepository::class => function (ContainerInterface $c): ApprovalWorkflowRepository {
+        return new ApprovalWorkflowRepository($c->get(EntityManagerInterface::class));
+    },
+    LoanApprovalRepository::class => function (ContainerInterface $c): LoanApprovalRepository {
+        return new LoanApprovalRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -140,5 +149,13 @@ return [
     },
     LoanCalculationService::class => function (ContainerInterface $c): LoanCalculationService {
         return new LoanCalculationService();
+    },
+    ApprovalEngineService::class => function (ContainerInterface $c): ApprovalEngineService {
+        return new ApprovalEngineService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(ApprovalWorkflowRepository::class),
+            $c->get(LoanApprovalRepository::class),
+            $c->get(SettingsCacheService::class)
+        );
     },
 ];
