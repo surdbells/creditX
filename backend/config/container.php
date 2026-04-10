@@ -9,13 +9,17 @@ use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DocumentService;
 use App\Infrastructure\Service\EligibilityService;
 use App\Infrastructure\Service\JwtService;
+use App\Infrastructure\Service\LoanCalculationService;
 use App\Infrastructure\Service\RedisService;
 use App\Infrastructure\Service\SettingsCacheService;
 use App\Domain\Repository\AuditLogRepository;
 use App\Domain\Repository\CustomerRepository;
 use App\Domain\Repository\DocumentRepository;
+use App\Domain\Repository\FeeTypeRepository;
 use App\Domain\Repository\GovernmentRecordRepository;
 use App\Domain\Repository\LocationRepository;
+use App\Domain\Repository\LoanProductRepository;
+use App\Domain\Repository\LoanRepository;
 use App\Domain\Repository\PermissionRepository;
 use App\Domain\Repository\RecordTypeRepository;
 use App\Domain\Repository\RoleRepository;
@@ -108,6 +112,15 @@ return [
     DocumentRepository::class => function (ContainerInterface $c): DocumentRepository {
         return new DocumentRepository($c->get(EntityManagerInterface::class));
     },
+    FeeTypeRepository::class => function (ContainerInterface $c): FeeTypeRepository {
+        return new FeeTypeRepository($c->get(EntityManagerInterface::class));
+    },
+    LoanProductRepository::class => function (ContainerInterface $c): LoanProductRepository {
+        return new LoanProductRepository($c->get(EntityManagerInterface::class));
+    },
+    LoanRepository::class => function (ContainerInterface $c): LoanRepository {
+        return new LoanRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -124,5 +137,8 @@ return [
     },
     DocumentService::class => function (ContainerInterface $c): DocumentService {
         return new DocumentService($c->get(DocumentRepository::class));
+    },
+    LoanCalculationService::class => function (ContainerInterface $c): LoanCalculationService {
+        return new LoanCalculationService();
     },
 ];

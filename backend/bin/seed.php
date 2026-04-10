@@ -359,3 +359,33 @@ $em->flush();
 echo "  Created {$rtCount} record types\n";
 
 echo "\n=== Seeding complete (all phases) ===\n";
+
+// ─── 7. Fee Types ───
+echo "[7/7] Seeding fee types...\n";
+
+use App\Domain\Entity\FeeType;
+
+$feeTypesDef = [
+    ['Admin Fee', 'AF', 'Administrative processing fee', true],
+    ['Insurance Fee', 'IF', 'Loan insurance premium', true],
+    ['Management Fee', 'MF', 'Loan management fee', true],
+    ['Bank Statement Fee', 'BSF', 'Bank statement processing fee', true],
+    ['Processing Fee', 'PF', 'General processing fee', false],
+];
+
+$ftCount = 0;
+foreach ($feeTypesDef as [$name, $code, $desc, $isSystem]) {
+    $existing = $em->getRepository(FeeType::class)->findOneBy(['code' => $code]);
+    if ($existing !== null) continue;
+    $ft = new FeeType();
+    $ft->setName($name);
+    $ft->setCode($code);
+    $ft->setDescription($desc);
+    $ft->setIsSystem($isSystem);
+    $em->persist($ft);
+    $ftCount++;
+}
+$em->flush();
+echo "  Created {$ftCount} fee types\n";
+
+echo "\n=== All seeding complete ===\n";

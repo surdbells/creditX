@@ -12,6 +12,9 @@ use App\Action\RecordType;
 use App\Action\GovRecord;
 use App\Action\Customer;
 use App\Action\Document;
+use App\Action\FeeType;
+use App\Action\LoanProduct;
+use App\Action\Loan;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -159,6 +162,46 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('customers.edit'));
             $group->delete('/{id}', Document\DeleteDocumentAction::class)
                 ->add(new RbacMiddleware('customers.edit'));
+        });
+
+        // ─── Fee Types ───
+        $api->group('/fee-types', function (RouteCollectorProxy $group) {
+            $group->get('', FeeType\ListFeeTypesAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->post('', FeeType\CreateFeeTypeAction::class)
+                ->add(new RbacMiddleware('products.create'));
+            $group->put('/{id}', FeeType\UpdateFeeTypeAction::class)
+                ->add(new RbacMiddleware('products.edit'));
+        });
+
+        // ─── Loan Products ───
+        $api->group('/loan-products', function (RouteCollectorProxy $group) {
+            $group->get('', LoanProduct\ListProductsAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->post('', LoanProduct\CreateProductAction::class)
+                ->add(new RbacMiddleware('products.create'));
+            $group->post('/calculate', LoanProduct\CalculateAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->get('/{id}', LoanProduct\GetProductAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->put('/{id}', LoanProduct\UpdateProductAction::class)
+                ->add(new RbacMiddleware('products.edit'));
+        });
+
+        // ─── Loans ───
+        $api->group('/loans', function (RouteCollectorProxy $group) {
+            $group->get('', Loan\ListLoansAction::class)
+                ->add(new RbacMiddleware('loans.view'));
+            $group->post('', Loan\CreateLoanAction::class)
+                ->add(new RbacMiddleware('loans.create'));
+            $group->get('/{id}', Loan\GetLoanAction::class)
+                ->add(new RbacMiddleware('loans.view'));
+            $group->put('/{id}', Loan\UpdateLoanAction::class)
+                ->add(new RbacMiddleware('loans.edit'));
+            $group->post('/{id}/submit', Loan\SubmitLoanAction::class)
+                ->add(new RbacMiddleware('loans.create'));
+            $group->post('/{id}/cancel', Loan\CancelLoanAction::class)
+                ->add(new RbacMiddleware('loans.edit'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
