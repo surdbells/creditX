@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline } from 'ionicons/icons';
+import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
@@ -121,7 +121,42 @@ import { ApiService } from '../../core/services/api.service';
         }
 
         <!-- Step 5: Review & Submit -->
+        <!-- Step 5: Document Upload -->
         @if (step() === 4) {
+          <div class="space-y-4">
+            <h3 class="text-base font-semibold text-gray-800">Upload Documents</h3>
+            <p class="text-xs text-gray-500">Upload required documents (passport, ID, payslip, bank statement)</p>
+
+            @for (docType of docTypes; track docType.key) {
+              <div class="p-4 rounded-xl border border-gray-100 bg-white">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium text-gray-800">{{ docType.label }}</span>
+                  @if (getUploadedDoc(docType.key)) {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Uploaded</span>
+                  }
+                </div>
+                @if (getUploadedDoc(docType.key)) {
+                  <div class="text-xs text-gray-500">{{ getUploadedDoc(docType.key)?.name }}</div>
+                } @else {
+                  <div class="flex gap-2">
+                    <label class="flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-center cursor-pointer hover:border-[#0A4F2A]/30 transition-colors">
+                      <input type="file" class="hidden" [accept]="docType.accept" (change)="onFileSelected($event, docType.key)" />
+                      <ion-icon name="cloud-upload-outline" class="text-xl text-gray-400 block mx-auto"></ion-icon>
+                      <span class="text-xs text-gray-500 mt-1 block">Tap to select file</span>
+                    </label>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (uploadError()) {
+              <div class="p-3 rounded-xl bg-red-50 text-red-600 text-sm">{{ uploadError() }}</div>
+            }
+          </div>
+        }
+
+        <!-- Step 6: Review & Submit -->
+        @if (step() === 5) {
           <div class="space-y-4">
             <h3 class="text-base font-semibold text-gray-800">Review & Submit</h3>
             <div class="p-4 rounded-xl bg-white border border-gray-100 space-y-2 text-sm">
@@ -145,7 +180,7 @@ import { ApiService } from '../../core/services/api.service';
               <ion-icon name="chevron-back-outline"></ion-icon> Back
             </button>
           }
-          @if (step() < 4) {
+          @if (step() < 5) {
             <button class="flex-1 py-3 rounded-xl bg-[#0A4F2A] text-white font-medium text-sm disabled:opacity-50"
                     [disabled]="!canProceed()" (click)="step.set(step() + 1)">
               Next <ion-icon name="chevron-forward-outline"></ion-icon>
@@ -164,7 +199,7 @@ import { ApiService } from '../../core/services/api.service';
 })
 export class LoanCapturePage implements OnInit {
   step = signal(0);
-  stepLabels = ['Product', 'Staff', 'Details', 'Info', 'Review'];
+  stepLabels = ['Product', 'Staff', 'Details', 'Info', 'Docs', 'Review'];
 
   products = signal<any[]>([]);
   productsLoading = signal(true);
@@ -181,6 +216,15 @@ export class LoanCapturePage implements OnInit {
     home_address: '', bvn: '',
   };
 
+  uploadedDocs: Map<string, {name: string; file: File}> = new Map();
+  uploadError = signal<string|null>(null);
+  docTypes = [
+    { key: 'passport', label: 'Passport Photograph', accept: 'image/*' },
+    { key: 'id_card', label: 'ID Card (NIN/Voter/Driver)', accept: 'image/*,.pdf' },
+    { key: 'payslip', label: 'Recent Payslip', accept: 'image/*,.pdf' },
+    { key: 'bank_statement', label: 'Bank Statement', accept: '.pdf,image/*' },
+  ];
+
   personalFields = [
     { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '08012345678' },
     { key: 'email', label: 'Email', type: 'email', placeholder: 'customer@email.com' },
@@ -191,7 +235,7 @@ export class LoanCapturePage implements OnInit {
   ];
 
   constructor(private api: ApiService, private router: Router) {
-    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline });
+    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline });
   }
 
   ngOnInit(): void {
@@ -238,8 +282,38 @@ export class LoanCapturePage implements OnInit {
       case 1: return !!this.staffRecord();
       case 2: return !!this.form['amount'] && !!this.form['tenure'];
       case 3: return !!this.form['phone'];
+      case 4: return true; // docs are optional
       default: return true;
     }
+  }
+
+  getUploadedDoc(key: string): {name: string; file: File} | undefined {
+    return this.uploadedDocs.get(key);
+  }
+
+  onFileSelected(event: Event, docKey: string): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        this.uploadError.set('File size must be under 10MB');
+        return;
+      }
+      this.uploadedDocs.set(docKey, { name: file.name, file });
+      this.uploadError.set(null);
+    }
+  }
+
+  private uploadDocuments(loanId: string): void {
+    this.uploadedDocs.forEach((doc, docType) => {
+      const formData = new FormData();
+      formData.append('file', doc.file);
+      formData.append('type', docType);
+      formData.append('loan_id', loanId);
+      this.api.upload(`/documents`, formData).subscribe({
+        error: () => { /* silent — loan is already created */ },
+      });
+    });
   }
 
   submit(): void {
@@ -256,7 +330,12 @@ export class LoanCapturePage implements OnInit {
       },
     };
     this.api.post('/loans', payload).subscribe({
-      next: res => { this.submitting.set(false); this.router.navigate(['/loans', res.data?.id || '']); },
+      next: res => {
+        this.submitting.set(false);
+        const loanId = res.data?.id || '';
+        if (loanId && this.uploadedDocs.size > 0) { this.uploadDocuments(loanId); }
+        this.router.navigate(['/loans', loanId]);
+      },
       error: () => this.submitting.set(false),
     });
   }
