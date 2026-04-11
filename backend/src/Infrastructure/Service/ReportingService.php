@@ -296,4 +296,38 @@ final class ReportingService
     {
         return $this->parReport();
     }
+
+    /**
+     * Customer variance report — expected vs actual per customer.
+     */
+    public function customerVarianceReport(?string $yearMonth = null, ?string $productId = null): array
+    {
+        $conn = $this->em->getConnection();
+        $ym = $yearMonth ?? date('Y-m');
+        $parts = explode('-', $ym);
+        $year = $parts[0];
+        $month = str_pad($parts[1] ?? date('m'), 2, '0', STR_PAD_LEFT);
+
+        $where = "EXTRACT(YEAR FROM rs.due_date) = :y AND EXTRACT(MONTH FROM rs.due_date) = :m";
+        $params = ['y' => $year, 'm' => $month];
+        if ($productId) { $where .= " AND l.product_id = :pid"; $params['pid'] = $productId; }
+
+        return $conn->fetchAllAssociative(
+            "SELECT c.id as customer_id, c.full_name as customer_name, c.staff_id,
+                    COUNT(rs.id) as installments,
+                    COALESCE(SUM(CAST(rs.total_amount AS NUMERIC)), 0) as expected,
+                    COALESCE(SUM(CAST(rs.paid_amount AS NUMERIC)), 0) as actual,
+                    COALESCE(SUM(CAST(rs.total_amount AS NUMERIC) - CAST(rs.paid_amount AS NUMERIC)), 0) as variance,
+                    SUM(CASE WHEN rs.status = 'paid' THEN 1 ELSE 0 END) as paid_count,
+                    SUM(CASE WHEN rs.status = 'overdue' THEN 1 ELSE 0 END) as overdue_count
+             FROM repayment_schedules rs
+             INNER JOIN loans l ON rs.loan_id = l.id
+             INNER JOIN customers c ON l.customer_id = c.id
+             WHERE {$where}
+             GROUP BY c.id, c.full_name, c.staff_id
+             ORDER BY variance DESC
+             LIMIT 500",
+            $params
+        );
+    }
 }

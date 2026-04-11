@@ -14,6 +14,7 @@ use App\Infrastructure\Service\OverdueService;
 use App\Infrastructure\Service\ReportingService;
 use App\Infrastructure\Service\ReconciliationService;
 use App\Infrastructure\Service\ExportService;
+use App\Infrastructure\Service\JournalReversalService;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
@@ -26,6 +27,7 @@ use App\Domain\Repository\AuditLogRepository;
 use App\Domain\Repository\ApprovalWorkflowRepository;
 use App\Domain\Repository\LoanApprovalRepository;
 use App\Domain\Repository\CustomerRepository;
+use App\Domain\Repository\DsaTargetRepository;
 use App\Domain\Repository\CustomerLedgerRepository;
 use App\Domain\Repository\DocumentRepository;
 use App\Domain\Repository\FeeTypeRepository;
@@ -187,6 +189,9 @@ return [
     ReconciliationRepository::class => function (ContainerInterface $c): ReconciliationRepository {
         return new ReconciliationRepository($c->get(EntityManagerInterface::class));
     },
+    DsaTargetRepository::class => function (ContainerInterface $c): DsaTargetRepository {
+        return new DsaTargetRepository($c->get(EntityManagerInterface::class));
+    },
 
     // ─── Domain Services ───
     AuditService::class => function (ContainerInterface $c): AuditService {
@@ -212,7 +217,8 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(ApprovalWorkflowRepository::class),
             $c->get(LoanApprovalRepository::class),
-            $c->get(SettingsCacheService::class)
+            $c->get(SettingsCacheService::class),
+            $c->get(NotificationDispatchService::class)
         );
     },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
@@ -249,7 +255,8 @@ return [
             $c->get(PenaltyRuleRepository::class),
             $c->get(GeneralLedgerRepository::class),
             $c->get(CustomerLedgerRepository::class),
-            $c->get(SettingsCacheService::class)
+            $c->get(SettingsCacheService::class),
+            $c->get(NotificationDispatchService::class)
         );
     },
     LoanLifecycleService::class => function (ContainerInterface $c): LoanLifecycleService {
@@ -282,5 +289,11 @@ return [
     },
     ExportService::class => function (ContainerInterface $c): ExportService {
         return new ExportService();
+    },
+    JournalReversalService::class => function (ContainerInterface $c): JournalReversalService {
+        return new JournalReversalService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(LedgerTransactionRepository::class)
+        );
     },
 ];

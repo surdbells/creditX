@@ -24,6 +24,7 @@ final class OverdueService
         private readonly GeneralLedgerRepository $glRepo,
         private readonly CustomerLedgerRepository $clRepo,
         private readonly SettingsCacheService $settings,
+        private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
 
@@ -130,6 +131,25 @@ final class OverdueService
         }
 
         $this->em->flush();
+
+        // Dispatch overdue notifications (Gap 8)
+        if ($this->notifService !== null) {
+            foreach (array_keys($processedLoans) as $loanId) {
+                try {
+                    $loan = $this->em->find(\App\Domain\Entity\Loan::class, $loanId);
+                    if ($loan !== null) {
+                        $this->notifService->dispatchEvent('overdue_reminder', [
+                            'customer_name' => $loan->getCustomer()->getFullName(),
+                            'customer_email' => $loan->getCustomer()->getEmail(),
+                            'customer_phone' => $loan->getCustomer()->getPhone(),
+                            'loan_amount' => $loan->getAmountRequested(),
+                            'application_id' => $loan->getApplicationId(),
+                            'user_id' => $loan->getAgentId(),
+                        ], $loan->getAgentId(), $loan->getCustomer()->getId());
+                    }
+                } catch (\Exception $e) { /* notification failure should not block */ }
+            }
+        }
 
         return [
             'overdue_loans' => count($processedLoans),

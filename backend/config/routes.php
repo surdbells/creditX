@@ -25,6 +25,7 @@ use App\Action\Penalty;
 use App\Action\Notification;
 use App\Action\Messaging;
 use App\Action\Report;
+use App\Action\DsaTarget;
 use App\Action\Reconciliation;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
@@ -49,6 +50,8 @@ return function (App $app): void {
     $app->group('/api/auth', function (RouteCollectorProxy $group) {
         $group->post('/login', Auth\LoginAction::class);
         $group->post('/refresh', Auth\RefreshTokenAction::class);
+        $group->post('/forgot-password', Auth\ForgotPasswordAction::class);
+        $group->post('/reset-password', Auth\ResetPasswordAction::class);
     });
 
     // ─── Paystack Webhook (public, signature-verified) ───
@@ -256,6 +259,10 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('accounting.view'));
             $group->get('/{id}/summary', Accounting\GlSummaryAction::class)
                 ->add(new RbacMiddleware('accounting.view'));
+            $group->get('/reports/trial-balance', Accounting\TrialBalanceAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->post('/transactions/{id}/reverse', Accounting\ReversalAction::class)
+                ->add(new RbacMiddleware('accounting.edit'));
         });
 
         // ─── Customer Ledgers ───
@@ -358,6 +365,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.cbn'));
             $group->get('/cbn/aging', Report\CbnAgingReportAction::class)
                 ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/customer-variance', Report\CustomerVarianceReportAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
         });
 
         // ─── Reconciliation ───
@@ -370,6 +379,14 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.reconciliation'));
             $group->post('/{id}/resolve', Reconciliation\ResolveReconciliationAction::class)
                 ->add(new RbacMiddleware('reports.reconciliation'));
+        });
+
+        // ─── DSA Targets ───
+        $api->group('/dsa-targets', function (RouteCollectorProxy $group) {
+            $group->get('', DsaTarget\ListDsaTargetsAction::class)
+                ->add(new RbacMiddleware('reports.performance'));
+            $group->post('', DsaTarget\CreateDsaTargetAction::class)
+                ->add(new RbacMiddleware('reports.performance'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));

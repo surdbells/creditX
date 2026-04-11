@@ -18,6 +18,11 @@ class UserRepository extends BaseRepository
         return $this->findOneBy(['email' => strtolower($email)]);
     }
 
+    public function findByResetToken(string $token): ?User
+    {
+        return $this->findOneBy(['resetToken' => $token]);
+    }
+
     public function emailExists(string $email, ?string $excludeId = null): bool
     {
         $qb = $this->em->createQueryBuilder()

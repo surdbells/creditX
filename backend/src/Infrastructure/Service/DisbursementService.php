@@ -149,6 +149,34 @@ final class DisbursementService
             // Then transition to active
             $loan->transitionTo(LoanStatus::ACTIVE);
 
+            // ─── 7b. Auto-close previous loan on top-up (Gap 14) ───
+            if (bccomp($topUpBalance, '0.00', 2) > 0 && $loan->getPreviousLoanId()) {
+                $previousLoan = $this->em->find(Loan::class, $loan->getPreviousLoanId());
+                if ($previousLoan !== null && in_array($previousLoan->getStatus(), [LoanStatus::ACTIVE, LoanStatus::OVERDUE, LoanStatus::DISBURSED], true)) {
+                    $previousLoan->transitionTo(LoanStatus::CLOSED);
+                    $previousLoan->setClosedAt(new \DateTimeImmutable($effectiveDate, new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos')));
+
+                    // Close previous customer ledger
+                    $prevLedger = $this->clRepo->findByLoan($previousLoan->getId());
+                    if ($prevLedger !== null) {
+                        $prevLedger->close();
+                    }
+
+                    // Waive remaining schedules on previous loan
+                    $prevSchedules = $this->em->getRepository(RepaymentSchedule::class)->findBy(['loan' => $previousLoan->getId()]);
+                    foreach ($prevSchedules as $ps) {
+                        if (in_array($ps->getStatus()->value, ['pending', 'partial', 'overdue'], true)) {
+                            $ps->setStatus(\App\Domain\Enum\RepaymentStatus::WAIVED);
+                        }
+                    }
+
+                    $prevTrail = new LoanTrail();
+                    $prevTrail->setUserId($userId);
+                    $prevTrail->setAction('Loan closed via top-up — new loan ' . $loan->getApplicationId());
+                    $previousLoan->addTrail($prevTrail);
+                }
+            }
+
             // ─── 8. Generate repayment schedule ───
             $this->generateRepaymentSchedule($loan, $customerLedger, $effectiveDate);
 

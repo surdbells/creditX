@@ -40,6 +40,12 @@ class User
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $phone = null;
 
+    #[ORM\Column(type: 'string', length: 64, nullable: true)]
+    private ?string $resetToken = null;
+
+    #[ORM\Column(type: 'string', length: 30, nullable: true)]
+    private ?string $resetTokenExpiresAt = null;
+
     #[ORM\Column(type: 'string', length: 20, enumType: UserStatus::class)]
     private UserStatus $status;
 
@@ -177,6 +183,11 @@ class User
     {
         $this->phone = $phone;
     }
+
+    public function getResetToken(): ?string { return $this->resetToken; }
+    public function setResetToken(?string $v): void { $this->resetToken = $v; }
+    public function getResetTokenExpiresAt(): ?string { return $this->resetTokenExpiresAt; }
+    public function setResetTokenExpiresAt(?string $v): void { $this->resetTokenExpiresAt = $v; }
 
     public function setStatus(UserStatus $status): void
     {

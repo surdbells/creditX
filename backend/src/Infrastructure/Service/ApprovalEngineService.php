@@ -17,6 +17,7 @@ use App\Domain\Enum\LoanStatus;
 use App\Domain\Exception\DomainException;
 use App\Domain\Repository\ApprovalWorkflowRepository;
 use App\Domain\Repository\LoanApprovalRepository;
+use App\Infrastructure\Service\NotificationDispatchService;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class ApprovalEngineService
@@ -26,6 +27,7 @@ final class ApprovalEngineService
         private readonly ApprovalWorkflowRepository $workflowRepo,
         private readonly LoanApprovalRepository $approvalRepo,
         private readonly SettingsCacheService $settings,
+        private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
 
@@ -148,6 +150,27 @@ final class ApprovalEngineService
         $result = $this->evaluateOverallStatus($loan, $workflow);
 
         $this->em->flush();
+
+        // Dispatch notifications for approval action (Gap 3)
+        if ($this->notifService !== null) {
+            try {
+                $event = $action === 'approve' ? 'loan_approved' : 'loan_rejected';
+                if ($result['loan_status'] === LoanStatus::APPROVED->value) $event = 'loan_approved';
+                elseif ($result['loan_status'] === LoanStatus::REJECTED->value) $event = 'loan_rejected';
+                else $event = 'loan_approval_step';
+
+                $this->notifService->dispatchEvent($event, [
+                    'customer_name' => $loan->getCustomer()->getFullName(),
+                    'customer_email' => $loan->getCustomer()->getEmail(),
+                    'customer_phone' => $loan->getCustomer()->getPhone(),
+                    'loan_amount' => $loan->getAmountRequested(),
+                    'application_id' => $loan->getApplicationId(),
+                    'step_name' => $approval->getStep()->getName(),
+                    'action' => $action,
+                    'user_id' => $loan->getAgentId(),
+                ], $loan->getAgentId(), $loan->getCustomer()->getId());
+            } catch (\Exception $e) { /* notification failure should not block */ }
+        }
 
         return $result;
     }
