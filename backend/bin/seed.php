@@ -283,7 +283,7 @@ echo "  Created {$settingCount} settings\n";
 // ─── 5. Super Admin User ───
 echo "[5/5] Seeding super admin user...\n";
 
-$existingAdmin = $em->getRepository(User::class)->findOneBy(['email' => 'admin@creditx.com']);
+$existingAdmin = $em->getRepository(User::class)->findOneBy(['email' => 'admin@dostsuite.com']);
 if ($existingAdmin === null) {
     $superAdminRole = $em->getRepository(Role::class)->findOneBy(['slug' => 'super_admin']);
     $hqLocation = $em->getRepository(Location::class)->findOneBy(['code' => 'HQ']);
@@ -291,7 +291,7 @@ if ($existingAdmin === null) {
     $admin = new User();
     $admin->setFirstName('System');
     $admin->setLastName('Administrator');
-    $admin->setEmail('admin@creditx.com');
+    $admin->setEmail('admin@dostsuite.com');
     $admin->setPasswordHash(PasswordService::hash('Admin@123456'));
     $admin->setPhone('+2340000000000');
     $admin->setStatus(UserStatus::ACTIVE);
@@ -299,7 +299,7 @@ if ($existingAdmin === null) {
     if ($hqLocation) $admin->addLocation($hqLocation);
     $em->persist($admin);
     $em->flush();
-    echo "  Created super admin: admin@creditx.com / Admin@123456\n";
+    echo "  Created super admin: admin@dostsuite.com / Admin@123456\n";
 } else {
     echo "  Super admin already exists\n";
 }

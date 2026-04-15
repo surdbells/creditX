@@ -28,7 +28,7 @@ import { AuthService } from '../../core/services/auth.service';
             <div>
               <label class="text-xs font-medium text-gray-500 mb-1 block">Email Address</label>
               <input type="email" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-[#0A4F2A] focus:outline-none focus:ring-2 focus:ring-[#0A4F2A]/10"
-                     [(ngModel)]="email" placeholder="agent@creditx.com" [disabled]="loading()" />
+                     [(ngModel)]="email" placeholder="agent@dostsuite.com" [disabled]="loading()" />
             </div>
             <div>
               <label class="text-xs font-medium text-gray-500 mb-1 block">Password</label>

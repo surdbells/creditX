@@ -96,7 +96,7 @@ final class NotificationDispatchService
         }
 
         $payload = [
-            'from' => ['address' => $_ENV['ZEPTOMAIL_FROM_EMAIL'] ?? 'noreply@creditx.com', 'name' => $_ENV['ZEPTOMAIL_FROM_NAME'] ?? 'CreditX'],
+            'from' => ['address' => $_ENV['ZEPTOMAIL_FROM_EMAIL'] ?? 'noreply@dostsuite.com', 'name' => $_ENV['ZEPTOMAIL_FROM_NAME'] ?? 'CreditX'],
             'to' => [['email_address' => ['address' => $notification->getRecipient()]]],
             'subject' => $notification->getSubject() ?? 'CreditX Notification',
             'htmlbody' => '<html><body>' . nl2br(htmlspecialchars($notification->getBody())) . '</body></html>',
