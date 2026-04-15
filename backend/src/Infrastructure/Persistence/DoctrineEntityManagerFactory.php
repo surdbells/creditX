@@ -8,6 +8,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 
 final class DoctrineEntityManagerFactory
@@ -21,6 +22,9 @@ final class DoctrineEntityManagerFactory
             isDevMode: $isDevMode,
             proxyDir: __DIR__ . '/../../../var/proxies',
         );
+
+        // Use underscore naming strategy: camelCase → snake_case columns
+        $config->setNamingStrategy(new UnderscoreNamingStrategy(CASE_LOWER));
 
         // Register custom DBAL types
         if (!Type::hasType('uuid')) {
