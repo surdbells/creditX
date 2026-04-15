@@ -19,6 +19,9 @@ use App\Infrastructure\Service\PasswordService;
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
+// Force production mode for CLI to reduce memory
+$_ENV['APP_ENV'] = 'production';
+
 $em = DoctrineEntityManagerFactory::create();
 
 echo "=== CreditX v2.0 Database Seeder ===\n\n";
@@ -141,7 +144,15 @@ foreach ($permissionsDef as $module => $perms) {
     }
 }
 $em->flush();
+$em->clear();
 echo "  Created {$permCount} permissions\n";
+
+// Reload permission entities for role assignment
+$allPerms = $em->getRepository(Permission::class)->findAll();
+$permissionEntities = [];
+foreach ($allPerms as $p) {
+    $permissionEntities[$p->getSlug()] = $p;
+}
 
 // ─── 2. Roles ───
 echo "[2/5] Seeding roles...\n";
@@ -206,6 +217,7 @@ foreach ($rolesDef as [$name, $slug, $desc, $isSystem, $permSlugs]) {
     $roleCount++;
 }
 $em->flush();
+$em->clear();
 echo "  Created {$roleCount} roles\n";
 
 // ─── 3. Default Location ───
@@ -221,6 +233,7 @@ if ($existingLoc === null) {
     $hq->setAddress('Lagos, Nigeria');
     $em->persist($hq);
     $em->flush();
+    $em->clear();
     echo "  Created Head Office location\n";
 } else {
     echo "  Head Office already exists\n";
@@ -278,6 +291,7 @@ foreach ($settingsDef as [$key, $value, $type, $category, $description]) {
     $settingCount++;
 }
 $em->flush();
+$em->clear();
 echo "  Created {$settingCount} settings\n";
 
 // ─── 5. Super Admin User ───
@@ -299,6 +313,7 @@ if ($existingAdmin === null) {
     if ($hqLocation) $admin->addLocation($hqLocation);
     $em->persist($admin);
     $em->flush();
+    $em->clear();
     echo "  Created super admin: admin@dostsuite.com / Admin@123456\n";
 } else {
     echo "  Super admin already exists\n";
@@ -356,6 +371,7 @@ foreach ($recordTypesDef as $rtDef) {
     $rtCount++;
 }
 $em->flush();
+$em->clear();
 echo "  Created {$rtCount} record types\n";
 
 echo "\n=== Seeding complete (all phases) ===\n";
@@ -386,6 +402,7 @@ foreach ($feeTypesDef as [$name, $code, $desc, $isSystem]) {
     $ftCount++;
 }
 $em->flush();
+$em->clear();
 echo "  Created {$ftCount} fee types\n";
 
 echo "\n=== All seeding complete ===\n";
@@ -428,6 +445,7 @@ foreach ($glDef as [$name, $number, $code, $type, $ledgerType, $desc]) {
     $glCount++;
 }
 $em->flush();
+$em->clear();
 echo "  Created {$glCount} GL accounts\n";
 
 echo "\n=== All seeding complete (Phases 1-5) ===\n";
