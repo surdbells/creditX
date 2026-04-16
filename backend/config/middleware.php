@@ -16,12 +16,6 @@ return function (App $app): void {
         $app->getContainer()->get(\Psr\Log\LoggerInterface::class)
     );
 
-    // CORS (must be before routing to handle preflight)
-    $app->add(new CorsMiddleware());
-
-    // Parse JSON request bodies
-    $app->add(new JsonBodyParserMiddleware());
-
     // Rate limiting
     $app->add(new RateLimitMiddleware(
         $app->getContainer()->get(\App\Infrastructure\Service\RedisService::class),
@@ -29,6 +23,14 @@ return function (App $app): void {
         (int) ($_ENV['RATE_LIMIT_WINDOW'] ?? 60)
     ));
 
-    // Routing
+    // Parse JSON request bodies
+    $app->add(new JsonBodyParserMiddleware());
+
+    // Routing (must be BEFORE CORS in registration = runs AFTER CORS in pipeline)
     $app->addRoutingMiddleware();
+
+    // CORS — added LAST = runs FIRST in Slim's LIFO middleware pipeline
+    // This ensures OPTIONS preflight requests get CORS headers BEFORE
+    // the router can reject them as 405 Method Not Allowed
+    $app->add(new CorsMiddleware());
 };
