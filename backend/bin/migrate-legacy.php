@@ -235,6 +235,7 @@ if (!$skipRecords) {
         $srcStmt = $mysql->query("SELECT * FROM `{$source}` ORDER BY `ID` ASC");
         $migrated = 0;
         $skipped  = 0;
+        $batchCount = 0;
 
         if (!$dryRun) $pg->beginTransaction();
 
@@ -273,19 +274,27 @@ if (!$skipRecords) {
             ];
 
             try {
-                if (!$dryRun) $insertStmt->execute($params);
+                if (!$dryRun) {
+                    $pg->exec("SAVEPOINT sp_row");
+                    $insertStmt->execute($params);
+                    $pg->exec("RELEASE SAVEPOINT sp_row");
+                }
                 $migrated++;
+                $batchCount++;
             } catch (PDOException $e) {
+                if (!$dryRun) { try { $pg->exec("ROLLBACK TO SAVEPOINT sp_row"); } catch (\Exception $ex) {} }
                 if (str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'duplicate')) {
                     $skipped++;
                 } else {
-                    echo "    ERROR [{$code}] Staff {$staffId}: " . $e->getMessage() . "\n";
                     $stats['errors']++;
                 }
             }
 
-            // Progress
-            if ($migrated % 5000 === 0 && $migrated > 0) {
+            // Commit and restart transaction every 5000 rows for memory
+            if ($batchCount >= 5000 && !$dryRun) {
+                $pg->commit();
+                $pg->beginTransaction();
+                $batchCount = 0;
                 echo "    Progress: {$migrated}/{$totalRows}\n";
             }
         }
