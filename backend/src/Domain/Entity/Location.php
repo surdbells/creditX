@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Domain\Entity;
 
 use App\Domain\Enum\LocationType;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -41,15 +39,10 @@ class Location
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isActive = true;
 
-    /** @var Collection<int, User> */
-    #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'locations')]
-    private Collection $users;
-
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
         $this->type = LocationType::BRANCH;
-        $this->users = new ArrayCollection();
     }
 
     public function getId(): string
@@ -117,11 +110,6 @@ class Location
         $this->isActive = $isActive;
     }
 
-    /** @return Collection<int, User> */
-    public function getUsers(): Collection
-    {
-        return $this->users;
-    }
 
     public function toArray(): array
     {

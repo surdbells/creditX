@@ -62,14 +62,14 @@ class User
     private ?\DateTimeImmutable $passwordResetExpiresAt = null;
 
     /** @var Collection<int, Role> */
-    #[ORM\ManyToMany(targetEntity: Role::class, inversedBy: 'users')]
+    #[ORM\ManyToMany(targetEntity: Role::class, )]
     #[ORM\JoinTable(name: 'user_roles')]
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id')]
     #[ORM\InverseJoinColumn(name: 'role_id', referencedColumnName: 'id')]
     private Collection $roles;
 
     /** @var Collection<int, Location> */
-    #[ORM\ManyToMany(targetEntity: Location::class, inversedBy: 'users')]
+    #[ORM\ManyToMany(targetEntity: Location::class, )]
     #[ORM\JoinTable(name: 'user_locations')]
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id')]
     #[ORM\InverseJoinColumn(name: 'location_id', referencedColumnName: 'id')]

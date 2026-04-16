@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -33,14 +31,9 @@ class Permission
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
-    /** @var Collection<int, Role> */
-    #[ORM\ManyToMany(targetEntity: Role::class, mappedBy: 'permissions')]
-    private Collection $roles;
-
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
-        $this->roles = new ArrayCollection();
     }
 
     public function getId(): string
@@ -89,10 +82,6 @@ class Permission
     }
 
     /** @return Collection<int, Role> */
-    public function getRoles(): Collection
-    {
-        return $this->roles;
-    }
 
     public function toArray(): array
     {

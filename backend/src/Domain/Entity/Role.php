@@ -37,21 +37,16 @@ class Role
     private bool $isActive = true;
 
     /** @var Collection<int, Permission> */
-    #[ORM\ManyToMany(targetEntity: Permission::class, inversedBy: 'roles')]
+    #[ORM\ManyToMany(targetEntity: Permission::class)]
     #[ORM\JoinTable(name: 'role_permissions')]
     #[ORM\JoinColumn(name: 'role_id', referencedColumnName: 'id')]
     #[ORM\InverseJoinColumn(name: 'permission_id', referencedColumnName: 'id')]
     private Collection $permissions;
 
-    /** @var Collection<int, User> */
-    #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'roles')]
-    private Collection $users;
-
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
         $this->permissions = new ArrayCollection();
-        $this->users = new ArrayCollection();
     }
 
     public function getId(): string
@@ -138,10 +133,6 @@ class Role
     }
 
     /** @return Collection<int, User> */
-    public function getUsers(): Collection
-    {
-        return $this->users;
-    }
 
     public function toArray(bool $includePermissions = false): array
     {
