@@ -28,15 +28,16 @@ final class AuditService
         ?string $ipAddress = null,
         ?string $userAgent = null,
     ): void {
-        $log = new AuditLog();
-        $log->setUserId($userId);
-        $log->setEntityType($entityType);
-        $log->setEntityId($entityId);
-        $log->setAction($action);
-        $log->setOldValues($oldValues);
-        $log->setNewValues($newValues);
-        $log->setIpAddress($ipAddress);
-        $log->setUserAgent($userAgent);
+        $log = AuditLog::create(
+            action: $action,
+            entityType: $entityType,
+            entityId: $entityId,
+            userId: $userId,
+            oldValues: $oldValues,
+            newValues: $newValues,
+            ipAddress: $ipAddress,
+            userAgent: $userAgent,
+        );
 
         $this->em->persist($log);
         $this->em->flush();
