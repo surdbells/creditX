@@ -239,7 +239,7 @@ if (!$skipRecords) {
         if (!$dryRun) $pg->beginTransaction();
 
         while ($row = $srcStmt->fetch()) {
-            $staffId = cleanStr($row[$map['Staff_ID'] ?? 'Staff_ID'] ?? null);
+            $staffId = cleanStr($row['Staff_ID'] ?? null);
             if ($staffId === null || $staffId === '') { $skipped++; continue; }
 
             $params = [
@@ -364,8 +364,6 @@ if (!$skipUsers) {
     $skipped  = 0;
     $nowStr = now();
 
-    if (!$dryRun) $pg->beginTransaction();
-
     while ($row = $srcUsers->fetch()) {
         $email = strtolower(trim($row['email_address'] ?? ''));
         if ($email === '') { $skipped++; continue; }
@@ -400,7 +398,7 @@ if (!$skipUsers) {
             ':last_name'     => $lastName,
             ':email'         => $email,
             ':password_hash' => $passwordHash,
-            ':phone'         => cleanStr($row['location'] ?? null), // old schema has no phone, location field repurposed
+            ':phone'         => null,
             ':status'        => $newStatus,
             ':created_at'    => $nowStr,
             ':updated_at'    => $nowStr,
@@ -408,6 +406,7 @@ if (!$skipUsers) {
 
         try {
             if (!$dryRun) {
+                $pg->beginTransaction();
                 $userInsertStmt->execute($params);
 
                 // Assign role
@@ -418,9 +417,11 @@ if (!$skipUsers) {
                 if ($roleId) {
                     $roleAssignStmt->execute([':user_id' => $userId, ':role_id' => $roleId]);
                 }
+                $pg->commit();
             }
             $migrated++;
         } catch (PDOException $e) {
+            if (!$dryRun) { try { $pg->rollBack(); } catch (\Exception $ex) {} }
             if (str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'duplicate')) {
                 $skipped++;
             } else {
@@ -429,8 +430,6 @@ if (!$skipUsers) {
             }
         }
     }
-
-    if (!$dryRun) $pg->commit();
 
     $stats['users'] = $migrated;
     $stats['skipped'] += $skipped;
