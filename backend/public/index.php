@@ -11,15 +11,9 @@ require __DIR__ . '/../vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
-// Build DI container
+// Build DI container (no compilation — Doctrine handles its own caching)
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions(__DIR__ . '/../config/container.php');
-
-if ($_ENV['APP_ENV'] === 'production') {
-    $containerBuilder->enableCompilation(__DIR__ . '/../var/cache');
-    $containerBuilder->writeProxiesToFile(true, __DIR__ . '/../var/proxies');
-}
-
 $container = $containerBuilder->build();
 
 // Create Slim app from container
