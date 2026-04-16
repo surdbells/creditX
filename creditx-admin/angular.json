@@ -52,6 +52,7 @@
               }
             ],
             "styles": [
+              "src/tailwind-output.css",
               "src/styles.scss"
             ],
             "polyfills": [

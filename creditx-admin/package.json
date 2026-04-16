@@ -4,9 +4,11 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "build": "npm run build:tailwind && npx ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "build:tailwind": "npx @tailwindcss/cli -i src/tailwind-input.css -o src/tailwind-output.css --minify",
+    "build:prod": "npm run build:tailwind && npx ng build --configuration production"
   },
   "private": true,
   "packageManager": "npm@10.9.4",
