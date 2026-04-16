@@ -7,7 +7,7 @@ use App\Domain\Enum\NotificationStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\NotificationRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'notifications')]
 #[ORM\Index(name: 'idx_notif_user', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_notif_status', columns: ['status'])]

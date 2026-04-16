@@ -6,7 +6,7 @@ use App\Domain\Enum\TransactionType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\LedgerTransactionRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'ledger_transactions')]
 #[ORM\Index(name: 'idx_lt_gl', columns: ['gl_id'])]
 #[ORM\Index(name: 'idx_lt_customer_ledger', columns: ['customer_ledger_id'])]

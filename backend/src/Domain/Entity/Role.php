@@ -9,7 +9,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\RoleRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'roles')]
 #[ORM\UniqueConstraint(name: 'uniq_roles_slug', columns: ['slug'])]
 #[ORM\HasLifecycleCallbacks]

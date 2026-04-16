@@ -10,7 +10,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\LoanProductRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'loan_products')]
 #[ORM\UniqueConstraint(name: 'uniq_loan_products_code', columns: ['code'])]
 #[ORM\HasLifecycleCallbacks]

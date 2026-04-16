@@ -10,18 +10,25 @@ use Doctrine\ORM\QueryBuilder;
 
 abstract class BaseRepository
 {
-    protected EntityRepository $repo;
-
     public function __construct(protected readonly EntityManagerInterface $em)
     {
-        $this->repo = $em->getRepository($this->getEntityClass());
     }
 
     abstract protected function getEntityClass(): string;
 
+    /**
+     * Get the underlying Doctrine EntityRepository.
+     * Uses getRepository on the EM but since our custom repos are NOT registered
+     * as Doctrine's customRepositoryClassName, this won't recurse.
+     */
+    protected function getRepo(): EntityRepository
+    {
+        return new EntityRepository($this->em, $this->em->getClassMetadata($this->getEntityClass()));
+    }
+
     public function find(string $id): ?object
     {
-        return $this->repo->find($id);
+        return $this->getRepo()->find($id);
     }
 
     public function findOrFail(string $id): object
@@ -37,17 +44,17 @@ abstract class BaseRepository
 
     public function findAll(): array
     {
-        return $this->repo->findAll();
+        return $this->getRepo()->findAll();
     }
 
     public function findBy(array $criteria, ?array $orderBy = null, ?int $limit = null, ?int $offset = null): array
     {
-        return $this->repo->findBy($criteria, $orderBy, $limit, $offset);
+        return $this->getRepo()->findBy($criteria, $orderBy, $limit, $offset);
     }
 
     public function findOneBy(array $criteria): ?object
     {
-        return $this->repo->findOneBy($criteria);
+        return $this->getRepo()->findOneBy($criteria);
     }
 
     public function persist(object $entity): void

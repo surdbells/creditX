@@ -8,7 +8,7 @@ use App\Domain\Enum\AuditAction;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\AuditLogRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'audit_logs')]
 #[ORM\Index(name: 'idx_audit_user', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_audit_entity', columns: ['entity_type', 'entity_id'])]

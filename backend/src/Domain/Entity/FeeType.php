@@ -7,7 +7,7 @@ namespace App\Domain\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\FeeTypeRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'fee_types')]
 #[ORM\UniqueConstraint(name: 'uniq_fee_types_code', columns: ['code'])]
 #[ORM\HasLifecycleCallbacks]

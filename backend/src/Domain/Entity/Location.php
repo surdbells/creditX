@@ -8,7 +8,7 @@ use App\Domain\Enum\LocationType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\LocationRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'locations')]
 #[ORM\UniqueConstraint(name: 'uniq_locations_code', columns: ['code'])]
 #[ORM\HasLifecycleCallbacks]

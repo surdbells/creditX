@@ -6,7 +6,7 @@ use App\Domain\Enum\CustomerLedgerStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\CustomerLedgerRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'customer_ledgers')]
 #[ORM\UniqueConstraint(name: 'uniq_cl_account_number', columns: ['account_number'])]
 #[ORM\Index(name: 'idx_cl_customer', columns: ['customer_id'])]

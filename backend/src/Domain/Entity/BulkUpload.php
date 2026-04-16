@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\BulkUploadRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'bulk_uploads')]
 #[ORM\HasLifecycleCallbacks]
 class BulkUpload

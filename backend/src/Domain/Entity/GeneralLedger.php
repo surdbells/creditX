@@ -9,7 +9,7 @@ use App\Domain\Enum\LedgerType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\GeneralLedgerRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'general_ledgers')]
 #[ORM\UniqueConstraint(name: 'uniq_gl_account_number', columns: ['account_number'])]
 #[ORM\UniqueConstraint(name: 'uniq_gl_account_code', columns: ['account_code'])]

@@ -10,7 +10,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\ApprovalWorkflowRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'approval_workflows')]
 #[ORM\HasLifecycleCallbacks]
 class ApprovalWorkflow

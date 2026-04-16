@@ -9,7 +9,7 @@ use App\Domain\Enum\SettingType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\SystemSettingRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'system_settings')]
 #[ORM\UniqueConstraint(name: 'uniq_settings_key', columns: ['setting_key'])]
 #[ORM\Index(name: 'idx_settings_category', columns: ['category'])]

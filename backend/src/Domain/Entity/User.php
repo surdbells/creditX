@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\UserRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'users')]
 #[ORM\Index(name: 'idx_users_email', columns: ['email'])]
 #[ORM\Index(name: 'idx_users_status', columns: ['status'])]

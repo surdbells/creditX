@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\ConversationRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'conversations')]
 #[ORM\Index(name: 'idx_conv_agent', columns: ['agent_id'])]
 #[ORM\Index(name: 'idx_conv_loan', columns: ['loan_id'])]

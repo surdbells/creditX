@@ -6,7 +6,7 @@ use App\Domain\Enum\RepaymentStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\RepaymentScheduleRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'repayment_schedules')]
 #[ORM\Index(name: 'idx_rs_loan', columns: ['loan_id'])]
 #[ORM\Index(name: 'idx_rs_due_date', columns: ['due_date'])]

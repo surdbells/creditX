@@ -8,7 +8,7 @@ use App\Domain\Enum\ApprovalStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\LoanApprovalRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'loan_approvals')]
 #[ORM\Index(name: 'idx_loan_approvals_loan', columns: ['loan_id'])]
 #[ORM\Index(name: 'idx_loan_approvals_status', columns: ['status'])]

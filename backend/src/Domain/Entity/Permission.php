@@ -7,7 +7,7 @@ namespace App\Domain\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\PermissionRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'permissions')]
 #[ORM\UniqueConstraint(name: 'uniq_permissions_slug', columns: ['slug'])]
 #[ORM\HasLifecycleCallbacks]

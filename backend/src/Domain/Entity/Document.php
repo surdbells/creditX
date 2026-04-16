@@ -9,7 +9,7 @@ use App\Domain\Enum\DocumentType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\DocumentRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'documents')]
 #[ORM\Index(name: 'idx_documents_customer', columns: ['customer_id'])]
 #[ORM\Index(name: 'idx_documents_loan', columns: ['loan_id'])]

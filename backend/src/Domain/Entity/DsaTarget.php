@@ -5,7 +5,7 @@ namespace App\Domain\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\DsaTargetRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'dsa_targets')]
 #[ORM\UniqueConstraint(name: 'uniq_dsa_target_period', columns: ['user_id', 'period_year', 'period_month'])]
 #[ORM\HasLifecycleCallbacks]

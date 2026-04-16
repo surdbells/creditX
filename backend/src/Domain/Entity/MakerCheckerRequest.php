@@ -6,7 +6,7 @@ use App\Domain\Enum\MakerCheckerStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\MakerCheckerRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'maker_checker_requests')]
 #[ORM\Index(name: 'idx_mc_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_mc_operation', columns: ['operation_type'])]

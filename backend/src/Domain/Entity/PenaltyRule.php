@@ -6,7 +6,7 @@ use App\Domain\Enum\PenaltyCalculationType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\PenaltyRuleRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'penalty_rules')]
 #[ORM\HasLifecycleCallbacks]
 class PenaltyRule

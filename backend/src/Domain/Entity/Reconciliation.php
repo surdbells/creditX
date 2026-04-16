@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\ReconciliationRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'reconciliations')]
 #[ORM\HasLifecycleCallbacks]
 class Reconciliation

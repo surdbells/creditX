@@ -7,7 +7,7 @@ namespace App\Domain\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\GovernmentRecordRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'government_records')]
 #[ORM\Index(name: 'idx_govrecords_staff_id', columns: ['staff_id'])]
 #[ORM\Index(name: 'idx_govrecords_record_type', columns: ['record_type_id'])]

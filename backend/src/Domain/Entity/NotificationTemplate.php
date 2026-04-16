@@ -6,7 +6,7 @@ use App\Domain\Enum\NotificationChannel;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\NotificationTemplateRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'notification_templates')]
 #[ORM\UniqueConstraint(name: 'uniq_nt_code', columns: ['code'])]
 #[ORM\HasLifecycleCallbacks]

@@ -9,7 +9,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity(repositoryClass: \App\Domain\Repository\PaymentRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'payments')]
 #[ORM\Index(name: 'idx_payments_loan', columns: ['loan_id'])]
 #[ORM\Index(name: 'idx_payments_customer', columns: ['customer_id'])]
