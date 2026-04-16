@@ -88,10 +88,15 @@ trait ApiResponse
         $page = max(1, (int) ($queryParams['page'] ?? 1));
         $perPage = min(100, max(1, (int) ($queryParams['per_page'] ?? 20)));
         $search = trim($queryParams['search'] ?? '');
-        $sortBy = trim($queryParams['sort_by'] ?? 'created_at');
+        $sortBy = trim($queryParams['sort_by'] ?? 'createdAt');
         $sortDir = strtoupper(trim($queryParams['sort_dir'] ?? 'DESC'));
         if (!in_array($sortDir, ['ASC', 'DESC'], true)) {
             $sortDir = 'DESC';
+        }
+
+        // Convert snake_case to camelCase for DQL (e.g. created_at → createdAt)
+        if (str_contains($sortBy, '_')) {
+            $sortBy = lcfirst(str_replace('_', '', ucwords($sortBy, '_')));
         }
 
         return [

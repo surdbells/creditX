@@ -3,26 +3,33 @@
   <aside class="cx-sidebar" [class.collapsed]="collapsed()">
     <div class="sidebar-header">
       @if (!collapsed()) {
-        <span class="text-lg font-bold text-[var(--cx-accent)]">Credit<span class="text-white">X</span></span>
+        <span class="text-lg font-bold"><span class="text-[var(--cx-accent)]">Credit</span><span class="sidebar-brand-x">X</span></span>
       } @else {
         <span class="text-lg font-bold text-[var(--cx-accent)]">CX</span>
       }
-      <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="collapsed.set(!collapsed())">
-        <lucide-icon [name]="collapsed() ? 'menu' : 'chevron-left'" [size]="18" class="text-white/70"></lucide-icon>
+      <button class="sidebar-toggle-btn" (click)="collapsed.set(!collapsed())">
+        <lucide-icon [name]="collapsed() ? 'menu' : 'chevron-left'" [size]="18"></lucide-icon>
       </button>
     </div>
 
     <nav class="sidebar-nav">
       @for (group of filteredGroups; track group.label) {
-        @if (!collapsed()) {
-          <div class="nav-group-label">{{ group.label }}</div>
+        <!-- Section header (collapsible) -->
+        @if (!collapsed() && group.label !== 'Overview') {
+          <button class="nav-group-header" (click)="toggleSection(group.label)">
+            <span class="nav-group-label">{{ group.label }}</span>
+            <lucide-icon [name]="isSectionOpen(group.label) ? 'chevron-down' : 'chevron-right'" [size]="14" class="nav-group-arrow"></lucide-icon>
+          </button>
         }
-        @for (item of group.items; track item.route) {
-          <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label"
-             (click)="mobileMenuOpen.set(false)">
-            <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
-            @if (!collapsed()) { <span class="nav-label">{{ item.label }}</span> }
-          </a>
+        <!-- Section items -->
+        @if (isSectionOpen(group.label) || collapsed()) {
+          @for (item of group.items; track item.route) {
+            <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label"
+               (click)="mobileMenuOpen.set(false)">
+              <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
+              @if (!collapsed()) { <span class="nav-label">{{ item.label }}</span> }
+            </a>
+          }
         }
       }
     </nav>
@@ -53,8 +60,7 @@
           @for (group of filteredGroups; track group.label) {
             <div class="text-xs font-medium text-[var(--cx-text-muted)] px-3 pt-3 pb-1 uppercase tracking-wider">{{ group.label }}</div>
             @for (item of group.items; track item.route) {
-              <a [routerLink]="item.route" routerLinkActive="active" class="mobile-nav-item"
-                 (click)="mobileMenuOpen.set(false)">
+              <a [routerLink]="item.route" routerLinkActive="active" class="mobile-nav-item" (click)="mobileMenuOpen.set(false)">
                 <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
                 {{ item.label }}
               </a>
@@ -77,8 +83,7 @@
               {{ theme.isDark() ? 'Light' : 'Dark' }}
             </button>
             <button class="cx-btn cx-btn-danger cx-btn-sm flex-1" (click)="logout()">
-              <lucide-icon name="log-out" [size]="14"></lucide-icon>
-              Logout
+              <lucide-icon name="log-out" [size]="14"></lucide-icon> Logout
             </button>
           </div>
         </div>
@@ -88,7 +93,6 @@
 
   <!-- Main Content -->
   <main class="cx-main">
-    <!-- Topbar -->
     <header class="cx-topbar">
       <div class="flex items-center gap-3">
         <span class="text-sm text-[var(--cx-text-secondary)]">Welcome, <strong class="text-[var(--cx-text)]">{{ auth.user()?.first_name }}</strong></span>
@@ -108,8 +112,6 @@
         </div>
       </div>
     </header>
-
-    <!-- Page Content -->
     <div class="cx-content">
       <router-outlet />
     </div>
@@ -119,8 +121,7 @@
   <nav class="cx-bottom-nav">
     @for (item of filteredMobileNav; track item.label) {
       @if (item.route) {
-        <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{exact: item.route === '/dashboard'}"
-           class="bottom-nav-item">
+        <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{exact: item.route === '/dashboard'}" class="bottom-nav-item">
           <lucide-icon [name]="item.icon" [size]="20"></lucide-icon>
           <span>{{ item.label }}</span>
         </a>
