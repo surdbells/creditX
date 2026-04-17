@@ -25,6 +25,7 @@ use App\Action\Penalty;
 use App\Action\Notification;
 use App\Action\Messaging;
 use App\Action\Channel;
+use App\Action\Device;
 use App\Action\Report;
 use App\Action\DsaTarget;
 use App\Action\Department;
@@ -365,6 +366,12 @@ return function (App $app): void {
         // ─── Unread Count ───
         $api->get('/messaging/unread-count', Channel\UnreadCountAction::class)
             ->add(new RbacMiddleware('messaging.view'));
+
+        // ─── Device Tokens (Push Notifications) ───
+        $api->post('/devices/register', Device\RegisterDeviceAction::class);
+        $api->post('/devices/unregister', Device\UnregisterDeviceAction::class);
+        $api->post('/notifications/push', Device\SendNotificationAction::class)
+            ->add(new RbacMiddleware('notifications.manage'));
 
         // ─── Reports ───
         $api->group('/reports', function (RouteCollectorProxy $group) {
