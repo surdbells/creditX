@@ -1,3 +1,8 @@
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /*
  * App Global CSS
  * ----------------------------------------------------------------------------
@@ -35,3 +40,66 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
+
+/* ─── CreditX Agent — Premium Global Styles ─── */
+:root {
+  --cx-primary: #0A4F2A;
+  --cx-primary-light: #1a7a45;
+  --cx-primary-dark: #063a1e;
+  --cx-accent: #C9A227;
+  --cx-danger: #dc2626;
+  --cx-success: #16a34a;
+}
+
+/* Dark mode via system preference (already imported dark.system.css) */
+body.dark, .dark {
+  --ion-background-color: #0f172a;
+  --ion-text-color: #f1f5f9;
+  --ion-card-background: #1e293b;
+  --ion-toolbar-background: #1e293b;
+  --ion-item-background: #1e293b;
+  --ion-tab-bar-background: #1e293b;
+}
+
+/* Premium typography */
+* { -webkit-font-smoothing: antialiased; }
+ion-content { --background: #f4f6f8; }
+body.dark ion-content { --background: #0f172a; }
+
+/* Premium cards */
+ion-card {
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+  margin: 8px !important;
+}
+body.dark ion-card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+}
+
+/* Premium buttons */
+ion-button {
+  --border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Bottom tabs */
+ion-tab-bar {
+  --background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+body.dark ion-tab-bar {
+  --background: #1e293b;
+  border-top-color: #334155;
+}
+
+/* Toolbar */
+ion-toolbar {
+  --background: #ffffff;
+  --color: #1a1a2e;
+}
+body.dark ion-toolbar {
+  --background: #1e293b;
+  --color: #f1f5f9;
+}

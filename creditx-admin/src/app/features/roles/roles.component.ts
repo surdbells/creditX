@@ -75,7 +75,24 @@ export class RolesComponent implements OnInit {
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
-  ngOnInit() { this.load(); this.api.get('/permissions', { per_page: 200 }).subscribe({ next: r => this.allPerms.set(r.data || []) }); }
+  ngOnInit() {
+    this.load();
+    this.api.get('/permissions', { per_page: 200 }).subscribe({
+      next: r => {
+        const data = r.data || [];
+        // API returns grouped: [{module, permissions: [...]}] — flatten to flat array
+        if (data.length && data[0].permissions) {
+          const flat: any[] = [];
+          for (const group of data) {
+            for (const p of group.permissions) flat.push(p);
+          }
+          this.allPerms.set(flat);
+        } else {
+          this.allPerms.set(data);
+        }
+      }
+    });
+  }
 
   load(p?: any) { this.loading.set(true); this.api.get('/roles', { ...this.q, ...p }).subscribe({ next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   onQuery(e: TableQueryEvent) { this.q = e; this.load(e); }
