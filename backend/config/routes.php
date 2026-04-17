@@ -24,6 +24,7 @@ use App\Action\Payment;
 use App\Action\Penalty;
 use App\Action\Notification;
 use App\Action\Messaging;
+use App\Action\Channel;
 use App\Action\Report;
 use App\Action\DsaTarget;
 use App\Action\Department;
@@ -344,6 +345,26 @@ return function (App $app): void {
             $group->post('/{id}/resolve', Messaging\ResolveConversationAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
         });
+
+        // ─── Channels & Groups ───
+        $api->group('/channels', function (RouteCollectorProxy $group) {
+            $group->get('', Channel\ListChannelsAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
+            $group->post('', Channel\CreateChannelAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+            $group->get('/{id}/messages', Channel\GetChannelMessagesAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
+            $group->post('/{id}/messages', Channel\SendChannelMessageAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+            $group->get('/{id}/members', Channel\GetChannelMembersAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
+            $group->post('/{id}/members', Channel\AddChannelMembersAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+        });
+
+        // ─── Unread Count ───
+        $api->get('/messaging/unread-count', Channel\UnreadCountAction::class)
+            ->add(new RbacMiddleware('messaging.view'));
 
         // ─── Reports ───
         $api->group('/reports', function (RouteCollectorProxy $group) {

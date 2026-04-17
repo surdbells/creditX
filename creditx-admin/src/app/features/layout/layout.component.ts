@@ -5,13 +5,14 @@ import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ToastContainerComponent } from '../../shared/components/toast/toast.component';
+import { FloatingChatComponent } from '../../shared/components/chat/floating-chat.component';
 
 interface NavItem { label: string; icon: string; route: string; permission?: string; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 @Component({
   selector: 'app-layout', standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent, FloatingChatComponent],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss',
 })
