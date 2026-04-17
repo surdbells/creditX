@@ -151,3 +151,36 @@ table tbody tr { transition: background 0.15s ease; }
 table tbody tr:hover { background: var(--cx-surface-hover); }
 
 /* ─── Remove old Material Snackbar styles ─── */
+
+/* ─── Premium Loading States ─── */
+@keyframes cx-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.cx-skeleton {
+  background: linear-gradient(90deg, var(--cx-surface-hover) 25%, var(--cx-border) 50%, var(--cx-surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: cx-shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* ─── Premium Focus States ─── */
+.cx-btn:focus-visible { outline: 2px solid var(--cx-primary); outline-offset: 2px; }
+.cx-input:focus-visible, .cx-select:focus-visible { outline: none; }
+
+/* ─── Premium Badge ─── */
+.cx-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 20px;
+  font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em;
+}
+
+/* ─── Subtle Borders ─── */
+.dark table thead tr { border-bottom-color: rgba(255,255,255,0.08); }
+.dark table tbody tr { border-bottom-color: rgba(255,255,255,0.06); }
+
+/* ─── Form Dialog Premium ─── */
+.dark .cx-card { border-color: rgba(255,255,255,0.06); }
+
+/* ─── Number Formatting Helper ─── */
+.tabular-nums { font-variant-numeric: tabular-nums; }

@@ -25,9 +25,6 @@ class Channel
     #[ORM\Column(type: 'string', length: 20, options: ['default' => 'group'])]
     private string $type = 'group'; // 'group' | 'channel' | 'direct'
 
-    #[ORM\Column(type: 'string', length: 36)]
-    private string $createdBy;
-
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isActive = true;
 
@@ -40,8 +37,6 @@ class Channel
     public function setDescription(?string $v): void { $this->description = $v; }
     public function getType(): string { return $this->type; }
     public function setType(string $v): void { $this->type = $v; }
-    public function getCreatedBy(): string { return $this->createdBy; }
-    public function setCreatedBy(string $v): void { $this->createdBy = $v; }
     public function getIsActive(): bool { return $this->isActive; }
     public function setIsActive(bool $v): void { $this->isActive = $v; }
 
