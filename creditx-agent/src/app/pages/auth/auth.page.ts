@@ -6,6 +6,7 @@ import { IonContent, IonSpinner, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { eyeOutline, eyeOffOutline, logInOutline } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
+import { PushService } from '../../core/services/push.service';
 
 @Component({
   selector: 'app-auth',
@@ -82,7 +83,7 @@ export class AuthPage {
 
   private readonly ALLOWED_ROLES = ['agent', 'dsa', 'field_agent', 'loan_officer'];
 
-  constructor(private auth: AuthService, private router: Router) {
+  constructor(private auth: AuthService, private router: Router, private push: PushService) {
     addIcons({ eyeOutline, eyeOffOutline, logInOutline });
   }
 
@@ -101,6 +102,7 @@ export class AuthPage {
             this.error.set('Access denied. This app is for field agents only. Please use the admin portal.');
             return;
           }
+          this.push.init();
           this.router.navigate(['/dashboard']);
         } else {
           this.error.set(res.message || 'Login failed');
