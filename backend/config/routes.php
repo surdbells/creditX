@@ -26,6 +26,8 @@ use App\Action\Notification;
 use App\Action\Messaging;
 use App\Action\Report;
 use App\Action\DsaTarget;
+use App\Action\Department;
+use App\Action\Team;
 use App\Action\Reconciliation;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
@@ -387,6 +389,24 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.performance'));
             $group->post('', DsaTarget\CreateDsaTargetAction::class)
                 ->add(new RbacMiddleware('reports.performance'));
+        });
+
+        // ─── Departments ───
+        $api->group('/departments', function (RouteCollectorProxy $group) {
+            $group->get('', Department\ListDepartmentsAction::class);
+            $group->post('', Department\CreateDepartmentAction::class)
+                ->add(new RbacMiddleware('users.create'));
+            $group->put('/{id}', Department\UpdateDepartmentAction::class)
+                ->add(new RbacMiddleware('users.edit'));
+        });
+
+        // ─── Teams ───
+        $api->group('/teams', function (RouteCollectorProxy $group) {
+            $group->get('', Team\ListTeamsAction::class);
+            $group->post('', Team\CreateTeamAction::class)
+                ->add(new RbacMiddleware('users.create'));
+            $group->put('/{id}', Team\UpdateTeamAction::class)
+                ->add(new RbacMiddleware('users.edit'));
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));

@@ -40,6 +40,14 @@ class User
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $phone = null;
 
+    #[ORM\ManyToOne(targetEntity: Department::class)]
+    #[ORM\JoinColumn(name: 'department_id', referencedColumnName: 'id', nullable: true)]
+    private ?Department $department = null;
+
+    #[ORM\ManyToOne(targetEntity: Team::class)]
+    #[ORM\JoinColumn(name: 'team_id', referencedColumnName: 'id', nullable: true)]
+    private ?Team $team = null;
+
     #[ORM\Column(type: 'string', length: 64, nullable: true)]
     private ?string $resetToken = null;
 
@@ -189,6 +197,11 @@ class User
     public function getResetTokenExpiresAt(): ?string { return $this->resetTokenExpiresAt; }
     public function setResetTokenExpiresAt(?string $v): void { $this->resetTokenExpiresAt = $v; }
 
+    public function getDepartment(): ?Department { return $this->department; }
+    public function setDepartment(?Department $v): void { $this->department = $v; }
+    public function getTeam(): ?Team { return $this->team; }
+    public function setTeam(?Team $v): void { $this->team = $v; }
+
     public function setStatus(UserStatus $status): void
     {
         $this->status = $status;
@@ -285,6 +298,11 @@ class User
             'full_name'     => $this->getFullName(),
             'email'         => $this->email,
             'phone'         => $this->phone,
+            'department_id'   => $this->department?->getId(),
+            'department_name' => $this->department?->getName(),
+            'team_id'         => $this->team?->getId(),
+            'team_name'       => $this->team?->getName(),
+            'team_lead_name'  => $this->team?->getLead()?->getFullName(),
             'status'        => $this->status->value,
             'last_login_at' => $this->lastLoginAt?->format('Y-m-d H:i:s'),
             'created_at'    => $this->createdAt->format('Y-m-d H:i:s'),

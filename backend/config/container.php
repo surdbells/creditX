@@ -28,6 +28,8 @@ use App\Domain\Repository\ApprovalWorkflowRepository;
 use App\Domain\Repository\LoanApprovalRepository;
 use App\Domain\Repository\CustomerRepository;
 use App\Domain\Repository\DsaTargetRepository;
+use App\Domain\Repository\DepartmentRepository;
+use App\Domain\Repository\TeamRepository;
 use App\Domain\Repository\CustomerLedgerRepository;
 use App\Domain\Repository\DocumentRepository;
 use App\Domain\Repository\FeeTypeRepository;
@@ -191,6 +193,12 @@ return [
     },
     DsaTargetRepository::class => function (ContainerInterface $c): DsaTargetRepository {
         return new DsaTargetRepository($c->get(EntityManagerInterface::class));
+    },
+    DepartmentRepository::class => function (ContainerInterface $c): DepartmentRepository {
+        return new DepartmentRepository($c->get(EntityManagerInterface::class));
+    },
+    TeamRepository::class => function (ContainerInterface $c): TeamRepository {
+        return new TeamRepository($c->get(EntityManagerInterface::class));
     },
 
     // ─── Domain Services ───

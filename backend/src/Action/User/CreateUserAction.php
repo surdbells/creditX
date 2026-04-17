@@ -68,6 +68,16 @@ final class CreateUserAction
         $user->setPhone($clean['phone'] ?? null);
         $user->setStatus(UserStatus::ACTIVE);
 
+        // Assign department and team
+        if (!empty($clean['department_id'])) {
+            $dept = $this->em->find(\App\Domain\Entity\Department::class, $clean['department_id']);
+            if ($dept) $user->setDepartment($dept);
+        }
+        if (!empty($clean['team_id'])) {
+            $team = $this->em->find(\App\Domain\Entity\Team::class, $clean['team_id']);
+            if ($team) $user->setTeam($team);
+        }
+
         // Assign roles
         foreach ($clean['role_ids'] as $roleId) {
             $role = $this->roleRepo->find($roleId);
