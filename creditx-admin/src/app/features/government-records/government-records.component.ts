@@ -15,9 +15,19 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
     <div class="cx-animate-in">
       <cx-page-header title="Government Records" subtitle="Unified employee records database — {{ totalRecords | number }} total">
         <div class="flex items-center gap-2">
-          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportCsv()">
-            <lucide-icon name="download" [size]="14"></lucide-icon> Export CSV
-          </button>
+          <div class="relative">
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
+              <lucide-icon name="download" [size]="14"></lucide-icon> Export
+              <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
+            </button>
+            @if (exportOpen) {
+              <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--cx-surface)] border border-[var(--cx-border)] rounded-xl shadow-xl z-50 overflow-hidden">
+                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('csv')"><lucide-icon name="file-text" [size]="14"></lucide-icon> Export CSV</button>
+                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('excel')"><lucide-icon name="file-text" [size]="14"></lucide-icon> Export Excel</button>
+                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('pdf')"><lucide-icon name="file-text" [size]="14"></lucide-icon> Export PDF</button>
+              </div>
+            }
+          </div>
           @if (auth.hasPermission('records.create')) {
             <button class="cx-btn cx-btn-primary" (click)="openForm()">
               <lucide-icon name="plus" [size]="16"></lucide-icon> Add Record
@@ -220,6 +230,7 @@ export class GovernmentRecordsComponent implements OnInit {
 
   filters: any = { search: '', record_type_id: '', is_active: '', gender: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 25; totalRecords = 0; totalPages = 0;
+  exportOpen = false;
   private filterTimeout: any;
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
@@ -316,7 +327,8 @@ export class GovernmentRecordsComponent implements OnInit {
     });
   }
 
-  exportCsv(): void {
+  exportData(format: string): void {
+    this.exportOpen = false;
     const params: any = { per_page: 10000, sort_by: this.filters.sort_by, sort_dir: this.filters.sort_dir };
     if (this.filters.search) params.search = this.filters.search;
     if (this.filters.record_type_id) params.record_type_id = this.filters.record_type_id;
@@ -324,20 +336,43 @@ export class GovernmentRecordsComponent implements OnInit {
       next: res => {
         const data = res.data || [];
         if (data.length === 0) { this.toast.error('No records to export'); return; }
+        const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+        const filename = `CreditX_GovRecords_${ts}`;
         const headers = ['Staff ID','Employee Name','Record Type','Job Title','Organization','Grade','Step','Gross Pay','Net Pay','Gender','Status'];
-        const csvRows = [headers.join(',')];
-        for (const r of data) {
-          csvRows.push([r.staff_id, `"${r.employee_name||''}"`, r.record_type_name, `"${r.job_title||''}"`,
-            `"${r.organization||''}"`, r.grade_level, r.step, r.gross_pay, r.net_pay, r.gender, r.is_active ? 'Active' : 'Inactive'
-          ].join(','));
+
+        if (format === 'csv') {
+          const csvRows = [headers.join(',')];
+          for (const r of data) {
+            csvRows.push([r.staff_id, `"${r.employee_name||''}"`, r.record_type_name, `"${r.job_title||''}"`,
+              `"${r.organization||''}"`, r.grade_level, r.step, r.gross_pay, r.net_pay, r.gender, r.is_active ? 'Active' : 'Inactive'
+            ].join(','));
+          }
+          this.downloadBlob(new Blob([csvRows.join('\n')], { type: 'text/csv' }), filename + '.csv');
+        } else if (format === 'excel') {
+          let html = '<html><head><meta charset="UTF-8"></head><body><table border="1"><tr>';
+          for (const h of headers) html += `<th>${h}</th>`;
+          html += '</tr>';
+          for (const r of data) {
+            html += `<tr><td>${r.staff_id}</td><td>${r.employee_name||''}</td><td>${r.record_type_name}</td><td>${r.job_title||''}</td><td>${r.organization||''}</td><td>${r.grade_level||''}</td><td>${r.step||''}</td><td>${r.gross_pay||''}</td><td>${r.net_pay||''}</td><td>${r.gender||''}</td><td>${r.is_active?'Active':'Inactive'}</td></tr>`;
+          }
+          this.downloadBlob(new Blob([html + '</table></body></html>'], { type: 'application/vnd.ms-excel' }), filename + '.xls');
+        } else if (format === 'pdf') {
+          const w = window.open('', '_blank'); if (!w) return;
+          let html = `<html><head><title>Government Records</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:5px;font-size:9px}th{background:#0A4F2A;color:white}.meta{color:#666;font-size:10px}</style></head><body>`;
+          html += `<h1>CreditX — Government Records Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Records: ${data.length}</p><table><tr>`;
+          for (const h of headers) html += `<th>${h}</th>`;
+          html += '</tr>';
+          for (const r of data) {
+            html += `<tr><td>${r.staff_id}</td><td>${r.employee_name||''}</td><td>${r.record_type_name}</td><td>${r.job_title||''}</td><td>${r.organization||''}</td><td>${r.grade_level||''}</td><td>${r.step||''}</td><td>${r.gross_pay||''}</td><td>${r.net_pay||''}</td><td>${r.gender||''}</td><td>${r.is_active?'Active':'Inactive'}</td></tr>`;
+          }
+          w.document.write(html + '</table></body></html>'); w.document.close(); w.onload = () => w.print();
         }
-        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `government_records_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-        URL.revokeObjectURL(url);
-        this.toast.success(`Exported ${data.length} records`);
+        this.toast.success(`Exported ${data.length} records (${format.toUpperCase()})`);
       },
     });
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
   }
 }

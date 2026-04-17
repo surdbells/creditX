@@ -44,6 +44,8 @@ export class LayoutComponent {
     ]},
     { label: 'System', items: [
       { label: 'Users', icon: 'users', route: '/users', permission: 'users.view' },
+      { label: 'Departments', icon: 'building-2', route: '/departments', permission: 'users.view' },
+      { label: 'Teams', icon: 'users', route: '/teams', permission: 'users.view' },
       { label: 'Roles', icon: 'shield', route: '/roles', permission: 'roles.view' },
       { label: 'Locations', icon: 'map-pin', route: '/locations', permission: 'locations.view' },
       { label: 'Settings', icon: 'settings', route: '/settings', permission: 'settings.view' },

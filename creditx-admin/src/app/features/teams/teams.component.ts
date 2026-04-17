@@ -1,0 +1,59 @@
+import { Component, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { LucideAngularModule } from 'lucide-angular';
+import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+@Component({
+  selector: 'app-teams', standalone: true,
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  template: `
+    <div class="cx-animate-in">
+      <cx-page-header title="Teams" subtitle="Manage teams within departments">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Team</button>
+      </cx-page-header>
+      <div class="cx-card !p-4">
+        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search teams..." [hasActions]="true" (query)="onQuery($event)">
+          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
+        </cx-data-table>
+      </div>
+    </div>
+    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Team' : 'Create Team'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
+        </div>
+        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description"></textarea></div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="cx-label">Department</label>
+            <select class="cx-select" [(ngModel)]="form.department_id"><option value="">— None —</option>
+              @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
+            </select>
+          </div>
+          <div><label class="cx-label">Team Lead</label>
+            <select class="cx-select" [(ngModel)]="form.lead_id"><option value="">— None —</option>
+              @for (u of users(); track u.id) { <option [value]="u.id">{{ u.full_name }}</option> }
+            </select>
+          </div>
+        </div>
+      </div>
+    </cx-form-dialog>
+  `,
+})
+export class TeamsComponent implements OnInit {
+  columns: TableColumn[] = [{key:'name',label:'Team Name'},{key:'code',label:'Code'},{key:'department_name',label:'Department'},{key:'lead_name',label:'Team Lead'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
+  rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
+  showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};
+  departments = signal<any[]>([]); users = signal<any[]>([]);
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  ngOnInit() { this.load(); this.api.get('/departments',{per_page:100}).subscribe({next:r=>this.departments.set(r.data||[])}); this.api.get('/users',{per_page:200}).subscribe({next:r=>this.users.set(r.data||[])}); }
+  load(p?:any) { this.loading.set(true); this.api.get('/teams',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
+  onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }
+  openForm(row?:any) { if(row){this.editId=row.id;this.form={name:row.name,code:row.code,description:row.description,department_id:row.department_id||'',lead_id:row.lead_id||''};}else{this.editId=null;this.form={name:'',code:'',description:'',department_id:'',lead_id:''};} this.showForm.set(true); }
+  saveForm() { this.saving.set(true); (this.editId?this.api.put('/teams/'+this.editId,this.form):this.api.post('/teams',this.form)).subscribe({next:r=>{this.saving.set(false);this.toast.success(r.message||'Saved');this.showForm.set(false);this.load(this.q);},error:e=>{this.saving.set(false);this.toast.error(e.error?.message||'Failed');}}); }
+}
