@@ -35,6 +35,7 @@ export class LayoutComponent {
       { label: 'Loan Products', icon: 'folder-kanban', route: '/loan-products', permission: 'products.view' },
       { label: 'Fee Types', icon: 'landmark', route: '/fee-types', permission: 'products.view' },
       { label: 'Penalty Rules', icon: 'gavel', route: '/penalty-rules', permission: 'products.view' },
+      { label: 'Approval Workflows', icon: 'check-circle', route: '/approval-workflows', permission: 'products.view' },
       { label: 'Record Types', icon: 'database', route: '/record-types', permission: 'record_types.view' },
       { label: 'Gov. Records', icon: 'building-2', route: '/government-records', permission: 'records.view' },
     ]},

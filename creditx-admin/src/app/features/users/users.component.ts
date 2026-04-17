@@ -7,10 +7,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 @Component({
   selector: 'app-users', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="User Management" subtitle="{{ totalRecords | number }} users">
@@ -176,16 +177,12 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         @if (!editId) { <div><label class="cx-label">Password *</label><input class="cx-input" type="password" [(ngModel)]="form.password" placeholder="Min 8 characters" /></div> }
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">Department</label>
-            <select class="cx-select" [(ngModel)]="form.department_id" (change)="onDeptChange()">
-              <option value="">— None —</option>
-              @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
-            </select>
+            <cx-searchable-select [options]="deptOptions()" placeholder="Select department..." [clearable]="true"
+              [(ngModel)]="form.department_id" (ngModelChange)="onDeptChange()"></cx-searchable-select>
           </div>
           <div><label class="cx-label">Team</label>
-            <select class="cx-select" [(ngModel)]="form.team_id">
-              <option value="">— None —</option>
-              @for (t of filteredTeams(); track t.id) { <option [value]="t.id">{{ t.name }}</option> }
-            </select>
+            <cx-searchable-select [options]="teamOptions()" placeholder="Select team..." [clearable]="true"
+              [(ngModel)]="form.team_id"></cx-searchable-select>
           </div>
         </div>
         <div><label class="cx-label">Roles</label>
@@ -268,6 +265,9 @@ export class UsersComponent implements OnInit {
     let hash = 0; for (const c of id) hash = c.charCodeAt(0) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
   }
+
+  deptOptions(): SelectOption[] { return this.departments().map((d: any) => ({ value: d.id, label: d.name, sublabel: d.code })); }
+  teamOptions(): SelectOption[] { return this.filteredTeams().map((t: any) => ({ value: t.id, label: t.name, sublabel: t.department_name })); }
 
   filteredTeams(): any[] {
     if (!this.form.department_id) return this.teams();

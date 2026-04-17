@@ -8,10 +8,11 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 @Component({
   selector: 'app-notifications', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Notifications" subtitle="Manage templates and send push notifications">
@@ -62,10 +63,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         </div>
         @if (pushForm.target === 'user') {
           <div><label class="cx-label">Select User</label>
-            <select class="cx-select" [(ngModel)]="pushForm.user_id">
-              <option value="">Choose...</option>
-              @for (u of users(); track u.id) { <option [value]="u.id">{{ u.full_name }} ({{ u.email }})</option> }
-            </select>
+            <cx-searchable-select [options]="userOptions()" placeholder="Search user..." [(ngModel)]="pushForm.user_id"></cx-searchable-select>
           </div>
         }
         @if (pushForm.target === 'role') {
@@ -131,6 +129,8 @@ export class NotificationsComponent implements OnInit {
       error: e => { this.saving.set(false); this.toast.error(e.error?.message || 'Failed'); },
     });
   }
+
+  userOptions(): SelectOption[] { return this.users().map((u: any) => ({ value: u.id, label: u.full_name, sublabel: u.email })); }
 
   openPushDialog() {
     this.pushForm = { title: '', body: '', target: 'user', user_id: '', role: '', route: '' };

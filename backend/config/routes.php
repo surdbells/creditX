@@ -93,6 +93,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('roles.view'));
             $group->put('/{id}', Role\UpdateRoleAction::class)
                 ->add(new RbacMiddleware('roles.edit'));
+            $group->put('/{id}/permissions', Role\UpdateRolePermissionsAction::class)
+                ->add(new RbacMiddleware('roles.edit'));
         });
 
         // ─── Permissions ───

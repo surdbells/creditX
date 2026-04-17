@@ -8,9 +8,10 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 @Component({
   selector: 'app-teams', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Teams" subtitle="Manage teams within departments">
@@ -31,14 +32,10 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description"></textarea></div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">Department</label>
-            <select class="cx-select" [(ngModel)]="form.department_id"><option value="">— None —</option>
-              @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
-            </select>
+            <cx-searchable-select [options]="deptOptions()" placeholder="Select department..." [clearable]="true" [(ngModel)]="form.department_id"></cx-searchable-select>
           </div>
           <div><label class="cx-label">Team Lead</label>
-            <select class="cx-select" [(ngModel)]="form.lead_id"><option value="">— None —</option>
-              @for (u of users(); track u.id) { <option [value]="u.id">{{ u.full_name }}</option> }
-            </select>
+            <cx-searchable-select [options]="userOptions()" placeholder="Select lead..." [clearable]="true" [(ngModel)]="form.lead_id"></cx-searchable-select>
           </div>
         </div>
       </div>
@@ -51,6 +48,8 @@ export class TeamsComponent implements OnInit {
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};
   departments = signal<any[]>([]); users = signal<any[]>([]);
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  deptOptions(): SelectOption[] { return this.departments().map((d: any) => ({ value: d.id, label: d.name, sublabel: d.code })); }
+  userOptions(): SelectOption[] { return this.users().map((u: any) => ({ value: u.id, label: u.full_name, sublabel: u.email })); }
   ngOnInit() { this.load(); this.api.get('/departments',{per_page:100}).subscribe({next:r=>this.departments.set(r.data||[])}); this.api.get('/users',{per_page:200}).subscribe({next:r=>this.users.set(r.data||[])}); }
   load(p?:any) { this.loading.set(true); this.api.get('/teams',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
   onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }
