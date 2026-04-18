@@ -81,6 +81,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('users.view'));
             $group->put('/{id}', User\UpdateUserAction::class)
                 ->add(new RbacMiddleware('users.edit'));
+            $group->post('/{id}/reset-password', User\ResetUserPasswordAction::class)
+                ->add(new RbacMiddleware('users.edit'));
         });
 
         // ─── Roles ───

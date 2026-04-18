@@ -140,6 +140,9 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                       <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)">
                         <lucide-icon name="pencil" [size]="14"></lucide-icon>
                       </button>
+                      <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="resetPassword(row)" title="Reset Password">
+                        <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
+                      </button>
                     </td>
                   </tr>
                 }
@@ -214,6 +217,37 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
         }
       </div>
     </cx-form-dialog>
+
+    <!-- Password Reset Dialog -->
+    @if (resetResult) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center" (click)="resetResult = null">
+        <div class="fixed inset-0 bg-black/40"></div>
+        <div class="relative bg-[var(--cx-surface)] rounded-2xl shadow-2xl max-w-sm w-full mx-4 cx-animate-in" (click)="$event.stopPropagation()">
+          <div class="px-6 py-4 border-b border-[var(--cx-border)]">
+            <h3 class="text-sm font-bold text-[var(--cx-text)]">Password Reset</h3>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="flex items-center gap-3 p-3 rounded-xl bg-[var(--cx-success-light)]">
+              <lucide-icon name="check-circle" [size]="20" class="text-[var(--cx-success)]"></lucide-icon>
+              <span class="text-sm font-medium text-[var(--cx-success)]">Password reset for {{ resetResult.user_name }}</span>
+            </div>
+            <div>
+              <label class="cx-label">New Password</label>
+              <div class="flex items-center gap-2">
+                <input type="text" class="cx-input font-mono text-base tracking-wider" [value]="resetResult.password" readonly #pwdInput />
+                <button class="cx-btn cx-btn-outline cx-btn-sm flex-shrink-0" (click)="copyPassword(pwdInput)">
+                  <lucide-icon name="copy" [size]="14"></lucide-icon> Copy
+                </button>
+              </div>
+            </div>
+            <p class="text-[10px] text-[var(--cx-text-muted)]">Share this password securely with the user. They should change it on first login.</p>
+          </div>
+          <div class="px-6 py-3 border-t border-[var(--cx-border)] flex justify-end">
+            <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="resetResult = null">Done</button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export class UsersComponent implements OnInit {
@@ -225,6 +259,7 @@ export class UsersComponent implements OnInit {
   filters: any = { search: '', role: '', department_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 25; totalRecords = 0; totalPages = 0;
   exportOpen = false;
+  resetResult: any = null;
   private filterTimeout: any;
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
@@ -348,6 +383,18 @@ export class UsersComponent implements OnInit {
         this.toast.success(`Exported ${data.length} users (${format.toUpperCase()})`);
       },
     });
+  }
+
+  resetPassword(row: any): void {
+    if (!confirm(`Reset password for ${row.full_name}?`)) return;
+    this.api.post('/users/' + row.id + '/reset-password', {}).subscribe({
+      next: r => { this.resetResult = r.data; },
+      error: e => this.toast.error(e.error?.message || 'Failed'),
+    });
+  }
+
+  copyPassword(input: HTMLInputElement): void {
+    navigator.clipboard.writeText(input.value).then(() => this.toast.success('Password copied'));
   }
 
   private downloadBlob(blob: Blob, filename: string): void {

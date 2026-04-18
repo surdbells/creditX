@@ -7,10 +7,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 @Component({
   selector: 'app-messaging', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Messaging" subtitle="Conversations, channels & groups">
@@ -173,10 +174,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           </div>
         </div>
         <div><label class="cx-label">Add Individual Users</label>
-          <select class="cx-select" (change)="addUser($event)">
-            <option value="">Select user to add...</option>
-            @for (u of users(); track u.id) { <option [value]="u.id">{{ u.full_name }}</option> }
-          </select>
+          <cx-searchable-select [options]="userOptions()" placeholder="Search user to add..." [clearable]="true"
+            (ngModelChange)="onUserSelected($event)" [ngModel]="null"></cx-searchable-select>
           @if (selUsers.length) {
             <div class="flex flex-wrap gap-1 mt-2">
               @for (uid of selUsers; track uid) {
@@ -215,10 +214,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           </div>
         </div>
         <div><label class="cx-label">Individual Users</label>
-          <select class="cx-select" (change)="addIndivUser($event)">
-            <option value="">Select user...</option>
-            @for (u of users(); track u.id) { <option [value]="u.id">{{ u.full_name }}</option> }
-          </select>
+          <cx-searchable-select [options]="userOptions()" placeholder="Search user..." [clearable]="true"
+            (ngModelChange)="onAddUserSelected($event)" [ngModel]="null"></cx-searchable-select>
           @if (addUserIds.length) {
             <div class="flex flex-wrap gap-1 mt-2">
               @for (uid of addUserIds; track uid) {
@@ -324,7 +321,8 @@ export class MessagingComponent implements OnInit, OnDestroy {
   }
 
   toggle(arr: string, id: string) { (this as any)[arr] = (this as any)[arr].includes(id) ? (this as any)[arr].filter((x: string) => x !== id) : [...(this as any)[arr], id]; }
-  addUser(event: Event) { const v = (event.target as HTMLSelectElement).value; if (v && !this.selUsers.includes(v)) this.selUsers = [...this.selUsers, v]; (event.target as HTMLSelectElement).value = ''; }
-  addIndivUser(event: Event) { const v = (event.target as HTMLSelectElement).value; if (v && !this.addUserIds.includes(v)) this.addUserIds = [...this.addUserIds, v]; (event.target as HTMLSelectElement).value = ''; }
+  userOptions(): SelectOption[] { return this.users().map((u: any) => ({ value: u.id, label: u.full_name, sublabel: u.email })); }
+  onUserSelected(uid: string | null) { if (uid && !this.selUsers.includes(uid)) this.selUsers = [...this.selUsers, uid]; }
+  onAddUserSelected(uid: string | null) { if (uid && !this.addUserIds.includes(uid)) this.addUserIds = [...this.addUserIds, uid]; }
   getUserName(uid: string): string { return this.users().find((u: any) => u.id === uid)?.full_name || uid.slice(0, 8); }
 }
