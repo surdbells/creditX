@@ -18,7 +18,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         </button>
       </cx-page-header>
 
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         @if (loading()) {
           <div class="flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
         } @else if (rows().length === 0) {

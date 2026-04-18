@@ -16,7 +16,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Approval Queue" subtitle="Loans pending your approval"></cx-page-header>
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
           searchPlaceholder="Search pending approvals..." [hasActions]="true" (query)="onQuery($event)">
           <ng-template #rowActions let-row>

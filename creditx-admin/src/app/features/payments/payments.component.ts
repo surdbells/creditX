@@ -28,7 +28,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
           }
         </div>
       </cx-page-header>
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
           searchPlaceholder="Search payments..." [hasActions]="false" (query)="onQuery($event)">
         </cx-data-table>

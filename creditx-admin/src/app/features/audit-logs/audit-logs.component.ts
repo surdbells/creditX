@@ -35,7 +35,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div class="lg:col-span-2">
             <div class="relative">
-              <lucide-icon name="search" class="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
               <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by user, entity, description..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
             </div>
           </div>
@@ -66,7 +66,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       </div>
 
       <!-- Table -->
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         @if (loading()) {
           <div class="flex items-center justify-center py-16">
             <div class="flex flex-col items-center gap-3">

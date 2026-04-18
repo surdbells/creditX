@@ -21,7 +21,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Customer</button>
         }
       </cx-page-header>
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
           searchPlaceholder="Search customers by name, phone, BVN..." [hasActions]="true" (query)="onQuery($event)">
           <ng-template #rowActions let-row>

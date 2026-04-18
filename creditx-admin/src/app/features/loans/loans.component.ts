@@ -36,7 +36,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       <div class="cx-card !p-4 mb-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div class="lg:col-span-2 relative">
-            <lucide-icon name="search" class="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+            <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
             <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by App ID, customer name..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
           </div>
           <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
@@ -53,7 +53,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
         </div>
       </div>
 
-      <div class="cx-card !p-0 overflow-hidden">
+      <div class="cx-card !p-4 overflow-hidden">
         <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
           [searchPlaceholder]="''" [hasActions]="true" (query)="onQuery($event)">
           <ng-template #rowActions let-row>

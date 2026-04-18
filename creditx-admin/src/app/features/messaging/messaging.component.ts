@@ -19,7 +19,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="min-height: 70vh">
         <!-- Left Panel — Conversations + Channels -->
-        <div class="cx-card !p-0 overflow-hidden flex flex-col">
+        <div class="cx-card !p-4 overflow-hidden flex flex-col">
           <!-- Tabs -->
           <div class="flex border-b border-[var(--cx-border)]">
             <button class="flex-1 py-2.5 text-xs font-semibold text-center transition-colors"
@@ -32,7 +32,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           <!-- Search -->
           <div class="p-3 border-b border-[var(--cx-border)]">
             <div class="relative">
-              <lucide-icon name="search" class="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="14"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="14"></lucide-icon>
               <input type="text" class="cx-input !pl-7 !py-1.5 !text-xs" placeholder="Search..." [(ngModel)]="listSearch" />
             </div>
           </div>
@@ -81,7 +81,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         </div>
 
         <!-- Right Panel — Message Thread -->
-        <div class="lg:col-span-2 cx-card !p-0 overflow-hidden flex flex-col">
+        <div class="lg:col-span-2 cx-card !p-4 overflow-hidden flex flex-col">
           @if (!activeId) {
             <div class="flex-1 flex flex-col items-center justify-center">
               <lucide-icon name="message-square" [size]="48" class="text-[var(--cx-text-muted)] opacity-20 mb-3"></lucide-icon>

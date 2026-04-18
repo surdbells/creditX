@@ -49,7 +49,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
         <!-- Data Table -->
         @if (tableRows().length) {
-          <div class="cx-card !p-0 overflow-hidden">
+          <div class="cx-card !p-4 overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--cx-border)]">
               <h3 class="text-sm font-semibold text-[var(--cx-text)]">{{ reportTitle }}</h3>
               <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportReport()">
