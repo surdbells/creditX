@@ -22,7 +22,7 @@ final class OtpService
         ]);
         foreach ($existing as $old) { $old->markUsed(); }
 
-        $ttl = (int) ($this->settings->get('2fa.otp_ttl_minutes', '10'));
+        $ttl = max(5, (int) ($this->settings->get('2fa.otp_ttl_minutes', '10')));
         $otp = OtpToken::create($user, $purpose, $ttl);
         $this->em->persist($otp);
         $this->em->flush();
@@ -47,7 +47,30 @@ final class OtpService
             'user' => $user, 'purpose' => $purpose, 'used' => false,
         ], ['createdAt' => 'DESC']);
 
-        if (!$otp || !$otp->isValid($code)) return false;
+        if (!$otp) {
+            $this->logger?->error('OTP verify: no unused OTP found', ['user_id' => $user->getId(), 'purpose' => $purpose]);
+            return false;
+        }
+
+        $this->logger?->info('OTP verify attempt', [
+            'user_id' => $user->getId(),
+            'input_code' => $code,
+            'stored_code' => $otp->getCode(),
+            'codes_match' => $otp->getCode() === $code,
+            'is_used' => $otp->isUsed(),
+            'expires_at' => $otp->getExpiresAt()->format('Y-m-d H:i:s T'),
+            'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s T'),
+            'is_expired' => $otp->isExpired(),
+        ]);
+
+        if (!$otp->isValid($code)) {
+            $this->logger?->error('OTP verify: invalid', [
+                'codes_match' => $otp->getCode() === $code,
+                'is_expired' => $otp->isExpired(),
+                'is_used' => $otp->isUsed(),
+            ]);
+            return false;
+        }
 
         $otp->markUsed();
         $this->em->flush();

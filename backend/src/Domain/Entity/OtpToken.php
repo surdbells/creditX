@@ -37,7 +37,7 @@ class OtpToken
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
-        $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos'));
+        $this->createdAt = new \DateTimeImmutable('now');
     }
 
     public static function create(User $user, string $purpose = 'login', int $ttlMinutes = 10): self
@@ -46,7 +46,7 @@ class OtpToken
         $otp->user = $user;
         $otp->code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $otp->purpose = $purpose;
-        $otp->expiresAt = new \DateTimeImmutable("+{$ttlMinutes} minutes", new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos'));
+        $otp->expiresAt = new \DateTimeImmutable("+{$ttlMinutes} minutes");
         return $otp;
     }
 
@@ -60,7 +60,7 @@ class OtpToken
 
     public function isExpired(): bool
     {
-        return new \DateTimeImmutable('now', new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos')) > $this->expiresAt;
+        return new \DateTimeImmutable('now') > $this->expiresAt;
     }
 
     public function isValid(string $code): bool
