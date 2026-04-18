@@ -4,20 +4,19 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\{OtpToken, User};
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 
 final class OtpService
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SettingsCacheService $settings,
+        private readonly ?LoggerInterface $logger = null,
     ) {}
 
-    /**
-     * Generate OTP and send via email.
-     */
     public function generateAndSend(User $user, string $purpose = 'login'): OtpToken
     {
-        // Invalidate any existing unused OTPs for this user+purpose
+        // Invalidate existing unused OTPs
         $existing = $this->em->getRepository(OtpToken::class)->findBy([
             'user' => $user, 'purpose' => $purpose, 'used' => false,
         ]);
@@ -28,15 +27,20 @@ final class OtpService
         $this->em->persist($otp);
         $this->em->flush();
 
-        // Send OTP email via ZeptoMail
-        $this->sendOtpEmail($user, $otp->getCode(), $ttl);
+        // Send email — MUST NOT throw on failure
+        try {
+            $this->sendOtpEmail($user, $otp->getCode(), $ttl);
+        } catch (\Throwable $e) {
+            $this->logger?->error('OTP email failed: ' . $e->getMessage(), [
+                'user_id' => $user->getId(),
+                'email' => $user->getEmail(),
+            ]);
+            // OTP is still created — user can request resend
+        }
 
         return $otp;
     }
 
-    /**
-     * Verify OTP code.
-     */
     public function verify(User $user, string $code, string $purpose = 'login'): bool
     {
         $otp = $this->em->getRepository(OtpToken::class)->findOneBy([
@@ -50,42 +54,33 @@ final class OtpService
         return true;
     }
 
-    /**
-     * Check if 2FA is enforced.
-     */
     public function isEnforced(): bool
     {
         return $this->settings->getBool('2fa.enabled', false);
     }
 
-    /**
-     * Send OTP email via ZeptoMail API.
-     */
     private function sendOtpEmail(User $user, string $code, int $ttlMinutes): void
     {
         $apiKey = $_ENV['ZEPTOMAIL_API_KEY'] ?? '';
-        if (empty($apiKey)) return;
+        if (empty($apiKey)) {
+            $this->logger?->warning('ZEPTOMAIL_API_KEY not set, skipping OTP email');
+            return;
+        }
+
+        $email = $user->getEmail();
+        if (empty($email)) {
+            $this->logger?->warning('User has no email, skipping OTP', ['user_id' => $user->getId()]);
+            return;
+        }
 
         $fromEmail = $_ENV['ZEPTOMAIL_FROM_EMAIL'] ?? 'noreply@dostsuite.com';
         $fromName = $_ENV['ZEPTOMAIL_FROM_NAME'] ?? 'CreditX';
 
-        $htmlBody = "
-        <div style='font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px'>
-            <div style='text-align:center;margin-bottom:24px'>
-                <h1 style='color:#0A4F2A;font-size:24px;margin:0'>Credit<span style='color:#C9A227'>X</span></h1>
-            </div>
-            <div style='background:#f8f9fa;border-radius:12px;padding:32px;text-align:center'>
-                <h2 style='color:#1a1a2e;font-size:18px;margin:0 0 8px'>Verification Code</h2>
-                <p style='color:#64748b;font-size:14px;margin:0 0 24px'>Enter this code to complete your sign in</p>
-                <div style='background:#0A4F2A;color:#fff;font-size:32px;letter-spacing:8px;padding:16px 24px;border-radius:12px;display:inline-block;font-weight:bold'>{$code}</div>
-                <p style='color:#94a3b8;font-size:12px;margin-top:24px'>This code expires in {$ttlMinutes} minutes</p>
-            </div>
-            <p style='color:#94a3b8;font-size:11px;text-align:center;margin-top:16px'>If you didn't request this, please ignore this email.</p>
-        </div>";
+        $htmlBody = $this->buildOtpEmailHtml($user->getFullName(), $code, $ttlMinutes);
 
         $payload = [
             'from' => ['address' => $fromEmail, 'name' => $fromName],
-            'to' => [['email_address' => ['address' => $user->getEmail(), 'name' => $user->getFullName()]]],
+            'to' => [['email_address' => ['address' => $email, 'name' => $user->getFullName()]]],
             'subject' => "CreditX - Your verification code is {$code}",
             'htmlbody' => $htmlBody,
         ];
@@ -97,11 +92,53 @@ final class OtpService
             CURLOPT_HTTPHEADER => [
                 'Authorization: Zoho-enczapikey ' . $apiKey,
                 'Content-Type: application/json',
+                'Accept: application/json',
             ],
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_TIMEOUT => 10,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
         ]);
-        curl_exec($ch);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
+
+        if ($response === false) {
+            $this->logger?->error('OTP email curl failed', ['error' => $curlError]);
+            return;
+        }
+
+        if ($httpCode >= 400) {
+            $this->logger?->error('OTP email API error', [
+                'http_code' => $httpCode,
+                'response' => substr((string)$response, 0, 500),
+            ]);
+        }
+    }
+
+    private function buildOtpEmailHtml(string $name, string $code, int $ttl): string
+    {
+        return <<<HTML
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:500px;margin:0 auto;padding:0;background:#f8f9fa">
+            <div style="background:linear-gradient(135deg,#0A4F2A 0%,#0d6b3a 100%);padding:32px 24px;text-align:center;border-radius:0 0 24px 24px">
+                <h1 style="color:#fff;font-size:28px;margin:0;font-weight:800;letter-spacing:-0.5px">
+                    Credit<span style="color:#C9A227">X</span>
+                </h1>
+                <p style="color:rgba(255,255,255,0.7);font-size:12px;margin:8px 0 0;text-transform:uppercase;letter-spacing:2px">Loan Management System</p>
+            </div>
+            <div style="padding:32px 24px">
+                <p style="color:#374151;font-size:15px;margin:0 0 8px">Hello <strong>{$name}</strong>,</p>
+                <p style="color:#6b7280;font-size:14px;margin:0 0 24px;line-height:1.5">Use the verification code below to complete your sign in. This code is valid for <strong>{$ttl} minutes</strong>.</p>
+                <div style="background:#fff;border:2px solid #e5e7eb;border-radius:16px;padding:24px;text-align:center;margin:0 0 24px">
+                    <div style="font-size:36px;font-weight:800;letter-spacing:12px;color:#0A4F2A;font-family:'Courier New',monospace">{$code}</div>
+                </div>
+                <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0 0 24px">If you didn't request this code, please ignore this email or contact your administrator.</p>
+                <div style="border-top:1px solid #e5e7eb;padding-top:16px;text-align:center">
+                    <p style="color:#9ca3af;font-size:11px;margin:0">&copy; 2026 Kodek Innovations Limited</p>
+                </div>
+            </div>
+        </div>
+        HTML;
     }
 }
