@@ -40,6 +40,9 @@ class User
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $phone = null;
 
+    #[ORM\Column(type: 'string', length: 500, nullable: true)]
+    private ?string $avatarPath = null;
+
     #[ORM\ManyToOne(targetEntity: Department::class)]
     #[ORM\JoinColumn(name: 'department_id', referencedColumnName: 'id', nullable: true)]
     private ?Department $department = null;
@@ -192,6 +195,9 @@ class User
         $this->phone = $phone;
     }
 
+    public function getAvatarPath(): ?string { return $this->avatarPath; }
+    public function setAvatarPath(?string $v): void { $this->avatarPath = $v; }
+
     public function getResetToken(): ?string { return $this->resetToken; }
     public function setResetToken(?string $v): void { $this->resetToken = $v; }
     public function getResetTokenExpiresAt(): ?string { return $this->resetTokenExpiresAt; }
@@ -298,6 +304,7 @@ class User
             'full_name'     => $this->getFullName(),
             'email'         => $this->email,
             'phone'         => $this->phone,
+            'avatar_path'   => $this->avatarPath,
             'department_id'   => $this->department?->getId(),
             'department_name' => $this->department?->getName(),
             'team_id'         => $this->team?->getId(),

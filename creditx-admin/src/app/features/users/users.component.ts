@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -107,10 +109,14 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                   <tr class="border-b border-[var(--cx-border)] transition-colors hover:bg-[var(--cx-surface-hover)]">
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                             [style.background]="avatarColor(row.id)">
-                          {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}
-                        </div>
+                        @if (row.avatar_path) {
+                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                        } @else {
+                          <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                               [style.background]="avatarColor(row.id)">
+                            {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}
+                          </div>
+                        }
                         <div>
                           <div class="text-sm font-medium text-[var(--cx-text)]">{{ row.full_name }}</div>
                           <div class="text-xs text-[var(--cx-text-muted)]">{{ row.email }}</div>
@@ -143,6 +149,10 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                       <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="resetPassword(row)" title="Reset Password">
                         <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
                       </button>
+                      <label class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cursor-pointer" title="Upload Photo">
+                        <lucide-icon name="upload" [size]="14"></lucide-icon>
+                        <input type="file" accept="image/*" class="hidden" (change)="uploadAvatar(row, $event)" />
+                      </label>
                     </td>
                   </tr>
                 }
@@ -262,7 +272,9 @@ export class UsersComponent implements OnInit {
   resetResult: any = null;
   private filterTimeout: any;
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  apiUrl = environment.apiUrl.replace('/api', '');
+
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private http: HttpClient) {}
 
   ngOnInit(): void {
     this.load();
@@ -395,6 +407,17 @@ export class UsersComponent implements OnInit {
 
   copyPassword(input: HTMLInputElement): void {
     navigator.clipboard.writeText(input.value).then(() => this.toast.success('Password copied'));
+  }
+
+  uploadAvatar(row: any, event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('avatar', file);
+    this.http.post<any>(`${environment.apiUrl}/users/${row.id}/avatar`, formData).subscribe({
+      next: () => { this.toast.success('Photo uploaded'); this.load(); },
+      error: (e: any) => this.toast.error(e.error?.message || 'Upload failed'),
+    });
   }
 
   private downloadBlob(blob: Blob, filename: string): void {

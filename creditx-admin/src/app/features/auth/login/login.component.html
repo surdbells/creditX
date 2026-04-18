@@ -10,45 +10,82 @@
       </div>
 
       @if (error()) {
-        <div class="mb-4 p-3 rounded-lg bg-[var(--cx-danger-light)] text-[var(--cx-danger)] text-sm">
+        <div class="mb-4 p-3 rounded-xl bg-[var(--cx-danger-light)] text-[var(--cx-danger)] text-sm text-center">
           {{ error() }}
         </div>
       }
 
-      <form (ngSubmit)="onSubmit()" class="space-y-5">
-        <div>
-          <label class="cx-label" for="email">Email Address</label>
-          <input id="email" type="email" class="cx-input" [(ngModel)]="email" name="email"
-                 placeholder="admin@dostsuite.com" [disabled]="loading()" autocomplete="email" />
-        </div>
+      <!-- Standard Login Form -->
+      @if (!requires2FA()) {
+        <form (ngSubmit)="onSubmit()" class="space-y-5">
+          <div>
+            <label class="cx-label" for="email">Email Address</label>
+            <input id="email" type="email" class="cx-input" [(ngModel)]="email" name="email"
+                   placeholder="admin@dostsuite.com" [disabled]="loading()" autocomplete="email" />
+          </div>
+          <div>
+            <label class="cx-label" for="password">Password</label>
+            <div class="relative">
+              <input id="password" [type]="showPassword() ? 'text' : 'password'" class="cx-input !pr-10"
+                     [(ngModel)]="password" name="password" placeholder="Enter password"
+                     [disabled]="loading()" autocomplete="current-password" />
+              <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]"
+                      (click)="showPassword.set(!showPassword())">
+                <lucide-icon [name]="showPassword() ? 'eye-off' : 'eye'" [size]="16"></lucide-icon>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="cx-btn cx-btn-primary cx-btn-lg w-full" [disabled]="loading()">
+            @if (loading()) {
+              <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Signing in...
+            } @else {
+              <lucide-icon name="log-in" [size]="18"></lucide-icon> Sign In
+            }
+          </button>
+        </form>
+      }
 
-        <div>
-          <label class="cx-label" for="password">Password</label>
-          <div class="relative">
-            <input id="password" [type]="showPassword() ? 'text' : 'password'" class="cx-input !pr-10"
-                   [(ngModel)]="password" name="password" placeholder="Enter password"
-                   [disabled]="loading()" autocomplete="current-password" />
-            <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]"
-                    (click)="showPassword.set(!showPassword())">
-              <lucide-icon [name]="showPassword() ? 'eye-off' : 'eye'" [size]="16"></lucide-icon>
+      <!-- 2FA OTP Verification -->
+      @if (requires2FA()) {
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[var(--cx-primary-50)] flex items-center justify-center">
+            <lucide-icon name="shield" [size]="24" class="text-[var(--cx-primary)]"></lucide-icon>
+          </div>
+          <h2 class="text-base font-bold text-[var(--cx-text)]">Two-Factor Authentication</h2>
+          <p class="text-xs text-[var(--cx-text-muted)] mt-1">
+            Enter the 6-digit code sent to <strong>{{ otpEmail }}</strong>
+          </p>
+          @if (otpMessage) {
+            <p class="text-xs text-[var(--cx-success)] mt-2 font-medium">{{ otpMessage }}</p>
+          }
+        </div>
+        <form (ngSubmit)="onSubmit()" class="space-y-5">
+          <div>
+            <label class="cx-label text-center">Verification Code</label>
+            <input type="text" class="cx-input text-center text-2xl tracking-[0.5em] font-bold" maxlength="6"
+                   [(ngModel)]="otpCode" name="otp" placeholder="000000"
+                   [disabled]="loading()" autocomplete="one-time-code" />
+          </div>
+          <button type="submit" class="cx-btn cx-btn-primary cx-btn-lg w-full" [disabled]="loading() || otpCode.length < 6">
+            @if (loading()) {
+              <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              Verifying...
+            } @else {
+              <lucide-icon name="check-circle" [size]="18"></lucide-icon> Verify & Sign In
+            }
+          </button>
+          <div class="flex items-center justify-between">
+            <button type="button" class="text-xs text-[var(--cx-text-muted)] hover:text-[var(--cx-text)]" (click)="backToLogin()">
+              ← Back to login
+            </button>
+            <button type="button" class="text-xs text-[var(--cx-primary)] font-medium hover:underline" (click)="resendOtp()" [disabled]="loading()">
+              Resend Code
             </button>
           </div>
-        </div>
-
-        <button type="submit" class="cx-btn cx-btn-primary cx-btn-lg w-full" [disabled]="loading()">
-          @if (loading()) {
-            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            Signing in...
-          } @else {
-            <lucide-icon name="log-in" [size]="18"></lucide-icon>
-            Sign In
-          }
-        </button>
-      </form>
+        </form>
+      }
     </div>
-
-    <p class="text-center text-xs text-[var(--cx-text-muted)] mt-6">
-      &copy; {{ currentYear }} Kodek Innovations Limited
-    </p>
+    <p class="text-center text-xs text-[var(--cx-text-muted)] mt-6">&copy; {{ currentYear }} Kodek Innovations Limited</p>
   </div>
 </div>

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Action\Auth;
+use App\Action\Storage;
 use App\Action\User;
 use App\Action\Location;
 use App\Action\Role;
@@ -53,6 +54,7 @@ return function (App $app): void {
     // ─── Auth (public) ───
     $app->group('/api/auth', function (RouteCollectorProxy $group) {
         $group->post('/login', Auth\LoginAction::class);
+        $group->post('/verify-otp', Auth\VerifyOtpAction::class);
         $group->post('/refresh', Auth\RefreshTokenAction::class);
         $group->post('/forgot-password', Auth\ForgotPasswordAction::class);
         $group->post('/reset-password', Auth\ResetPasswordAction::class);
@@ -60,6 +62,9 @@ return function (App $app): void {
 
     // ─── Paystack Webhook (public, signature-verified) ───
     $app->post('/api/payments/webhook/paystack', Payment\PaystackWebhookAction::class);
+
+    // ─── Public Storage (avatars, uploads) ───
+    $app->get('/storage/{path:.*}', Storage\ServeFileAction::class);
 
     // ─── Authenticated routes ───
     $app->group('/api', function (RouteCollectorProxy $api) {
@@ -82,6 +87,8 @@ return function (App $app): void {
             $group->put('/{id}', User\UpdateUserAction::class)
                 ->add(new RbacMiddleware('users.edit'));
             $group->post('/{id}/reset-password', User\ResetUserPasswordAction::class)
+                ->add(new RbacMiddleware('users.edit'));
+            $group->post('/{id}/avatar', User\UploadAvatarAction::class)
                 ->add(new RbacMiddleware('users.edit'));
         });
 
