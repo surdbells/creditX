@@ -1,19 +1,11 @@
 <?php
-
 declare(strict_types=1);
-
 namespace App\Action\Auth;
 
-use App\Domain\Enum\UserStatus;
+use App\Domain\Enum\{UserStatus, AuditAction};
 use App\Domain\Repository\UserRepository;
-use App\Infrastructure\Service\ApiResponse;
-use App\Infrastructure\Service\AuditService;
-use App\Infrastructure\Service\InputValidator;
-use App\Infrastructure\Service\JwtService;
-use App\Infrastructure\Service\PasswordService;
-use App\Domain\Enum\AuditAction;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, JwtService, PasswordService, OtpService};
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class LoginAction
 {
@@ -23,8 +15,8 @@ final class LoginAction
         private readonly UserRepository $userRepo,
         private readonly JwtService $jwtService,
         private readonly AuditService $auditService,
-    ) {
-    }
+        private readonly OtpService $otpService,
+    ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -35,9 +27,7 @@ final class LoginAction
             'password' => ['required' => true, 'type' => 'string', 'min' => 1],
         ]);
 
-        if (!empty($validation['errors'])) {
-            return $this->validationError($validation['errors']);
-        }
+        if (!empty($validation['errors'])) return $this->validationError($validation['errors']);
 
         $user = $this->userRepo->findByEmail($validation['clean']['email']);
 
@@ -49,23 +39,35 @@ final class LoginAction
             return $this->error('Your account is ' . $user->getStatus()->value . '. Contact administrator.', 403);
         }
 
-        // Issue tokens
+        // Check if 2FA is enforced
+        if ($this->otpService->isEnforced()) {
+            // Generate and send OTP
+            $this->otpService->generateAndSend($user, 'login');
+
+            return $this->success([
+                'requires_2fa' => true,
+                'email' => $user->getEmail(),
+                'user_id' => $user->getId(),
+            ], 'Verification code sent to your email');
+        }
+
+        // No 2FA — issue tokens directly
+        return $this->issueTokens($user, $request);
+    }
+
+    private function issueTokens($user, ServerRequestInterface $request): ResponseInterface
+    {
         $roles = $user->getRoles()->map(fn($r) => $r->getSlug())->toArray();
         $permissions = $user->getAllPermissionSlugs();
 
         $tokens = $this->jwtService->issueTokens(
-            $user->getId(),
-            $user->getEmail(),
-            array_values($roles),
-            $permissions,
+            $user->getId(), $user->getEmail(), array_values($roles), $permissions,
         );
 
-        // Record login
         $ip = $this->getClientIp($request);
         $user->recordLogin($ip);
         $this->userRepo->flush();
 
-        // Audit
         $this->auditService->log(
             $user->getId(), 'User', $user->getId(), AuditAction::LOGIN,
             null, null, $ip, $this->getUserAgent($request)

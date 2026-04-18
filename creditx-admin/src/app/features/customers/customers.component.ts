@@ -33,21 +33,56 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         </cx-data-table>
       </div>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Customer' : 'Create Customer'" [saving]="saving()" maxWidth="640px" (close)="showForm.set(false)" (save)="saveForm()">
+    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Customer' : 'Create Customer'" [saving]="saving()" maxWidth="720px" (close)="showForm.set(false)" (save)="saveForm()">
       <div class="space-y-4">
+        <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider">Personal Information</h4>
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">First Name *</label><input class="cx-input" [(ngModel)]="form.first_name" /></div>
-          <div><label class="cx-label">Last Name *</label><input class="cx-input" [(ngModel)]="form.last_name" /></div>
+          <div><label class="cx-label">Full Name *</label><input class="cx-input" [(ngModel)]="form.full_name" /></div>
+          <div><label class="cx-label">Staff ID</label><input class="cx-input" [(ngModel)]="form.staff_id" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-4">
           <div><label class="cx-label">Phone *</label><input class="cx-input" [(ngModel)]="form.phone" /></div>
+          <div><label class="cx-label">Alt Phone</label><input class="cx-input" [(ngModel)]="form.alt_phone" /></div>
           <div><label class="cx-label">Email</label><input class="cx-input" type="email" [(ngModel)]="form.email" /></div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div><label class="cx-label">Date of Birth</label><input class="cx-input" type="date" [(ngModel)]="form.date_of_birth" /></div>
+          <div><label class="cx-label">Gender</label>
+            <select class="cx-select" [(ngModel)]="form.gender"><option value="">—</option><option>Male</option><option>Female</option></select>
+          </div>
+          <div><label class="cx-label">Marital Status</label>
+            <select class="cx-select" [(ngModel)]="form.marital_status"><option value="">—</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">BVN</label><input class="cx-input" [(ngModel)]="form.bvn" /></div>
-          <div><label class="cx-label">Date of Birth</label><input class="cx-input" type="date" [(ngModel)]="form.date_of_birth" /></div>
+          <div><label class="cx-label">Religion</label><input class="cx-input" [(ngModel)]="form.religion" /></div>
         </div>
-        <div><label class="cx-label">Address</label><textarea class="cx-input" rows="2" [(ngModel)]="form.address"></textarea></div>
+
+        <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Address & Origin</h4>
+        <div><label class="cx-label">Home Address</label><textarea class="cx-input" rows="2" [(ngModel)]="form.home_address"></textarea></div>
+        <div><label class="cx-label">Permanent Address</label><textarea class="cx-input" rows="2" [(ngModel)]="form.permanent_address"></textarea></div>
+        <div class="grid grid-cols-3 gap-4">
+          <div><label class="cx-label">State of Origin</label><input class="cx-input" [(ngModel)]="form.state_of_origin" /></div>
+          <div><label class="cx-label">LGA</label><input class="cx-input" [(ngModel)]="form.lga" /></div>
+          <div><label class="cx-label">Hometown</label><input class="cx-input" [(ngModel)]="form.hometown" /></div>
+        </div>
+
+        <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Family</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="cx-label">Mother's Maiden Name</label><input class="cx-input" [(ngModel)]="form.mothers_maiden_name" /></div>
+          <div><label class="cx-label">Number of Children</label><input class="cx-input" type="number" [(ngModel)]="form.number_of_children" /></div>
+        </div>
+
+        <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Banking</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="cx-label">Bank Name</label><input class="cx-input" [(ngModel)]="form.bank_name" /></div>
+          <div><label class="cx-label">Account Number</label><input class="cx-input" [(ngModel)]="form.account_number" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="cx-label">Alt Bank Name</label><input class="cx-input" [(ngModel)]="form.alt_bank_name" /></div>
+          <div><label class="cx-label">Alt Account Number</label><input class="cx-input" [(ngModel)]="form.alt_account_number" /></div>
+        </div>
       </div>
     </cx-form-dialog>
   `,
@@ -78,8 +113,26 @@ export class CustomersComponent implements OnInit {
   onQuery(e: TableQueryEvent) { this.q = e; this.load(e); }
 
   openForm(row?: any) {
-    if (row) { this.editId = row.id; this.form = { first_name: row.first_name, last_name: row.last_name, phone: row.phone, email: row.email, bvn: row.bvn, date_of_birth: row.date_of_birth, address: row.address }; }
-    else { this.editId = null; this.form = { first_name: '', last_name: '', phone: '', email: '', bvn: '', date_of_birth: '', address: '' }; }
+    if (row) {
+      this.editId = row.id;
+      this.form = {
+        full_name: row.full_name, staff_id: row.staff_id, phone: row.phone, alt_phone: row.alt_phone,
+        email: row.email, date_of_birth: row.date_of_birth, gender: row.gender || '', marital_status: row.marital_status || '',
+        bvn: row.bvn, religion: row.religion, home_address: row.home_address, permanent_address: row.permanent_address,
+        state_of_origin: row.state_of_origin, lga: row.lga, hometown: row.hometown,
+        mothers_maiden_name: row.mothers_maiden_name, number_of_children: row.number_of_children,
+        bank_name: row.bank_name, account_number: row.account_number,
+        alt_bank_name: row.alt_bank_name, alt_account_number: row.alt_account_number,
+      };
+    } else {
+      this.editId = null;
+      this.form = {
+        full_name: '', staff_id: '', phone: '', alt_phone: '', email: '', date_of_birth: '',
+        gender: '', marital_status: '', bvn: '', religion: '', home_address: '', permanent_address: '',
+        state_of_origin: '', lga: '', hometown: '', mothers_maiden_name: '', number_of_children: null,
+        bank_name: '', account_number: '', alt_bank_name: '', alt_account_number: '',
+      };
+    }
     this.showForm.set(true);
   }
 
