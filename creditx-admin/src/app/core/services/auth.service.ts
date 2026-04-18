@@ -30,11 +30,12 @@ export class AuthService {
   login(credentials: LoginRequest): Observable<ApiResponse<LoginResponse>> {
     return this.http.post<ApiResponse<LoginResponse>>(`${this.API}/auth/login`, credentials).pipe(
       tap(res => {
-        if (res.status === 'success' && res.data) {
-          this.storeTokens(res.data.tokens.access_token, res.data.tokens.refresh_token);
-          this.storeUser(res.data.user);
-          this.currentUser.set(res.data.user);
+        if (res.status === 'success' && res.data && (res.data as any).tokens) {
+          this.storeTokens((res.data as any).tokens.access_token, (res.data as any).tokens.refresh_token);
+          this.storeUser((res.data as any).user);
+          this.currentUser.set((res.data as any).user);
         }
+        // If requires_2fa, don't try to store tokens — let component handle it
       })
     );
   }

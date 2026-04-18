@@ -69,9 +69,13 @@ final class SettingsCacheService
      */
     public function all(): array
     {
-        $cached = $this->redis->getJson(self::CACHE_KEY);
-        if ($cached !== null) {
-            return $cached;
+        try {
+            $cached = $this->redis->getJson(self::CACHE_KEY);
+            if ($cached !== null) {
+                return $cached;
+            }
+        } catch (\Exception $e) {
+            // Redis down — fall through to DB
         }
 
         return $this->rebuild();
@@ -91,7 +95,11 @@ final class SettingsCacheService
             $map[$setting->getKey()] = $setting->getValue();
         }
 
-        $this->redis->setJson(self::CACHE_KEY, $map, self::CACHE_TTL);
+        try {
+            $this->redis->setJson(self::CACHE_KEY, $map, self::CACHE_TTL);
+        } catch (\Exception $e) {
+            // Redis down — cache write fails silently
+        }
 
         return $map;
     }
@@ -101,6 +109,8 @@ final class SettingsCacheService
      */
     public function invalidate(): void
     {
-        $this->redis->delete(self::CACHE_KEY);
+        try {
+            $this->redis->delete(self::CACHE_KEY);
+        } catch (\Exception $e) {}
     }
 }

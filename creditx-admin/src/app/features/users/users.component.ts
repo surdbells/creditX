@@ -47,7 +47,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
 
       <!-- Filters -->
       <div class="cx-card !p-4 mb-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div class="lg:col-span-2">
             <div class="relative">
               <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
@@ -61,6 +61,10 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
           <select class="cx-select" [(ngModel)]="filters.department_id" (change)="onFilterChange()">
             <option value="">All Departments</option>
             @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
+          </select>
+          <select class="cx-select" [(ngModel)]="filters.location_id" (change)="onFilterChange()">
+            <option value="">All Locations</option>
+            @for (l of locs(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
           </select>
           <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
             <option value="">All Status</option>
@@ -143,16 +147,18 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                     </td>
                     <td class="px-4 py-3 text-xs text-[var(--cx-text-muted)]">{{ row.created_at | date:'mediumDate' }}</td>
                     <td class="px-4 py-3">
-                      <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)">
-                        <lucide-icon name="pencil" [size]="14"></lucide-icon>
-                      </button>
-                      <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="resetPassword(row)" title="Reset Password">
-                        <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
-                      </button>
-                      <label class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cursor-pointer" title="Upload Photo">
-                        <lucide-icon name="upload" [size]="14"></lucide-icon>
-                        <input type="file" accept="image/*" class="hidden" (change)="uploadAvatar(row, $event)" />
-                      </label>
+                      <div class="flex items-center gap-0.5">
+                        <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+                          <lucide-icon name="pencil" [size]="14"></lucide-icon>
+                        </button>
+                        <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="resetPassword(row)" title="Reset Password">
+                          <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
+                        </button>
+                        <label class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cursor-pointer" title="Upload Photo">
+                          <lucide-icon name="upload" [size]="14"></lucide-icon>
+                          <input type="file" accept="image/*" class="hidden" (change)="uploadAvatar(row, $event)" />
+                        </label>
+                      </div>
                     </td>
                   </tr>
                 }
@@ -266,7 +272,7 @@ export class UsersComponent implements OnInit {
   showForm = signal(false); saving = signal(false);
   editId: string | null = null; form: any = {};
   selRoles: string[] = []; selLocs: string[] = [];
-  filters: any = { search: '', role: '', department_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
+  filters: any = { search: '', role: '', department_id: '', location_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 25; totalRecords = 0; totalPages = 0;
   exportOpen = false;
   resetResult: any = null;
