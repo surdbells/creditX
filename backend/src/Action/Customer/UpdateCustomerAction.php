@@ -2,8 +2,10 @@
 declare(strict_types=1);
 namespace App\Action\Customer;
 
+use App\Domain\Entity\NextOfKin;
 use App\Domain\Repository\CustomerRepository;
 use App\Infrastructure\Service\{ApiResponse, AuditService};
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class UpdateCustomerAction
@@ -12,6 +14,7 @@ final class UpdateCustomerAction
     public function __construct(
         private readonly CustomerRepository $repo,
         private readonly AuditService $audit,
+        private readonly EntityManagerInterface $em,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -30,7 +33,28 @@ final class UpdateCustomerAction
         }
 
         $customer->fillFromArray($data);
-        $this->repo->flush();
+
+        // Handle next_of_kins — replace all
+        $nokArray = $data['next_of_kins'] ?? $data['next_of_kin'] ?? null;
+        if (is_array($nokArray)) {
+            // Remove existing NOKs (orphanRemoval will delete them)
+            foreach ($customer->getNextOfKins()->toArray() as $old_nok) {
+                $customer->removeNextOfKin($old_nok);
+            }
+            // Add new NOKs
+            foreach ($nokArray as $nokData) {
+                if (empty($nokData['full_name'])) continue;
+                $nok = new NextOfKin();
+                $nok->setCustomer($customer);
+                $nok->setFullName($nokData['full_name']);
+                $nok->setPhone($nokData['phone'] ?? null);
+                $nok->setRelationship($nokData['relationship'] ?? null);
+                $nok->setAddress($nokData['address'] ?? null);
+                $customer->addNextOfKin($nok);
+            }
+        }
+
+        $this->em->flush();
 
         $this->audit->logUpdate($request->getAttribute('user_id'), 'Customer', $customer->getId(), $old, $customer->toArray(), $this->getClientIp($request), $this->getUserAgent($request));
         return $this->success($customer->toArray(true), 'Customer updated successfully');

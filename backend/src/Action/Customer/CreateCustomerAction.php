@@ -52,8 +52,9 @@ final class CreateCustomerAction
         $customer->fillFromArray($v['clean']);
 
         // Handle next_of_kin array
-        if (isset($data['next_of_kin']) && is_array($data['next_of_kin'])) {
-            foreach ($data['next_of_kin'] as $i => $nokData) {
+        $nokArray = $data['next_of_kins'] ?? $data['next_of_kin'] ?? [];
+        if (is_array($nokArray)) {
+            foreach ($nokArray as $i => $nokData) {
                 if (empty($nokData['full_name'])) continue;
                 $nok = new NextOfKin();
                 $nok->setCustomer($customer);
