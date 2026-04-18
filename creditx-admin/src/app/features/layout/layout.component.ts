@@ -1,8 +1,11 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../core/services/auth.service';
+import { ApiService } from '../../core/services/api.service';
+import { ToastService } from '../../core/services/toast.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ToastContainerComponent } from '../../shared/components/toast/toast.component';
 import { ChatBubbleComponent } from '../../shared/components/chat-bubble/chat-bubble.component';
@@ -12,13 +15,16 @@ interface NavGroup { label: string; items: NavItem[]; }
 
 @Component({
   selector: 'app-layout', standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent, ChatBubbleComponent],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent, ChatBubbleComponent],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss',
 })
 export class LayoutComponent {
   collapsed = signal(false);
   mobileMenuOpen = signal(false);
+  showProfile = signal(false);
+  profileSaving = signal(false);
+  profileForm: any = {};
   openSection = signal<string>('Loan Operations');
 
   navGroups: NavGroup[] = [
@@ -65,7 +71,7 @@ export class LayoutComponent {
     { label: 'Menu', icon: 'menu', route: '' },
   ];
 
-  constructor(public auth: AuthService, public theme: ThemeService, private router: Router) {}
+  constructor(public auth: AuthService, public theme: ThemeService, private router: Router, private api: ApiService, private toast: ToastService) {}
 
   get filteredGroups(): NavGroup[] {
     return this.navGroups.map(g => ({ ...g, items: g.items.filter(i => !i.permission || this.auth.hasPermission(i.permission)) })).filter(g => g.items.length > 0);
@@ -89,4 +95,39 @@ export class LayoutComponent {
   }
 
   logout(): void { this.auth.logout(); }
+
+  openProfile(): void {
+    const u = this.auth.user();
+    this.profileForm = { first_name: u?.first_name || '', last_name: u?.last_name || '', phone: u?.phone || '', password: '', password_confirmation: '' };
+    this.showProfile.set(true);
+  }
+
+  saveProfile(): void {
+    this.profileSaving.set(true);
+    const userId = this.auth.user()?.id;
+    if (!userId) { this.profileSaving.set(false); return; }
+    const payload: any = { first_name: this.profileForm.first_name, last_name: this.profileForm.last_name, phone: this.profileForm.phone };
+    if (this.profileForm.password && this.profileForm.password.length >= 6) {
+      if (this.profileForm.password !== this.profileForm.password_confirmation) {
+        this.toast.error('Passwords do not match');
+        this.profileSaving.set(false);
+        return;
+      }
+      payload.password = this.profileForm.password;
+    }
+    this.api.put('/users/' + userId, payload).subscribe({
+      next: () => {
+        this.profileSaving.set(false);
+        this.showProfile.set(false);
+        this.toast.success('Profile updated');
+        // Update stored user
+        const u = this.auth.user();
+        if (u) {
+          const updated = { ...u, first_name: payload.first_name, last_name: payload.last_name, full_name: payload.first_name + ' ' + payload.last_name, phone: payload.phone };
+          localStorage.setItem('creditx_user', JSON.stringify(updated));
+        }
+      },
+      error: (e: any) => { this.profileSaving.set(false); this.toast.error(e.error?.message || 'Update failed'); },
+    });
+  }
 }

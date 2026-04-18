@@ -109,7 +109,7 @@ export class NotificationsComponent implements OnInit {
 
   load(p?: any) {
     this.loading.set(true);
-    this.api.get('/notifications', { ...this.q, ...p }).subscribe({
+    this.api.get('/notification-templates', { ...this.q, ...p }).subscribe({
       next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
@@ -124,7 +124,7 @@ export class NotificationsComponent implements OnInit {
 
   saveTemplate() {
     this.saving.set(true);
-    (this.editId ? this.api.put('/notifications/' + this.editId, this.form) : this.api.post('/notifications', this.form)).subscribe({
+    (this.editId ? this.api.put('/notification-templates/' + this.editId, this.form) : this.api.post('/notification-templates', this.form)).subscribe({
       next: r => { this.saving.set(false); this.toast.success(r.message || 'Saved'); this.showForm.set(false); this.load(this.q); },
       error: e => { this.saving.set(false); this.toast.error(e.error?.message || 'Failed'); },
     });

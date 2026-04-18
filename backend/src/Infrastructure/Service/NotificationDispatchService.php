@@ -95,11 +95,15 @@ final class NotificationDispatchService
             return;
         }
 
+        $subject = $notification->getSubject() ?? 'CreditX Notification';
+        $body = $notification->getBody();
+        $htmlBody = $this->buildBrandedEmail($subject, $body);
+
         $payload = [
             'from' => ['address' => $_ENV['ZEPTOMAIL_FROM_EMAIL'] ?? 'noreply@dostsuite.com', 'name' => $_ENV['ZEPTOMAIL_FROM_NAME'] ?? 'CreditX'],
             'to' => [['email_address' => ['address' => $notification->getRecipient()]]],
-            'subject' => $notification->getSubject() ?? 'CreditX Notification',
-            'htmlbody' => '<html><body>' . nl2br(htmlspecialchars($notification->getBody())) . '</body></html>',
+            'subject' => $subject,
+            'htmlbody' => $htmlBody,
         ];
 
         $ch = curl_init('https://api.zeptomail.com/v1.1/email');
@@ -222,5 +226,30 @@ final class NotificationDispatchService
             NotificationChannel::SMS, NotificationChannel::WHATSAPP => $context['customer_phone'] ?? $context['phone'] ?? null,
             NotificationChannel::IN_APP => $context['user_id'] ?? null,
         };
+    }
+
+    /**
+     * Build branded HTML email template.
+     */
+    private function buildBrandedEmail(string $subject, string $body): string
+    {
+        $bodyHtml = nl2br(htmlspecialchars($body));
+        $year = date('Y');
+
+        return <<<HTML
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#f8f9fa">
+            <div style="background:linear-gradient(135deg,#0A4F2A 0%,#0d6b3a 100%);padding:24px;text-align:center;border-radius:0 0 20px 20px">
+                <h1 style="color:#fff;font-size:24px;margin:0;font-weight:800">Credit<span style="color:#C9A227">X</span></h1>
+                <p style="color:rgba(255,255,255,0.6);font-size:11px;margin:6px 0 0;text-transform:uppercase;letter-spacing:2px">Loan Management System</p>
+            </div>
+            <div style="padding:28px 24px">
+                <h2 style="color:#1a1a2e;font-size:16px;margin:0 0 16px;font-weight:700">{$subject}</h2>
+                <div style="color:#374151;font-size:14px;line-height:1.6">{$bodyHtml}</div>
+            </div>
+            <div style="padding:16px 24px;border-top:1px solid #e5e7eb;text-align:center">
+                <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {$year} Kodek Innovations Limited &bull; CreditX</p>
+            </div>
+        </div>
+        HTML;
     }
 }
