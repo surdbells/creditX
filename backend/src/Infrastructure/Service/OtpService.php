@@ -85,12 +85,19 @@ final class OtpService
             'htmlbody' => $htmlBody,
         ];
 
+        if (!function_exists('curl_init')) {
+            $this->logger?->error('OTP email: curl extension not installed');
+            return;
+        }
+
+        $this->logger?->info('OTP email: sending to ' . $email, ['code' => $code]);
+
         $ch = curl_init('https://api.zeptomail.com/v1.1/email');
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
-                'Authorization: Zoho-enczapikey ' . $apiKey,
+                'Authorization: ' . $apiKey,
                 'Content-Type: application/json',
                 'Accept: application/json',
             ],
@@ -108,6 +115,12 @@ final class OtpService
             $this->logger?->error('OTP email curl failed', ['error' => $curlError]);
             return;
         }
+
+        $this->logger?->info('OTP email response', [
+            'http_code' => $httpCode,
+            'response' => substr((string)$response, 0, 500),
+            'to' => $email,
+        ]);
 
         if ($httpCode >= 400) {
             $this->logger?->error('OTP email API error', [

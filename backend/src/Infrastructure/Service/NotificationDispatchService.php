@@ -110,7 +110,7 @@ final class NotificationDispatchService
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Zoho-enczapikey ' . $apiKey],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: ' . $apiKey],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
         ]);
