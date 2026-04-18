@@ -158,6 +158,11 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                           <lucide-icon name="upload" [size]="14"></lucide-icon>
                           <input type="file" accept="image/*" class="hidden" (change)="uploadAvatar(row, $event)" />
                         </label>
+                        <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="toggleStatus(row)"
+                                [title]="row.status === 'active' ? 'Deactivate' : 'Activate'">
+                          <lucide-icon [name]="row.status === 'active' ? 'user-x' : 'user-check'" [size]="14"
+                                       [class]="row.status === 'active' ? 'text-[var(--cx-danger)]' : 'text-[var(--cx-success)]'"></lucide-icon>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -423,6 +428,15 @@ export class UsersComponent implements OnInit {
     this.http.post<any>(`${environment.apiUrl}/users/${row.id}/avatar`, formData).subscribe({
       next: () => { this.toast.success('Photo uploaded'); this.load(); },
       error: (e: any) => this.toast.error(e.error?.message || 'Upload failed'),
+    });
+  }
+
+  toggleStatus(row: any): void {
+    const newStatus = row.status === 'active' ? 'inactive' : 'active';
+    if (!confirm(`${newStatus === 'inactive' ? 'Deactivate' : 'Activate'} ${row.full_name}?`)) return;
+    this.api.put('/users/' + row.id, { status: newStatus }).subscribe({
+      next: () => { this.toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}`); this.load(); },
+      error: (e: any) => this.toast.error(e.error?.message || 'Failed'),
     });
   }
 

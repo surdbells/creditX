@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline } from 'ionicons/icons';
+import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
@@ -20,6 +20,16 @@ import { ApiService } from '../../core/services/api.service';
     </ion-header>
     <ion-content [fullscreen]="true">
       <div class="p-4">
+        @if (agentBlocked()) {
+          <div class="flex flex-col items-center justify-center py-16">
+            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
+              <ion-icon name="close-circle-outline" class="text-3xl text-red-500"></ion-icon>
+            </div>
+            <h3 class="text-base font-bold text-gray-800 mb-1">Loan Applications Paused</h3>
+            <p class="text-xs text-gray-500 text-center max-w-xs">The admin has temporarily stopped accepting new loan applications. Please check back later or contact your supervisor.</p>
+            <button class="mt-4 px-4 py-2 rounded-xl bg-gray-100 text-sm font-medium text-gray-600" (click)="router.navigate(['/dashboard'])">Back to Dashboard</button>
+          </div>
+        } @else {
         <!-- Step Indicator -->
         <div class="flex items-center justify-between mb-6">
           @for (s of stepLabels; track s; let i = $index) {
@@ -193,6 +203,7 @@ import { ApiService } from '../../core/services/api.service';
             </button>
           }
         </div>
+        } <!-- end else agentBlocked -->
       </div>
     </ion-content>
   `,
@@ -234,11 +245,24 @@ export class LoanCapturePage implements OnInit {
     { key: 'home_address', label: 'Home Address', placeholder: 'Residential address' },
   ];
 
-  constructor(private api: ApiService, private router: Router) {
-    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline });
+  agentBlocked = signal(false);
+
+  constructor(private api: ApiService, public router: Router) {
+    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline });
   }
 
   ngOnInit(): void {
+    // Check if agents can accept loans
+    this.api.get('/settings', { per_page: 200 }).subscribe({
+      next: res => {
+        const settings = res.data || [];
+        const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
+        if (s && (s.value === 'false' || s.value === '0')) {
+          this.agentBlocked.set(true);
+        }
+      },
+    });
+
     this.api.get('/loan-products', { per_page: 50, is_active: true }).subscribe({
       next: res => { this.products.set(res.data || []); this.productsLoading.set(false); },
       error: () => this.productsLoading.set(false),
