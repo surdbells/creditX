@@ -10,6 +10,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { NIGERIA_STATES } from '../../core/data/nigeria-states';
 
 @Component({
   selector: 'app-customers', standalone: true,
@@ -63,8 +64,18 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         <div><label class="cx-label">Home Address</label><textarea class="cx-input" rows="2" [(ngModel)]="form.home_address"></textarea></div>
         <div><label class="cx-label">Permanent Address</label><textarea class="cx-input" rows="2" [(ngModel)]="form.permanent_address"></textarea></div>
         <div class="grid grid-cols-3 gap-4">
-          <div><label class="cx-label">State of Origin</label><input class="cx-input" [(ngModel)]="form.state_of_origin" /></div>
-          <div><label class="cx-label">LGA</label><input class="cx-input" [(ngModel)]="form.lga" /></div>
+          <div><label class="cx-label">State of Origin</label>
+            <select class="cx-select" [(ngModel)]="form.state_of_origin" (change)="onStateChange()">
+              <option value="">Select State</option>
+              @for (s of states; track s.name) { <option [value]="s.name">{{ s.name }}</option> }
+            </select>
+          </div>
+          <div><label class="cx-label">LGA</label>
+            <select class="cx-select" [(ngModel)]="form.lga">
+              <option value="">Select LGA</option>
+              @for (l of filteredLgas; track l) { <option [value]="l">{{ l }}</option> }
+            </select>
+          </div>
           <div><label class="cx-label">Hometown</label><input class="cx-input" [(ngModel)]="form.hometown" /></div>
         </div>
 
@@ -73,6 +84,31 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           <div><label class="cx-label">Mother's Maiden Name</label><input class="cx-input" [(ngModel)]="form.mothers_maiden_name" /></div>
           <div><label class="cx-label">Number of Children</label><input class="cx-input" type="number" [(ngModel)]="form.number_of_children" /></div>
         </div>
+
+        <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Next of Kin</h4>
+        @for (nok of form.next_of_kins; track $index; let i = $index) {
+          <div class="p-3 rounded-xl border border-[var(--cx-border)] bg-[var(--cx-surface-hover)]/30 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-[var(--cx-text-muted)]">NOK {{ i + 1 }}</span>
+              <button type="button" class="text-xs text-[var(--cx-danger)]" (click)="removeNok(i)">Remove</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="cx-label">Full Name *</label><input class="cx-input" [(ngModel)]="nok.full_name" /></div>
+              <div><label class="cx-label">Phone *</label><input class="cx-input" [(ngModel)]="nok.phone" /></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="cx-label">Relationship</label>
+                <select class="cx-select" [(ngModel)]="nok.relationship">
+                  <option value="">—</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Child</option><option>Friend</option><option>Colleague</option><option>Other</option>
+                </select>
+              </div>
+              <div><label class="cx-label">Address</label><input class="cx-input" [(ngModel)]="nok.address" /></div>
+            </div>
+          </div>
+        }
+        <button type="button" class="cx-btn cx-btn-outline cx-btn-sm w-full" (click)="addNok()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon> Add Next of Kin
+        </button>
 
         <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Banking</h4>
         <div class="grid grid-cols-2 gap-4">
@@ -100,7 +136,23 @@ export class CustomersComponent implements OnInit {
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {};
   totalRecords = 0; q: any = {};
 
+  states = NIGERIA_STATES;
+  filteredLgas: string[] = [];
+
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+
+  onStateChange(): void {
+    const state = this.states.find(s => s.name === this.form.state_of_origin);
+    this.filteredLgas = state?.lgas || [];
+    this.form.lga = '';
+  }
+
+  addNok(): void {
+    if (!this.form.next_of_kins) this.form.next_of_kins = [];
+    this.form.next_of_kins.push({ full_name: '', phone: '', relationship: '', address: '' });
+  }
+
+  removeNok(i: number): void { this.form.next_of_kins.splice(i, 1); }
   ngOnInit() { this.load(); }
 
   load(p?: any) {
@@ -119,11 +171,14 @@ export class CustomersComponent implements OnInit {
         full_name: row.full_name, staff_id: row.staff_id, phone: row.phone, alt_phone: row.alt_phone,
         email: row.email, date_of_birth: row.date_of_birth, gender: row.gender || '', marital_status: row.marital_status || '',
         bvn: row.bvn, religion: row.religion, home_address: row.home_address, permanent_address: row.permanent_address,
-        state_of_origin: row.state_of_origin, lga: row.lga, hometown: row.hometown,
+        state_of_origin: row.state_of_origin || '', lga: row.lga || '', hometown: row.hometown,
         mothers_maiden_name: row.mothers_maiden_name, number_of_children: row.number_of_children,
         bank_name: row.bank_name, account_number: row.account_number,
         alt_bank_name: row.alt_bank_name, alt_account_number: row.alt_account_number,
+        next_of_kins: (row.next_of_kins || []).map((n: any) => ({ full_name: n.full_name, phone: n.phone, relationship: n.relationship, address: n.address })),
       };
+      const state = this.states.find(s => s.name === row.state_of_origin);
+      this.filteredLgas = state?.lgas || [];
     } else {
       this.editId = null;
       this.form = {
@@ -131,7 +186,9 @@ export class CustomersComponent implements OnInit {
         gender: '', marital_status: '', bvn: '', religion: '', home_address: '', permanent_address: '',
         state_of_origin: '', lga: '', hometown: '', mothers_maiden_name: '', number_of_children: null,
         bank_name: '', account_number: '', alt_bank_name: '', alt_account_number: '',
+        next_of_kins: [],
       };
+      this.filteredLgas = [];
     }
     this.showForm.set(true);
   }
