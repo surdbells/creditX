@@ -50,7 +50,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div class="lg:col-span-2">
             <div class="relative">
-              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
               <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by name, email, phone..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
             </div>
           </div>

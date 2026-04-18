@@ -44,7 +44,7 @@ export interface TableQueryEvent {
     <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-2 flex-1 min-w-0">
         <div class="relative flex-1 max-w-sm">
-          <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+          <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
           <input type="text" class="cx-input !pl-8" [placeholder]="searchPlaceholder"
             [ngModel]="searchTerm()" (ngModelChange)="onSearchChange($event)" />
         </div>

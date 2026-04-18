@@ -31,7 +31,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         <div class="cx-card !p-4 mb-4">
           <div class="flex items-center justify-between mb-3">
             <div class="relative flex-1 max-w-sm">
-              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
               <input type="text" class="cx-input !pl-8" placeholder="Search accounts..." [(ngModel)]="coaSearch" (input)="loadCoa()" />
             </div>
             <button class="cx-btn cx-btn-primary" (click)="openCoaForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Account</button>
@@ -107,7 +107,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         <div class="cx-card !p-4 mb-4">
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div class="sm:col-span-2 relative">
-              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
               <input type="text" class="cx-input !pl-8" placeholder="Search transactions..." [(ngModel)]="txnSearch" (input)="onTxnFilter()" />
             </div>
             <input type="date" class="cx-input" [(ngModel)]="txnFrom" (change)="onTxnFilter()" />

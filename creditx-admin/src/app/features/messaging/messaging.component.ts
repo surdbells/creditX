@@ -33,7 +33,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
           <!-- Search -->
           <div class="p-3 border-b border-[var(--cx-border)]">
             <div class="relative">
-              <lucide-icon name="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="14"></lucide-icon>
+              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="14"></lucide-icon>
               <input type="text" class="cx-input !pl-7 !py-1.5 !text-xs" placeholder="Search..." [(ngModel)]="listSearch" />
             </div>
           </div>
