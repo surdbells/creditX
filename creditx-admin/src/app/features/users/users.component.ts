@@ -17,7 +17,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="User Management" subtitle="{{ totalRecords | number }} users">
+      <cx-page-header title="User Management" [subtitle]="totalRecords() + ' users'">
         <div class="flex items-center gap-2">
           <div class="relative">
             <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
@@ -93,77 +93,75 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
           </div>
         } @else {
           <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full min-w-[800px]">
               <thead>
                 <tr class="border-b border-[var(--cx-border)]">
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer" (click)="sort('firstName')">
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer min-w-[220px]" (click)="sort('firstName')">
                     <div class="flex items-center gap-1">User @if (filters.sort_by==='firstName') { <lucide-icon [name]="filters.sort_dir==='ASC'?'arrow-up':'arrow-down'" [size]="12"></lucide-icon> }</div>
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Role</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Department</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Team</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Location</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Status</th>
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer" (click)="sort('createdAt')">
+                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[120px]">Role</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[130px]">Dept / Team</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[120px]">Location</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[90px]">Status</th>
+                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer w-[110px]" (click)="sort('createdAt')">
                     <div class="flex items-center gap-1">Joined @if (filters.sort_by==='createdAt') { <lucide-icon [name]="filters.sort_dir==='ASC'?'arrow-up':'arrow-down'" [size]="12"></lucide-icon> }</div>
                   </th>
-                  <th class="px-4 py-3 w-16"></th>
+                  <th class="px-3 py-3 w-[140px]"></th>
                 </tr>
               </thead>
               <tbody>
-                @for (row of rows(); track row.id; let odd = $odd) {
+                @for (row of rows(); track row.id) {
                   <tr class="border-b border-[var(--cx-border)] transition-colors hover:bg-[var(--cx-surface-hover)]">
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-3">
                         @if (row.avatar_path) {
-                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                         } @else {
-                          <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                                [style.background]="avatarColor(row.id)">
                             {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}
                           </div>
                         }
-                        <div>
-                          <div class="text-sm font-medium text-[var(--cx-text)]">{{ row.full_name }}</div>
-                          <div class="text-xs text-[var(--cx-text-muted)]">{{ row.email }}</div>
+                        <div class="min-w-0">
+                          <div class="text-sm font-medium text-[var(--cx-text)] truncate">{{ row.full_name }}</div>
+                          <div class="text-xs text-[var(--cx-text-muted)] truncate">{{ row.email }}</div>
                         </div>
                       </div>
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-3">
                       @if (row.roles?.length) {
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--cx-primary-50)] text-[var(--cx-primary)]">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--cx-primary-50)] text-[var(--cx-primary)] whitespace-nowrap">
                           {{ row.roles[0].name }}
                         </span>
                       } @else { <span class="text-xs text-[var(--cx-text-muted)]">—</span> }
                     </td>
-                    <td class="px-4 py-3 text-sm text-[var(--cx-text-secondary)]">{{ row.department_name || '—' }}</td>
-                    <td class="px-4 py-3">
-                      <div class="text-sm text-[var(--cx-text-secondary)]">{{ row.team_name || '—' }}</div>
-                      @if (row.team_lead_name) { <div class="text-xs text-[var(--cx-text-muted)]">Lead: {{ row.team_lead_name }}</div> }
+                    <td class="px-3 py-3">
+                      <div class="text-xs text-[var(--cx-text-secondary)] truncate">{{ row.department_name || '—' }}</div>
+                      @if (row.team_name) { <div class="text-[10px] text-[var(--cx-text-muted)] truncate">{{ row.team_name }}</div> }
                     </td>
-                    <td class="px-4 py-3 text-sm text-[var(--cx-text-secondary)]">{{ row.location_name || '—' }}</td>
-                    <td class="px-4 py-3">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    <td class="px-3 py-3 text-xs text-[var(--cx-text-secondary)] truncate">{{ row.location_name || '—' }}</td>
+                    <td class="px-3 py-3">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
                             [class]="statusClass(row.status)">
                         {{ row.status | titlecase }}
                       </span>
                     </td>
-                    <td class="px-4 py-3 text-xs text-[var(--cx-text-muted)]">{{ row.created_at | date:'mediumDate' }}</td>
-                    <td class="px-4 py-3">
-                      <div class="flex items-center gap-0.5">
+                    <td class="px-3 py-3 text-xs text-[var(--cx-text-muted)] whitespace-nowrap">{{ row.created_at | date:'mediumDate' }}</td>
+                    <td class="px-3 py-3">
+                      <div class="flex items-center gap-0.5 justify-end">
                         <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
-                          <lucide-icon name="pencil" [size]="14"></lucide-icon>
+                          <lucide-icon name="pencil" [size]="13"></lucide-icon>
                         </button>
                         <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="resetPassword(row)" title="Reset Password">
-                          <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
+                          <lucide-icon name="refresh-cw" [size]="13"></lucide-icon>
                         </button>
                         <label class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cursor-pointer" title="Upload Photo">
-                          <lucide-icon name="upload" [size]="14"></lucide-icon>
+                          <lucide-icon name="upload" [size]="13"></lucide-icon>
                           <input type="file" accept="image/*" class="hidden" (change)="uploadAvatar(row, $event)" />
                         </label>
                         <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="toggleStatus(row)"
                                 [title]="row.status === 'active' ? 'Deactivate' : 'Activate'">
-                          <lucide-icon [name]="row.status === 'active' ? 'user-x' : 'user-check'" [size]="14"
+                          <lucide-icon [name]="row.status === 'active' ? 'user-x' : 'user-check'" [size]="13"
                                        [class]="row.status === 'active' ? 'text-[var(--cx-danger)]' : 'text-[var(--cx-success)]'"></lucide-icon>
                         </button>
                       </div>
@@ -176,7 +174,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
           <!-- Pagination -->
           <div class="flex items-center justify-between px-4 py-3 border-t border-[var(--cx-border)]">
             <div class="text-xs text-[var(--cx-text-muted)]">
-              Showing {{ (page - 1) * perPage + 1 }}–{{ min(page * perPage, totalRecords) }} of {{ totalRecords | number }}
+              Showing {{ (page - 1) * perPage + 1 }}–{{ min(page * perPage, totalRecords()) }} of {{ totalRecords() | number }}
             </div>
             <div class="flex items-center gap-1">
               <button class="cx-btn cx-btn-ghost cx-btn-sm" [disabled]="page <= 1" (click)="goPage(page - 1)"><lucide-icon name="chevron-left" [size]="14"></lucide-icon></button>
@@ -285,6 +283,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 })
 export class UsersComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true);
+  totalRecords = signal(0);
   roles = signal<any[]>([]); locs = signal<any[]>([]); departments = signal<any[]>([]); teams = signal<any[]>([]);
   showForm = signal(false); saving = signal(false);
   editId: string | null = null; form: any = {};
@@ -292,7 +291,7 @@ export class UsersComponent implements OnInit {
   confirmData: any = {};
   selRoles: string[] = []; selLocs: string[] = [];
   filters: any = { search: '', role: '', department_id: '', location_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
-  page = 1; perPage = 25; totalRecords = 0; totalPages = 0;
+  page = 1; perPage = 25; totalPages = 0;
   exportOpen = false;
   resetResult: any = null;
   private filterTimeout: any;
@@ -321,7 +320,13 @@ export class UsersComponent implements OnInit {
     if (this.filters.department_id) params.department_id = this.filters.department_id;
     if (this.filters.status) params.status = this.filters.status;
     this.api.get('/users', params).subscribe({
-      next: res => { this.rows.set(res.data || []); this.totalRecords = res.meta?.total || 0; this.totalPages = Math.ceil(this.totalRecords / this.perPage); this.loading.set(false); },
+      next: res => {
+        this.rows.set(res.data || []);
+        const total = Number(res.meta?.total ?? 0);
+        this.totalRecords.set(total);
+        this.totalPages = Math.ceil(total / this.perPage);
+        this.loading.set(false);
+      },
       error: () => { this.loading.set(false); },
     });
   }
