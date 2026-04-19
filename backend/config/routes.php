@@ -402,6 +402,10 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.portfolio'));
             $group->get('/closed-loans', Report\ClosedLoansReportAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
+            $group->get('/repayment', Report\RepaymentPerformanceAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
+            $group->get('/collection', Report\CollectionEfficiencyAction::class)
+                ->add(new RbacMiddleware('reports.portfolio'));
             $group->get('/cbn/portfolio', Report\CbnPortfolioReportAction::class)
                 ->add(new RbacMiddleware('reports.cbn'));
             $group->get('/cbn/npl', Report\CbnNplReportAction::class)

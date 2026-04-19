@@ -187,11 +187,14 @@ interface DrillLevel { label: string; key: string; value?: string; }
 export class ReportsComponent implements OnInit {
   reportTabs = [
     { key: 'portfolio', label: 'Loan Portfolio' },
+    { key: 'par', label: 'Portfolio at Risk' },
+    { key: 'agent-performance', label: 'Agent Performance' },
+    { key: 'branch-performance', label: 'Branch Performance' },
+    { key: 'product-performance', label: 'Product Performance' },
+    { key: 'receivables', label: 'Receivables' },
+    { key: 'closed-loans', label: 'Closed Loans' },
     { key: 'repayment', label: 'Repayment Performance' },
     { key: 'collection', label: 'Collection Efficiency' },
-    { key: 'par', label: 'Portfolio at Risk' },
-    { key: 'agent', label: 'Agent Performance' },
-    { key: 'branch', label: 'Branch Performance' },
   ];
 
   activeReport = signal('portfolio');

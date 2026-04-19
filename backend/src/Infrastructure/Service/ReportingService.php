@@ -330,4 +330,151 @@ final class ReportingService
             $params
         );
     }
+
+    /**
+     * Repayment performance — schedule vs actual payments over time.
+     * Groups repayments by month with expected vs collected amounts.
+     */
+    public function repaymentPerformance(?string $dateFrom = null, ?string $dateTo = null, ?string $productId = null): array
+    {
+        $conn = $this->em->getConnection();
+        $where = '1=1';
+        $params = [];
+
+        if ($dateFrom !== null) { $where .= ' AND rs.due_date >= :df'; $params['df'] = $dateFrom; }
+        if ($dateTo !== null) { $where .= ' AND rs.due_date <= :dt'; $params['dt'] = $dateTo; }
+        if ($productId !== null) { $where .= ' AND l.product_id = :pid'; $params['pid'] = $productId; }
+
+        $totals = $conn->fetchAssociative(
+            "SELECT
+                COUNT(DISTINCT rs.loan_id) as total_loans,
+                COALESCE(SUM(CAST(rs.total_amount AS NUMERIC)), 0) as expected,
+                COALESCE(SUM(CAST(rs.paid_amount AS NUMERIC)), 0) as collected,
+                SUM(CASE WHEN rs.status = 'paid' THEN 1 ELSE 0 END) as installments_paid,
+                SUM(CASE WHEN rs.status = 'overdue' THEN 1 ELSE 0 END) as installments_overdue,
+                COUNT(*) as total_installments
+             FROM repayment_schedules rs
+             INNER JOIN loans l ON rs.loan_id = l.id
+             WHERE {$where}",
+            $params
+        ) ?: [];
+
+        $expected = (float) ($totals['expected'] ?? 0);
+        $collected = (float) ($totals['collected'] ?? 0);
+        $collectionRate = $expected > 0 ? round(($collected / $expected) * 100, 2) : 0;
+
+        // Breakdown by month
+        $byPeriod = $conn->fetchAllAssociative(
+            "SELECT
+                TO_CHAR(rs.due_date, 'YYYY-MM') as period,
+                COALESCE(SUM(CAST(rs.total_amount AS NUMERIC)), 0) as expected,
+                COALESCE(SUM(CAST(rs.paid_amount AS NUMERIC)), 0) as collected,
+                COUNT(*) as count
+             FROM repayment_schedules rs
+             INNER JOIN loans l ON rs.loan_id = l.id
+             WHERE {$where}
+             GROUP BY period
+             ORDER BY period DESC
+             LIMIT 12",
+            $params
+        );
+
+        // Breakdown by product
+        $byProduct = $conn->fetchAllAssociative(
+            "SELECT
+                lp.name,
+                lp.id as product_id,
+                COALESCE(SUM(CAST(rs.total_amount AS NUMERIC)), 0) as expected,
+                COALESCE(SUM(CAST(rs.paid_amount AS NUMERIC)), 0) as collected,
+                COUNT(DISTINCT rs.loan_id) as count
+             FROM repayment_schedules rs
+             INNER JOIN loans l ON rs.loan_id = l.id
+             INNER JOIN loan_products lp ON l.product_id = lp.id
+             WHERE {$where}
+             GROUP BY lp.id, lp.name
+             ORDER BY expected DESC",
+            $params
+        );
+
+        return [
+            'total_loans'       => (int) ($totals['total_loans'] ?? 0),
+            'total_amount'      => $expected,
+            'outstanding'       => max(0, $expected - $collected),
+            'collection_rate'   => $collectionRate,
+            'installments_paid' => (int) ($totals['installments_paid'] ?? 0),
+            'installments_overdue' => (int) ($totals['installments_overdue'] ?? 0),
+            'total_installments'=> (int) ($totals['total_installments'] ?? 0),
+            'by_period'         => $byPeriod,
+            'by_product'        => $byProduct,
+        ];
+    }
+
+    /**
+     * Collection efficiency — payments received grouped by agent and recovery rate.
+     */
+    public function collectionEfficiency(?string $dateFrom = null, ?string $dateTo = null, ?string $agentId = null): array
+    {
+        $conn = $this->em->getConnection();
+        $where = '1=1';
+        $params = [];
+
+        if ($dateFrom !== null) { $where .= ' AND p.payment_date >= :df'; $params['df'] = $dateFrom; }
+        if ($dateTo !== null) { $where .= ' AND p.payment_date <= :dt'; $params['dt'] = $dateTo; }
+        if ($agentId !== null) { $where .= ' AND l.agent_id = :aid'; $params['aid'] = $agentId; }
+
+        $totals = $conn->fetchAssociative(
+            "SELECT
+                COUNT(DISTINCT p.loan_id) as loans_collected,
+                COALESCE(SUM(CAST(p.amount AS NUMERIC)), 0) as total_collected,
+                COUNT(*) as total_payments
+             FROM payments p
+             INNER JOIN loans l ON p.loan_id = l.id
+             WHERE p.status = 'confirmed' AND {$where}",
+            $params
+        ) ?: [];
+
+        // Expected in same period (for recovery rate)
+        $expected = $conn->fetchAssociative(
+            "SELECT COALESCE(SUM(CAST(rs.total_amount AS NUMERIC)), 0) as expected
+             FROM repayment_schedules rs
+             INNER JOIN loans l ON rs.loan_id = l.id
+             WHERE 1=1" .
+                ($dateFrom !== null ? ' AND rs.due_date >= :df' : '') .
+                ($dateTo !== null ? ' AND rs.due_date <= :dt' : '') .
+                ($agentId !== null ? ' AND l.agent_id = :aid' : ''),
+            $params
+        ) ?: [];
+
+        $exp = (float) ($expected['expected'] ?? 0);
+        $col = (float) ($totals['total_collected'] ?? 0);
+        $recoveryRate = $exp > 0 ? round(($col / $exp) * 100, 2) : 0;
+
+        // Breakdown by agent
+        $byAgent = $conn->fetchAllAssociative(
+            "SELECT
+                u.id as agent_id,
+                CONCAT(u.first_name, ' ', u.last_name) as agent_name,
+                COUNT(DISTINCT p.loan_id) as loans_touched,
+                COUNT(*) as payments_count,
+                COALESCE(SUM(CAST(p.amount AS NUMERIC)), 0) as total_collected
+             FROM payments p
+             INNER JOIN loans l ON p.loan_id = l.id
+             INNER JOIN users u ON l.agent_id = u.id
+             WHERE p.status = 'confirmed' AND {$where}
+             GROUP BY u.id, u.first_name, u.last_name
+             ORDER BY total_collected DESC
+             LIMIT 50",
+            $params
+        );
+
+        return [
+            'total_loans'     => (int) ($totals['loans_collected'] ?? 0),
+            'total_amount'    => $exp,
+            'collected'       => $col,
+            'outstanding'     => max(0, $exp - $col),
+            'collection_rate' => $recoveryRate,
+            'total_payments'  => (int) ($totals['total_payments'] ?? 0),
+            'by_agent'        => $byAgent,
+        ];
+    }
 }
