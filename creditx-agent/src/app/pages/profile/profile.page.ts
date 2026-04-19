@@ -41,7 +41,7 @@ import { AuthService } from '../../core/services/auth.service';
           <ion-icon name="log-out-outline"></ion-icon> Sign Out
         </button>
 
-        <p class="text-center text-[10px] text-gray-400 mt-6">CreditX Agent v2.0 &bull; Kodek Innovations Limited</p>
+        <p class="text-center text-[10px] text-gray-400 mt-6">CreditX Agent v2.0 &bull; DOST HQ LIMITED</p>
       </div>
     </ion-content>
   `,

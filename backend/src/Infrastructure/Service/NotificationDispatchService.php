@@ -247,7 +247,7 @@ final class NotificationDispatchService
                 <div style="color:#374151;font-size:14px;line-height:1.6">{$bodyHtml}</div>
             </div>
             <div style="padding:16px 24px;border-top:1px solid #e5e7eb;text-align:center">
-                <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {$year} Kodek Innovations Limited &bull; CreditX</p>
+                <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {$year} DOST HQ LIMITED &bull; CreditX</p>
             </div>
         </div>
         HTML;

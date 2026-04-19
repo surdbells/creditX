@@ -171,7 +171,7 @@ final class OtpService
                 </div>
                 <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0 0 24px">If you didn't request this code, please ignore this email or contact your administrator.</p>
                 <div style="border-top:1px solid #e5e7eb;padding-top:16px;text-align:center">
-                    <p style="color:#9ca3af;font-size:11px;margin:0">&copy; 2026 Kodek Innovations Limited</p>
+                    <p style="color:#9ca3af;font-size:11px;margin:0">&copy; 2026 DOST HQ LIMITED</p>
                 </div>
             </div>
         </div>

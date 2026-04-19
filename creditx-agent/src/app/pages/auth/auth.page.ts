@@ -93,7 +93,7 @@ import { environment } from '../../../environments/environment';
               </div>
             }
           </div>
-          <p class="text-center text-[10px] text-white/50 mt-6 font-medium">&copy; {{ year }} Kodek Innovations Limited</p>
+          <p class="text-center text-[10px] text-white/50 mt-6 font-medium">&copy; {{ year }} DOST HQ LIMITED</p>
         </div>
       </div>
     </ion-content>
