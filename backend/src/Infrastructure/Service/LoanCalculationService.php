@@ -44,7 +44,7 @@ final class LoanCalculationService
             // Bank statement fee only applies when the company generated the statement.
             // Matches legacy logic: if ($statement_mode == 'Generated_by_FTI') { $bs_fee = 500; }
             $feeCode = $productFee->getFeeType()->getCode();
-            if ($feeCode === 'bank_statement_fee' && $bankStatementMode !== 'generated_by_company' && $bankStatementMode !== 'Generated_by_FTI') {
+            if ($feeCode === 'BSF' && $bankStatementMode !== 'generated_by_company' && $bankStatementMode !== 'Generated_by_FTI') {
                 continue;
             }
 

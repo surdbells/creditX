@@ -14,16 +14,17 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
+use App\Domain\Entity\{LoanProduct, ProductFee, FeeType};
+use App\Domain\Enum\{InterestMethod, FeeCalculationType, FeeAppliesTo};
+use App\Infrastructure\Persistence\DoctrineEntityManagerFactory;
+
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
-$container = require __DIR__ . '/../config/container.php';
+// Force production mode for CLI to reduce memory
+$_ENV['APP_ENV'] = 'production';
 
-/** @var Doctrine\ORM\EntityManagerInterface $em */
-$em = $container->get(Doctrine\ORM\EntityManagerInterface::class);
-
-use App\Domain\Entity\{LoanProduct, ProductFee, FeeType};
-use App\Domain\Enum\{InterestMethod, FeeCalculationType, FeeAppliesTo};
+$em = DoctrineEntityManagerFactory::create();
 
 // Legacy products from FTI Pay: products_id | product_name | interest_rate
 $legacyProducts = [
@@ -38,16 +39,16 @@ $legacyProducts = [
     ['code' => 'FED',  'name' => 'Federal Institutions',              'rate' => 0.05],
 ];
 
-// Fee definitions matching legacy calculateLoan() function:
-//   admin_fee        = ₦2,000 flat
-//   insurance_fee    = 2% of app_amount
-//   management_fee   = 2% of app_amount (mgt_fee)
-//   bank_statement_fee = ₦500 flat, CONDITIONAL on statement_mode=Generated_by_FTI
+// Fee definitions matching legacy calculateLoan() function and existing seed codes:
+//   admin_fee        = ₦2,000 flat         (code: AF)
+//   insurance_fee    = 2% of app_amount    (code: IF)
+//   management_fee   = 2% of app_amount    (code: MF)
+//   bank_statement_fee = ₦500 flat         (code: BSF) — CONDITIONAL on statement_mode
 $feeDefinitions = [
-    ['code' => 'admin_fee',          'name' => 'Admin Fee',          'calc' => FeeCalculationType::FLAT,       'value' => '2000.00'],
-    ['code' => 'insurance_fee',      'name' => 'Insurance Fee',      'calc' => FeeCalculationType::PERCENTAGE, 'value' => '2.00'],
-    ['code' => 'management_fee',     'name' => 'Management Fee',     'calc' => FeeCalculationType::PERCENTAGE, 'value' => '2.00'],
-    ['code' => 'bank_statement_fee', 'name' => 'Bank Statement Fee', 'calc' => FeeCalculationType::FLAT,       'value' => '500.00'],
+    ['code' => 'AF',  'name' => 'Admin Fee',          'calc' => FeeCalculationType::FLAT,       'value' => '2000.00'],
+    ['code' => 'IF',  'name' => 'Insurance Fee',      'calc' => FeeCalculationType::PERCENTAGE, 'value' => '2.00'],
+    ['code' => 'MF',  'name' => 'Management Fee',     'calc' => FeeCalculationType::PERCENTAGE, 'value' => '2.00'],
+    ['code' => 'BSF', 'name' => 'Bank Statement Fee', 'calc' => FeeCalculationType::FLAT,       'value' => '500.00'],
 ];
 
 echo "\n=== CreditX Products Migration ===\n\n";
