@@ -10,10 +10,11 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-users', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="User Management" subtitle="{{ totalRecords | number }} users">
@@ -101,6 +102,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                   <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Role</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Department</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Team</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Location</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Status</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer" (click)="sort('createdAt')">
                     <div class="flex items-center gap-1">Joined @if (filters.sort_by==='createdAt') { <lucide-icon [name]="filters.sort_dir==='ASC'?'arrow-up':'arrow-down'" [size]="12"></lucide-icon> }</div>
@@ -139,6 +141,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                       <div class="text-sm text-[var(--cx-text-secondary)]">{{ row.team_name || '—' }}</div>
                       @if (row.team_lead_name) { <div class="text-xs text-[var(--cx-text-muted)]">Lead: {{ row.team_lead_name }}</div> }
                     </td>
+                    <td class="px-4 py-3 text-sm text-[var(--cx-text-secondary)]">{{ row.location_name || '—' }}</td>
                     <td class="px-4 py-3">
                       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                             [class]="statusClass(row.status)">
@@ -239,6 +242,15 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       </div>
     </cx-form-dialog>
 
+    <!-- Confirm Toggle Status Dialog -->
+    <cx-confirm-dialog [open]="showConfirm()" 
+                       [title]="confirmData.newStatus === 'inactive' ? 'Deactivate User' : 'Activate User'"
+                       [message]="(confirmData.newStatus === 'inactive' ? 'Deactivate ' : 'Activate ') + (confirmData.row?.full_name || 'this user') + '?'"
+                       [confirmLabel]="confirmData.newStatus === 'inactive' ? 'Deactivate' : 'Activate'"
+                       [variant]="confirmData.newStatus === 'inactive' ? 'danger' : 'warning'"
+                       (confirmed)="confirmToggleStatus()" (cancelled)="showConfirm.set(false)">
+    </cx-confirm-dialog>
+
     <!-- Password Reset Dialog -->
     @if (resetResult) {
       <div class="fixed inset-0 z-50 flex items-center justify-center" (click)="resetResult = null">
@@ -276,12 +288,18 @@ export class UsersComponent implements OnInit {
   roles = signal<any[]>([]); locs = signal<any[]>([]); departments = signal<any[]>([]); teams = signal<any[]>([]);
   showForm = signal(false); saving = signal(false);
   editId: string | null = null; form: any = {};
+  showConfirm = signal(false);
+  confirmData: any = {};
   selRoles: string[] = []; selLocs: string[] = [];
   filters: any = { search: '', role: '', department_id: '', location_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 25; totalRecords = 0; totalPages = 0;
   exportOpen = false;
   resetResult: any = null;
   private filterTimeout: any;
+
+  // Confirm dialog state
+  confirmOpen = signal(false);
+  confirmConfig: any = { title: '', message: '', type: 'warning', action: () => {} };
 
   apiUrl = environment.apiUrl.replace('/api', '');
 
@@ -409,11 +427,18 @@ export class UsersComponent implements OnInit {
   }
 
   resetPassword(row: any): void {
-    if (!confirm(`Reset password for ${row.full_name}?`)) return;
-    this.api.post('/users/' + row.id + '/reset-password', {}).subscribe({
-      next: r => { this.resetResult = r.data; },
-      error: e => this.toast.error(e.error?.message || 'Failed'),
-    });
+    this.confirmConfig = {
+      title: 'Reset Password',
+      message: `Reset password for ${row.full_name}? A new temporary password will be generated.`,
+      type: 'warning',
+      action: () => {
+        this.api.post('/users/' + row.id + '/reset-password', {}).subscribe({
+          next: r => { this.resetResult = r.data; this.confirmOpen.set(false); },
+          error: e => { this.toast.error(e.error?.message || 'Failed'); this.confirmOpen.set(false); },
+        });
+      },
+    };
+    this.confirmOpen.set(true);
   }
 
   copyPassword(input: HTMLInputElement): void {
@@ -433,7 +458,12 @@ export class UsersComponent implements OnInit {
 
   toggleStatus(row: any): void {
     const newStatus = row.status === 'active' ? 'inactive' : 'active';
-    if (!confirm(`${newStatus === 'inactive' ? 'Deactivate' : 'Activate'} ${row.full_name}?`)) return;
+    this.confirmData = { row, newStatus };
+    this.showConfirm.set(true);
+  }
+
+  confirmToggleStatus(): void {
+    const { row, newStatus } = this.confirmData;
     this.api.put('/users/' + row.id, { status: newStatus }).subscribe({
       next: () => { this.toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}`); this.load(); },
       error: (e: any) => this.toast.error(e.error?.message || 'Failed'),

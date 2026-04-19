@@ -310,6 +310,7 @@ class User
             'team_id'         => $this->team?->getId(),
             'team_name'       => $this->team?->getName(),
             'team_lead_name'  => $this->team?->getLead()?->getFullName(),
+            'location_name'   => $this->locations->first() ? $this->locations->first()->getName() : null,
             'status'        => $this->status->value,
             'last_login_at' => $this->lastLoginAt?->format('Y-m-d H:i:s'),
             'created_at'    => $this->createdAt->format('Y-m-d H:i:s'),

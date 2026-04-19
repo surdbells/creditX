@@ -18,7 +18,7 @@ import { LucideAngularModule } from 'lucide-angular';
               <lucide-icon name="x" [size]="18"></lucide-icon>
             </button>
           </div>
-          <div class="px-6 py-4 overflow-y-auto" [style.max-height]="'calc(85vh - 130px)'">
+          <div class="px-6 py-4 overflow-y-auto" [style.max-height]="'calc(90vh - 120px)'">
             <ng-content></ng-content>
           </div>
           <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--cx-border)]">

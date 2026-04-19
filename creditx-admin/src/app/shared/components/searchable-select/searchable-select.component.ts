@@ -15,7 +15,7 @@ export interface SelectOption {
   imports: [CommonModule, FormsModule, LucideAngularModule],
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => SearchableSelectComponent), multi: true }],
   template: `
-    <div class="relative" (clickOutside)="open.set(false)">
+    <div class="relative">
       <div class="cx-input flex items-center cursor-pointer" [class.!border-[var(--cx-primary)]]="open()" (click)="open.set(!open())">
         <span class="flex-1 truncate" [class.text-[var(--cx-text-muted)]]="!selectedLabel()">
           {{ selectedLabel() || placeholder }}
@@ -26,7 +26,7 @@ export interface SelectOption {
       @if (open()) {
         <div class="absolute z-50 w-full mt-1 cx-card p-0 shadow-lg max-h-60 overflow-hidden cx-animate-in">
           <div class="p-2 border-b border-[var(--cx-border)]">
-            <input type="text" class="cx-input !text-sm" placeholder="Search..." [(ngModel)]="searchTerm"
+            <input type="text" class="cx-input !text-sm" placeholder="Search..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)"
                    (click)="$event.stopPropagation()" />
           </div>
           <div class="overflow-y-auto max-h-48">
@@ -38,7 +38,7 @@ export interface SelectOption {
             }
             @for (opt of filteredOptions(); track opt.value) {
               <div class="px-3 py-2 cursor-pointer text-sm hover:bg-[var(--cx-surface-hover)] transition-colors"
-                   [class.bg-[var(--cx-primary-50)]]="opt.value === selectedValue"
+                   [class.bg-[var(--cx-primary-50))]="opt.value === selectedValue"
                    [class.font-medium]="opt.value === selectedValue"
                    (click)="selectOption(opt)">
                 <div class="text-[var(--cx-text)]">{{ opt.label }}</div>
@@ -52,7 +52,7 @@ export interface SelectOption {
       }
     </div>
   `,
-  host: { '(document:click)': 'onDocumentClick($event)' },
+  host: { '(document:click)': 'onHostClick($event)' },
 })
 export class SearchableSelectComponent implements ControlValueAccessor {
   @Input() options: SelectOption[] = [];
@@ -60,14 +60,14 @@ export class SearchableSelectComponent implements ControlValueAccessor {
   @Input() clearable = false;
 
   open = signal(false);
-  searchTerm = '';
+  searchTerm = signal('');
   selectedValue: string | null = null;
 
   private onChange: (value: string | null) => void = () => {};
   private onTouched: () => void = () => {};
 
   filteredOptions = computed(() => {
-    const term = this.searchTerm.toLowerCase();
+    const term = this.searchTerm().toLowerCase();
     if (!term) return this.options;
     return this.options.filter(o => o.label.toLowerCase().includes(term) || (o.sublabel?.toLowerCase().includes(term) ?? false));
   });
@@ -81,11 +81,14 @@ export class SearchableSelectComponent implements ControlValueAccessor {
     this.selectedValue = opt?.value ?? null;
     this.onChange(this.selectedValue);
     this.open.set(false);
-    this.searchTerm = '';
+    this.searchTerm.set('');
   }
 
-  onDocumentClick(event: Event): void {
-    // Close dropdown when clicking outside handled by host listener
+  onHostClick(event: Event): void {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.relative')) {
+      this.open.set(false);
+    }
   }
 
   writeValue(value: string | null): void { this.selectedValue = value; }
