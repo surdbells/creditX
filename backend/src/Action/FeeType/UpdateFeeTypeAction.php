@@ -15,14 +15,17 @@ final class UpdateFeeTypeAction
     {
         $ft = $this->repo->find($args['id'] ?? '');
         if ($ft === null) return $this->notFound('Fee type not found');
-        if ($ft->isSystem()) return $this->error('System fee types cannot be modified', 403);
 
         $old = $ft->toArray();
         $data = (array) ($request->getParsedBody() ?? []);
+        $isSystem = $ft->isSystem();
 
-        if (isset($data['name']) && $data['name'] !== '') $ft->setName($data['name']);
-        if (isset($data['description'])) $ft->setDescription($data['description']);
-        if (isset($data['gl_account_id'])) $ft->setGlAccountId($data['gl_account_id']);
+        // Non-system fees: allow all fields. System fees: only GL mapping + is_active.
+        if (!$isSystem) {
+            if (isset($data['name']) && $data['name'] !== '') $ft->setName($data['name']);
+            if (isset($data['description'])) $ft->setDescription($data['description']);
+        }
+        if (array_key_exists('gl_account_id', $data)) $ft->setGlAccountId($data['gl_account_id'] ?: null);
         if (isset($data['is_active'])) $ft->setIsActive(filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN));
 
         $this->repo->flush();

@@ -41,6 +41,13 @@ final class LoanCalculationService
                 continue;
             }
 
+            // Bank statement fee only applies when the company generated the statement.
+            // Matches legacy logic: if ($statement_mode == 'Generated_by_FTI') { $bs_fee = 500; }
+            $feeCode = $productFee->getFeeType()->getCode();
+            if ($feeCode === 'bank_statement_fee' && $bankStatementMode !== 'generated_by_company' && $bankStatementMode !== 'Generated_by_FTI') {
+                continue;
+            }
+
             // For gross_loan-based fees, we need gross_loan. Initially use appAmount + fees as estimate.
             // We'll do a two-pass: first pass with principal-based, then compute gross, then recompute gross-based.
             $feeAmount = $productFee->computeAmount($appAmount, $appAmount);

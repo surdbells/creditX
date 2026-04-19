@@ -28,8 +28,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
         <div><label class="cx-label">Description</label><input class="cx-input" [(ngModel)]="form.description" /></div>
         <div><label class="cx-label">GL Account</label>
-          <select class="cx-select" [(ngModel)]="form.gl_account_id"><option value="">— Select GL —</option>
-            @for (gl of glAccounts(); track gl.id) { <option [value]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option> }
+          <select class="cx-select" [(ngModel)]="form.gl_account_id"><option [ngValue]="''">— Select GL —</option>
+            @for (gl of glAccounts(); track gl.id) { <option [ngValue]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option> }
           </select>
         </div>
       </div>

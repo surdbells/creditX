@@ -162,6 +162,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('records.create'));
             $group->get('/lookup/{staffId}', GovRecord\LookupStaffAction::class)
                 ->add(new RbacMiddleware('records.view'));
+            $group->get('/{id}/eligibility', GovRecord\GetEligibilityAction::class)
+                ->add(new RbacMiddleware('records.view'));
             $group->post('/bulk-import', GovRecord\BulkImportAction::class)
                 ->add(new RbacMiddleware('records.import'));
             $group->get('/{id}', GovRecord\GetGovRecordAction::class)
