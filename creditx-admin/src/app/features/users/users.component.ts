@@ -240,41 +240,133 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
       </div>
     </cx-form-dialog>
 
-    <!-- Confirm Toggle Status Dialog -->
+    <!-- Unified Confirm Dialog (toggle status + reset password) -->
     <cx-confirm-dialog [open]="showConfirm()" 
-                       [title]="confirmData.newStatus === 'inactive' ? 'Deactivate User' : 'Activate User'"
-                       [message]="(confirmData.newStatus === 'inactive' ? 'Deactivate ' : 'Activate ') + (confirmData.row?.full_name || 'this user') + '?'"
-                       [confirmLabel]="confirmData.newStatus === 'inactive' ? 'Deactivate' : 'Activate'"
-                       [variant]="confirmData.newStatus === 'inactive' ? 'danger' : 'warning'"
-                       (confirmed)="confirmToggleStatus()" (cancelled)="showConfirm.set(false)">
+                       [title]="confirmData.title || 'Confirm'"
+                       [message]="confirmData.message || ''"
+                       [confirmLabel]="confirmData.confirmLabel || 'Confirm'"
+                       [variant]="confirmData.variant || 'warning'"
+                       (confirmed)="handleConfirm()" (cancelled)="showConfirm.set(false)">
     </cx-confirm-dialog>
 
-    <!-- Password Reset Dialog -->
+    <!-- Password Reset Result Dialog - Enhanced -->
     @if (resetResult) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center" (click)="resetResult = null">
-        <div class="fixed inset-0 bg-black/40"></div>
-        <div class="relative bg-[var(--cx-surface)] rounded-2xl shadow-2xl max-w-sm w-full mx-4 cx-animate-in" (click)="$event.stopPropagation()">
-          <div class="px-6 py-4 border-b border-[var(--cx-border)]">
-            <h3 class="text-sm font-bold text-[var(--cx-text)]">Password Reset</h3>
-          </div>
-          <div class="px-6 py-5 space-y-4">
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-[var(--cx-success-light)]">
-              <lucide-icon name="check-circle" [size]="20" class="text-[var(--cx-success)]"></lucide-icon>
-              <span class="text-sm font-medium text-[var(--cx-success)]">Password reset for {{ resetResult.user_name }}</span>
-            </div>
-            <div>
-              <label class="cx-label">New Password</label>
-              <div class="flex items-center gap-2">
-                <input type="text" class="cx-input font-mono text-base tracking-wider" [value]="resetResult.password" readonly #pwdInput />
-                <button class="cx-btn cx-btn-outline cx-btn-sm flex-shrink-0" (click)="copyPassword(pwdInput)">
-                  <lucide-icon name="copy" [size]="14"></lucide-icon> Copy
-                </button>
+      <div class="fixed inset-0 z-50 flex items-center justify-center cx-animate-in" (click)="resetResult = null">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="relative bg-[var(--cx-surface)] rounded-2xl shadow-2xl max-w-md w-full mx-4" (click)="$event.stopPropagation()">
+          <!-- Header with gradient -->
+          <div class="px-6 py-5 rounded-t-2xl bg-gradient-to-br from-[var(--cx-primary)] to-[var(--cx-primary-hover)] text-white">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <lucide-icon name="shield" [size]="20"></lucide-icon>
+              </div>
+              <div>
+                <h3 class="text-base font-bold">Password Reset Successful</h3>
+                <p class="text-xs text-white/80 mt-0.5">{{ resetResult.user_name }} &bull; {{ resetResult.user_email }}</p>
               </div>
             </div>
-            <p class="text-[10px] text-[var(--cx-text-muted)]">Share this password securely with the user. They should change it on first login.</p>
           </div>
-          <div class="px-6 py-3 border-t border-[var(--cx-border)] flex justify-end">
-            <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="resetResult = null">Done</button>
+
+          <div class="px-6 py-5 space-y-4">
+            <!-- Password Display -->
+            <div>
+              <label class="cx-label flex items-center gap-1.5">
+                <lucide-icon name="lock" [size]="12"></lucide-icon> Temporary Password
+              </label>
+              <div class="relative">
+                <input [type]="showPwd() ? 'text' : 'password'" class="cx-input font-mono text-base tracking-wider pr-24"
+                       [value]="resetResult.password" readonly #pwdInput />
+                <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="showPwd.set(!showPwd())" [title]="showPwd() ? 'Hide' : 'Show'">
+                    <lucide-icon [name]="showPwd() ? 'eye-off' : 'eye'" [size]="14"></lucide-icon>
+                  </button>
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="copyPassword(pwdInput)" title="Copy to clipboard">
+                    <lucide-icon name="copy" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security Warning -->
+            <div class="flex items-start gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20">
+              <lucide-icon name="alert-triangle" [size]="16" class="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"></lucide-icon>
+              <div class="flex-1">
+                <p class="text-xs font-semibold text-amber-800 dark:text-amber-300">Security Notice</p>
+                <ul class="text-[11px] text-amber-700 dark:text-amber-400 mt-1 space-y-0.5 list-disc list-inside">
+                  <li>Share this password through a secure channel only</li>
+                  <li>The user must change it on first login</li>
+                  <li>This is the only time the password will be shown</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-3 border-t border-[var(--cx-border)] flex justify-end gap-2">
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="copyPassword(pwdInput)">
+              <lucide-icon name="copy" [size]="14"></lucide-icon> Copy Password
+            </button>
+            <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="resetResult = null; showPwd.set(false)">
+              <lucide-icon name="check" [size]="14"></lucide-icon> Done
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Avatar Upload Preview Dialog -->
+    @if (showAvatarPreview()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center cx-animate-in" (click)="showAvatarPreview.set(false)">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="relative bg-[var(--cx-surface)] rounded-2xl shadow-2xl max-w-md w-full mx-4" (click)="$event.stopPropagation()">
+          <div class="px-6 py-4 border-b border-[var(--cx-border)] flex items-center justify-between">
+            <h3 class="text-sm font-bold text-[var(--cx-text)] flex items-center gap-2">
+              <lucide-icon name="upload" [size]="16"></lucide-icon>
+              Upload Profile Photo
+            </h3>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="showAvatarPreview.set(false)">
+              <lucide-icon name="x" [size]="16"></lucide-icon>
+            </button>
+          </div>
+
+          <div class="px-6 py-6">
+            <!-- User context -->
+            <p class="text-xs text-[var(--cx-text-muted)] mb-4 text-center">Update photo for <strong class="text-[var(--cx-text)]">{{ avatarPreview.row?.full_name }}</strong></p>
+
+            <!-- Preview -->
+            <div class="flex flex-col items-center gap-4">
+              <div class="relative">
+                <div class="w-32 h-32 rounded-full overflow-hidden ring-4 ring-[var(--cx-primary)]/10 shadow-xl">
+                  <img [src]="avatarPreview.previewUrl" class="w-full h-full object-cover" alt="Preview" />
+                </div>
+                <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[var(--cx-primary)] text-white text-[10px] font-semibold shadow-lg whitespace-nowrap">
+                  Preview
+                </div>
+              </div>
+
+              <!-- File Info -->
+              <div class="w-full p-3 rounded-xl bg-[var(--cx-surface-hover)] text-center">
+                <div class="text-xs font-medium text-[var(--cx-text)] truncate">{{ avatarPreview.fileName }}</div>
+                <div class="text-[10px] text-[var(--cx-text-muted)] mt-0.5">{{ avatarPreview.fileSize }}</div>
+              </div>
+
+              <!-- Tip -->
+              <div class="w-full flex items-start gap-2 p-2.5 rounded-lg bg-[var(--cx-primary)]/5 border border-[var(--cx-primary)]/10">
+                <lucide-icon name="info" [size]="14" class="text-[var(--cx-primary)] flex-shrink-0 mt-0.5"></lucide-icon>
+                <p class="text-[11px] text-[var(--cx-text-secondary)]">For best results, use a square image at least 200×200 pixels. Maximum file size: 2MB.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-3 border-t border-[var(--cx-border)] flex justify-end gap-2">
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="showAvatarPreview.set(false)" [disabled]="avatarUploading()">Cancel</button>
+            <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="confirmAvatarUpload()" [disabled]="avatarUploading()">
+              @if (avatarUploading()) {
+                <div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Uploading...
+              } @else {
+                <lucide-icon name="upload" [size]="14"></lucide-icon> Upload Photo
+              }
+            </button>
           </div>
         </div>
       </div>
@@ -289,6 +381,10 @@ export class UsersComponent implements OnInit {
   editId: string | null = null; form: any = {};
   showConfirm = signal(false);
   confirmData: any = {};
+  showAvatarPreview = signal(false);
+  avatarPreview: any = {};
+  avatarUploading = signal(false);
+  showPwd = signal(false);
   selRoles: string[] = []; selLocs: string[] = [];
   filters: any = { search: '', role: '', department_id: '', location_id: '', status: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 25; totalPages = 0;
@@ -432,47 +528,110 @@ export class UsersComponent implements OnInit {
   }
 
   resetPassword(row: any): void {
-    this.confirmConfig = {
+    this.confirmData = {
+      mode: 'reset_password',
+      row,
       title: 'Reset Password',
-      message: `Reset password for ${row.full_name}? A new temporary password will be generated.`,
-      type: 'warning',
-      action: () => {
-        this.api.post('/users/' + row.id + '/reset-password', {}).subscribe({
-          next: r => { this.resetResult = r.data; this.confirmOpen.set(false); },
-          error: e => { this.toast.error(e.error?.message || 'Failed'); this.confirmOpen.set(false); },
-        });
-      },
+      message: `Generate a new temporary password for ${row.full_name}? The user will be required to change it on next login.`,
+      confirmLabel: 'Reset Password',
+      variant: 'warning',
     };
-    this.confirmOpen.set(true);
+    this.showConfirm.set(true);
+  }
+
+  uploadAvatar(row: any, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      this.toast.error('Please select a JPEG, PNG, WebP, or GIF image');
+      input.value = '';
+      return;
+    }
+    if (file.size > maxSize) {
+      this.toast.error('Image must be smaller than 2MB');
+      input.value = '';
+      return;
+    }
+
+    // Preview then confirm
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.avatarPreview = {
+        row,
+        file,
+        previewUrl: e.target?.result as string,
+        fileName: file.name,
+        fileSize: this.formatFileSize(file.size),
+      };
+      this.showAvatarPreview.set(true);
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  }
+
+  confirmAvatarUpload(): void {
+    const { row, file } = this.avatarPreview;
+    this.avatarUploading.set(true);
+    const formData = new FormData();
+    formData.append('avatar', file);
+    this.http.post<any>(`${environment.apiUrl}/users/${row.id}/avatar`, formData).subscribe({
+      next: () => {
+        this.avatarUploading.set(false);
+        this.showAvatarPreview.set(false);
+        this.toast.success('Profile photo updated');
+        this.load();
+      },
+      error: (e: any) => {
+        this.avatarUploading.set(false);
+        this.toast.error(e.error?.message || 'Upload failed');
+      },
+    });
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(2) + ' MB';
   }
 
   copyPassword(input: HTMLInputElement): void {
     navigator.clipboard.writeText(input.value).then(() => this.toast.success('Password copied'));
   }
 
-  uploadAvatar(row: any, event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('avatar', file);
-    this.http.post<any>(`${environment.apiUrl}/users/${row.id}/avatar`, formData).subscribe({
-      next: () => { this.toast.success('Photo uploaded'); this.load(); },
-      error: (e: any) => this.toast.error(e.error?.message || 'Upload failed'),
-    });
-  }
-
   toggleStatus(row: any): void {
     const newStatus = row.status === 'active' ? 'inactive' : 'active';
-    this.confirmData = { row, newStatus };
+    this.confirmData = {
+      mode: 'toggle_status',
+      row,
+      newStatus,
+      title: newStatus === 'inactive' ? 'Deactivate User' : 'Activate User',
+      message: (newStatus === 'inactive' ? 'Deactivate ' : 'Activate ') + row.full_name + '?',
+      confirmLabel: newStatus === 'inactive' ? 'Deactivate' : 'Activate',
+      variant: newStatus === 'inactive' ? 'danger' : 'warning',
+    };
     this.showConfirm.set(true);
   }
 
-  confirmToggleStatus(): void {
-    const { row, newStatus } = this.confirmData;
-    this.api.put('/users/' + row.id, { status: newStatus }).subscribe({
-      next: () => { this.toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}`); this.load(); },
-      error: (e: any) => this.toast.error(e.error?.message || 'Failed'),
-    });
+  handleConfirm(): void {
+    const { mode, row, newStatus } = this.confirmData;
+    if (mode === 'toggle_status') {
+      this.api.put('/users/' + row.id, { status: newStatus }).subscribe({
+        next: () => { this.showConfirm.set(false); this.toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}`); this.load(); },
+        error: (e: any) => { this.showConfirm.set(false); this.toast.error(e.error?.message || 'Failed'); },
+      });
+    } else if (mode === 'reset_password') {
+      this.api.post('/users/' + row.id + '/reset-password', {}).subscribe({
+        next: (r: any) => {
+          this.showConfirm.set(false);
+          this.resetResult = { ...r.data, user_name: row.full_name, user_email: row.email };
+        },
+        error: (e: any) => { this.showConfirm.set(false); this.toast.error(e.error?.message || 'Failed'); },
+      });
+    }
   }
 
   private downloadBlob(blob: Blob, filename: string): void {

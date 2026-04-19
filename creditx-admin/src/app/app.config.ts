@@ -10,7 +10,7 @@ import { LucideAngularModule,
   Pencil, Trash2, Search, Download, Upload, Filter, CheckCircle, XCircle,
   Clock, AlertTriangle, AlertCircle, TrendingUp, Save, RefreshCw, MoreVertical, Copy,
   Calendar, Hash, DollarSign, Percent, Info, ArrowUp, ArrowDown, Loader2,
-  Columns3, FileSpreadsheet, Home, ExternalLink, Check,
+  Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -31,7 +31,7 @@ export const appConfig: ApplicationConfig = {
         Pencil, Trash2, Search, Download, Upload, Filter, CheckCircle, XCircle,
         Clock, AlertTriangle, AlertCircle, TrendingUp, Save, RefreshCw, MoreVertical, Copy,
         Calendar, Hash, DollarSign, Percent, Info, ArrowUp, ArrowDown, Loader2,
-        Columns3, FileSpreadsheet, Home, ExternalLink, Check,
+        Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
       })
     ),
   ],
