@@ -22,13 +22,17 @@ export class AuthService {
     return this.http.post<ApiResponse<LoginResponse>>(`${this.API}/auth/login`, credentials).pipe(
       tap(res => {
         if (res.status === 'success' && res.data && (res.data as any).tokens) {
-          localStorage.setItem(this.ACCESS_KEY, res.data.tokens.access_token);
-          localStorage.setItem(this.REFRESH_KEY, res.data.tokens.refresh_token);
-          localStorage.setItem(this.USER_KEY, JSON.stringify(res.data.user));
-          this.currentUser.set(res.data.user);
+          this.setSession(res.data);
         }
       })
     );
+  }
+
+  setSession(data: any): void {
+    localStorage.setItem(this.ACCESS_KEY, data.tokens.access_token);
+    localStorage.setItem(this.REFRESH_KEY, data.tokens.refresh_token);
+    localStorage.setItem(this.USER_KEY, JSON.stringify(data.user));
+    this.currentUser.set(data.user);
   }
 
   logout(): void {

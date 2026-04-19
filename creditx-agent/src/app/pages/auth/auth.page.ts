@@ -147,15 +147,12 @@ export class AuthPage {
       next: (res) => {
         this.loading.set(false);
         if (res.status === 'success' && res.data?.tokens) {
-          localStorage.setItem('cxa_access_token', res.data.tokens.access_token);
-          localStorage.setItem('cxa_refresh_token', res.data.tokens.refresh_token);
-          localStorage.setItem('cxa_user', JSON.stringify(res.data.user));
           const userRoles = (res.data.user?.roles || []).map((r: any) => (r.slug || r.name || '').toLowerCase());
           if (!userRoles.some((r: string) => this.ALLOWED_ROLES.includes(r))) {
-            this.auth.logout();
             this.error.set('Access denied. This app is for field agents only.');
             return;
           }
+          this.auth.setSession(res.data);
           this.push.init();
           this.router.navigate(['/dashboard']);
         } else { this.error.set(res.message || 'Verification failed'); }
