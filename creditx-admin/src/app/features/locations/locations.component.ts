@@ -13,25 +13,52 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Location Management" subtitle="Manage branches and offices">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Location</button>
+      <cx-page-header
+        title="Locations"
+        subtitle="Manage head office, branches, and satellite locations"
+        eyebrow="Operations">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Location</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search locations..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search locations..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Location' : 'Create Location'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
-          <div><label class="cx-label">Type</label><select class="cx-select" [(ngModel)]="form.type"><option value="head_office">Head Office</option><option value="branch">Branch</option><option value="satellite">Satellite</option></select></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Location' : 'Create Location'"
+      [subtitle]="editId ? 'Update location details' : 'Add a new office or branch'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Lagos Island Branch" /></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. LI" /></div>
+          <div>
+            <label class="cx-label">Type</label>
+            <select class="cx-select" [(ngModel)]="form.type">
+              <option value="head_office">Head Office</option>
+              <option value="branch">Branch</option>
+              <option value="satellite">Satellite</option>
+            </select>
+          </div>
         </div>
-        <div><label class="cx-label">Address</label><input class="cx-input" [(ngModel)]="form.address" /></div>
-        <div><label class="cx-label">State</label><input class="cx-input" [(ngModel)]="form.state" /></div>
-        @if (editId) { <div><label class="cx-label">Active</label><select class="cx-select" [(ngModel)]="form.is_active"><option [ngValue]="true">Yes</option><option [ngValue]="false">No</option></select></div> }
+        <div><label class="cx-label">Address</label><input class="cx-input" [(ngModel)]="form.address" placeholder="Street address" /></div>
+        <div><label class="cx-label">State</label><input class="cx-input" [(ngModel)]="form.state" placeholder="e.g. Lagos" /></div>
+        @if (editId) {
+          <div>
+            <label class="cx-label">Status</label>
+            <select class="cx-select" [(ngModel)]="form.is_active">
+              <option [ngValue]="true">Active</option>
+              <option [ngValue]="false">Inactive</option>
+            </select>
+          </div>
+        }
       </div>
     </cx-form-dialog>
   `,

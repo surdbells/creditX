@@ -352,6 +352,28 @@ html, body {
   letter-spacing: 0.02em;
 }
 
+/* ─── Form layout helpers (shared across admin forms) ─── */
+.cx-form-stack { display: flex; flex-direction: column; gap: 1rem; }
+.cx-form-section { display: flex; flex-direction: column; gap: 0.85rem; }
+.cx-form-section-title {
+  font-size: var(--cx-text-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--cx-text-muted);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--cx-border-subtle);
+  margin: 0.35rem 0 0;
+}
+.cx-form-row { display: grid; gap: 1rem; }
+.cx-form-row-2 { grid-template-columns: 1fr 1fr; }
+.cx-form-row-3 { grid-template-columns: repeat(3, 1fr); }
+.cx-form-row-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 640px) {
+  .cx-form-row-2, .cx-form-row-3, .cx-form-row-4 { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .cx-form-row-3, .cx-form-row-4 { grid-template-columns: 1fr 1fr; }
+}
+
 .cx-select {
   width: 100%; padding: 0.55rem 0.85rem;
   background: var(--cx-surface); border: 1px solid var(--cx-border);

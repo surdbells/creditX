@@ -13,23 +13,41 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Fee Types" subtitle="Manage fee type definitions">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Fee Type</button>
+      <cx-page-header
+        title="Fee Types"
+        subtitle="Define the types of fees that can be charged on loans"
+        eyebrow="Configuration">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Fee Type</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search fee types..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search fee types..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Fee Type' : 'Create Fee Type'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-        <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
-        <div><label class="cx-label">Description</label><input class="cx-input" [(ngModel)]="form.description" /></div>
-        <div><label class="cx-label">GL Account</label>
-          <select class="cx-select" [(ngModel)]="form.gl_account_id"><option [ngValue]="''">— Select GL —</option>
-            @for (gl of glAccounts(); track gl.id) { <option [ngValue]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option> }
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Fee Type' : 'Create Fee Type'"
+      [subtitle]="editId ? 'Update this fee definition' : 'Define a new chargeable fee'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Processing Fee" /></div>
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. PROC_FEE" /></div>
+        </div>
+        <div><label class="cx-label">Description</label><input class="cx-input" [(ngModel)]="form.description" placeholder="Short description" /></div>
+        <div>
+          <label class="cx-label">GL Account</label>
+          <select class="cx-select" [(ngModel)]="form.gl_account_id">
+            <option [ngValue]="''">— Select GL —</option>
+            @for (gl of glAccounts(); track gl.id) {
+              <option [ngValue]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option>
+            }
           </select>
         </div>
       </div>

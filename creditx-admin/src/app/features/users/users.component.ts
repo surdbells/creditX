@@ -11,144 +11,162 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-users', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="User Management" [subtitle]="totalRecords() + ' users'">
+      <cx-page-header
+        title="Users"
+        [subtitle]="totalRecords() + ' active team members'"
+        eyebrow="Access Management">
         <div class="flex items-center gap-2">
           <div class="relative">
             <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
-              <lucide-icon name="download" [size]="14"></lucide-icon> Export
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+              <span>Export</span>
               <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
             </button>
             @if (exportOpen) {
-              <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--cx-surface)] border border-[var(--cx-border)] rounded-xl shadow-xl z-50 overflow-hidden">
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('csv')">
-                  <lucide-icon name="file-text" [size]="14"></lucide-icon> Export CSV
+              <div class="cx-users-export-menu cx-animate-in">
+                <button class="cx-users-export-option" (click)="exportData('csv')">
+                  <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                  <span>CSV</span>
                 </button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('excel')">
-                  <lucide-icon name="file-text" [size]="14"></lucide-icon> Export Excel
+                <button class="cx-users-export-option" (click)="exportData('excel')">
+                  <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                  <span>Excel</span>
                 </button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)] flex items-center gap-2" (click)="exportData('pdf')">
-                  <lucide-icon name="file-text" [size]="14"></lucide-icon> Export PDF
+                <button class="cx-users-export-option" (click)="exportData('pdf')">
+                  <lucide-icon name="file-text" [size]="14"></lucide-icon>
+                  <span>PDF</span>
                 </button>
               </div>
             }
           </div>
           @if (auth.hasPermission('users.create')) {
             <button class="cx-btn cx-btn-primary" (click)="openForm()">
-              <lucide-icon name="plus" [size]="16"></lucide-icon> Add User
+              <lucide-icon name="plus" [size]="14"></lucide-icon>
+              <span>Add User</span>
             </button>
           }
         </div>
       </cx-page-header>
 
       <!-- Filters -->
-      <div class="cx-card !p-4 mb-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <div class="lg:col-span-2">
-            <div class="relative">
-              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
-              <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by name, email, phone..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
-            </div>
-          </div>
-          <select class="cx-select" [(ngModel)]="filters.role" (change)="onFilterChange()">
-            <option value="">All Roles</option>
-            @for (r of roles(); track r.id) { <option [value]="r.slug">{{ r.name }}</option> }
-          </select>
-          <select class="cx-select" [(ngModel)]="filters.department_id" (change)="onFilterChange()">
-            <option value="">All Departments</option>
-            @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
-          </select>
-          <select class="cx-select" [(ngModel)]="filters.location_id" (change)="onFilterChange()">
-            <option value="">All Locations</option>
-            @for (l of locs(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
-          </select>
-          <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="suspended">Suspended</option>
-          </select>
+      <div class="cx-users-filters">
+        <div class="cx-users-filter-search">
+          <lucide-icon name="search" [size]="14" class="cx-users-filter-search-icon"></lucide-icon>
+          <input type="text" class="cx-users-filter-search-input"
+            placeholder="Search by name, email, phone..."
+            [(ngModel)]="filters.search" (input)="onFilterChange()" />
         </div>
+        <select class="cx-select" [(ngModel)]="filters.role" (change)="onFilterChange()">
+          <option value="">All Roles</option>
+          @for (r of roles(); track r.id) { <option [value]="r.slug">{{ r.name }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.department_id" (change)="onFilterChange()">
+          <option value="">All Departments</option>
+          @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.location_id" (change)="onFilterChange()">
+          <option value="">All Locations</option>
+          @for (l of locs(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
+        </select>
       </div>
 
       <!-- Table -->
-      <div class="cx-card !p-4 overflow-hidden">
+      <div class="cx-users-table-wrap">
         @if (loading()) {
-          <div class="flex items-center justify-center py-16">
-            <div class="flex flex-col items-center gap-3">
-              <div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div>
-              <span class="text-sm text-[var(--cx-text-muted)]">Loading users...</span>
+          <div class="cx-users-state">
+            <div class="cx-users-loading">
+              <div class="cx-users-loading-dots"><span></span><span></span><span></span></div>
+              <span>Loading users...</span>
             </div>
           </div>
         } @else if (rows().length === 0) {
-          <div class="flex flex-col items-center justify-center py-16">
-            <lucide-icon name="users" [size]="48" class="text-[var(--cx-text-muted)] opacity-30 mb-3"></lucide-icon>
-            <h3 class="text-base font-semibold text-[var(--cx-text)]">No users found</h3>
-            <p class="text-sm text-[var(--cx-text-muted)] mt-1">Try adjusting your filters</p>
+          <div class="cx-users-state">
+            <cx-empty-state title="No users found" description="Try adjusting your filters or add a new user." icon="users"></cx-empty-state>
           </div>
         } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[800px]">
+          <div class="cx-users-table-scroll">
+            <table class="cx-users-table">
               <thead>
-                <tr class="border-b border-[var(--cx-border)]">
-                  <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer min-w-[220px]" (click)="sort('firstName')">
-                    <div class="flex items-center gap-1">User @if (filters.sort_by==='firstName') { <lucide-icon [name]="filters.sort_dir==='ASC'?'arrow-up':'arrow-down'" [size]="12"></lucide-icon> }</div>
+                <tr>
+                  <th class="cx-users-th-user" (click)="sort('firstName')">
+                    <div class="cx-users-th-inner">
+                      <span>User</span>
+                      @if (filters.sort_by === 'firstName') {
+                        <lucide-icon [name]="filters.sort_dir === 'ASC' ? 'arrow-up' : 'arrow-down'" [size]="12" class="cx-users-sort-icon is-active"></lucide-icon>
+                      } @else {
+                        <lucide-icon name="chevrons-up-down" [size]="12" class="cx-users-sort-icon"></lucide-icon>
+                      }
+                    </div>
                   </th>
-                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[120px]">Role</th>
-                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[130px]">Dept / Team</th>
-                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[120px]">Location</th>
-                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[90px]">Status</th>
-                  <th class="px-3 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider cursor-pointer w-[110px]" (click)="sort('createdAt')">
-                    <div class="flex items-center gap-1">Joined @if (filters.sort_by==='createdAt') { <lucide-icon [name]="filters.sort_dir==='ASC'?'arrow-up':'arrow-down'" [size]="12"></lucide-icon> }</div>
+                  <th>Role</th>
+                  <th>Dept / Team</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th class="cx-users-th-sortable" (click)="sort('createdAt')">
+                    <div class="cx-users-th-inner">
+                      <span>Joined</span>
+                      @if (filters.sort_by === 'createdAt') {
+                        <lucide-icon [name]="filters.sort_dir === 'ASC' ? 'arrow-up' : 'arrow-down'" [size]="12" class="cx-users-sort-icon is-active"></lucide-icon>
+                      } @else {
+                        <lucide-icon name="chevrons-up-down" [size]="12" class="cx-users-sort-icon"></lucide-icon>
+                      }
+                    </div>
                   </th>
-                  <th class="px-3 py-3 w-[140px]"></th>
+                  <th class="cx-users-actions-col"></th>
                 </tr>
               </thead>
               <tbody>
                 @for (row of rows(); track row.id) {
-                  <tr class="border-b border-[var(--cx-border)] transition-colors hover:bg-[var(--cx-surface-hover)]">
-                    <td class="px-4 py-3">
-                      <div class="flex items-center gap-3">
+                  <tr>
+                    <td class="cx-users-user-cell">
+                      <div class="cx-users-user">
                         @if (row.avatar_path) {
-                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="cx-users-avatar-img" alt="" />
                         } @else {
-                          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                               [style.background]="avatarColor(row.id)">
+                          <div class="cx-users-avatar-initial" [style.background]="avatarColor(row.id)">
                             {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}
                           </div>
                         }
-                        <div class="min-w-0">
-                          <div class="text-sm font-medium text-[var(--cx-text)] truncate">{{ row.full_name }}</div>
-                          <div class="text-xs text-[var(--cx-text-muted)] truncate">{{ row.email }}</div>
+                        <div class="cx-users-user-meta">
+                          <div class="cx-users-user-name">{{ row.full_name }}</div>
+                          <div class="cx-users-user-email">{{ row.email }}</div>
                         </div>
                       </div>
                     </td>
-                    <td class="px-3 py-3">
+                    <td>
                       @if (row.roles?.length) {
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--cx-primary-50)] text-[var(--cx-primary)] whitespace-nowrap">
-                          {{ row.roles[0].name }}
-                        </span>
-                      } @else { <span class="text-xs text-[var(--cx-text-muted)]">—</span> }
+                        <span class="cx-users-role-chip">{{ row.roles[0].name }}</span>
+                      } @else {
+                        <span class="cx-users-muted">—</span>
+                      }
                     </td>
-                    <td class="px-3 py-3">
-                      <div class="text-xs text-[var(--cx-text-secondary)] truncate">{{ row.department_name || '—' }}</div>
-                      @if (row.team_name) { <div class="text-[10px] text-[var(--cx-text-muted)] truncate">{{ row.team_name }}</div> }
+                    <td>
+                      <div class="cx-users-dept">{{ row.department_name || '—' }}</div>
+                      @if (row.team_name) { <div class="cx-users-team">{{ row.team_name }}</div> }
                     </td>
-                    <td class="px-3 py-3 text-xs text-[var(--cx-text-secondary)] truncate">{{ row.location_name || '—' }}</td>
-                    <td class="px-3 py-3">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
-                            [class]="statusClass(row.status)">
-                        {{ row.status | titlecase }}
+                    <td class="cx-users-loc">{{ row.location_name || '—' }}</td>
+                    <td>
+                      <span class="cx-status-badge" [attr.data-tone]="row.status === 'active' ? 'success' : row.status === 'suspended' ? 'danger' : 'neutral'">
+                        <span class="cx-status-dot"></span>
+                        <span>{{ row.status | titlecase }}</span>
                       </span>
                     </td>
-                    <td class="px-3 py-3 text-xs text-[var(--cx-text-muted)] whitespace-nowrap">{{ row.created_at | date:'mediumDate' }}</td>
-                    <td class="px-3 py-3">
-                      <div class="flex items-center gap-0.5 justify-end">
+                    <td class="cx-users-joined tabular-nums">{{ row.created_at | date:'mediumDate' }}</td>
+                    <td class="cx-users-actions-col">
+                      <div class="cx-users-row-actions">
                         <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
                           <lucide-icon name="pencil" [size]="13"></lucide-icon>
                         </button>
@@ -172,16 +190,21 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
             </table>
           </div>
           <!-- Pagination -->
-          <div class="flex items-center justify-between px-4 py-3 border-t border-[var(--cx-border)]">
-            <div class="text-xs text-[var(--cx-text-muted)]">
-              Showing {{ (page - 1) * perPage + 1 }}–{{ min(page * perPage, totalRecords()) }} of {{ totalRecords() | number }}
+          <div class="cx-users-pagination">
+            <div class="cx-users-pagination-info">
+              Showing <span class="tabular-nums">{{ (page - 1) * perPage + 1 }}</span>&ndash;<span class="tabular-nums">{{ min(page * perPage, totalRecords()) }}</span>
+              of <span class="tabular-nums">{{ totalRecords() | number }}</span>
             </div>
-            <div class="flex items-center gap-1">
-              <button class="cx-btn cx-btn-ghost cx-btn-sm" [disabled]="page <= 1" (click)="goPage(page - 1)"><lucide-icon name="chevron-left" [size]="14"></lucide-icon></button>
+            <div class="cx-users-pagination-controls">
+              <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" [disabled]="page <= 1" (click)="goPage(page - 1)" aria-label="Previous page">
+                <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+              </button>
               @for (p of pageNumbers(); track p) {
-                <button class="cx-btn cx-btn-sm min-w-[32px]" [class]="p === page ? 'cx-btn-primary' : 'cx-btn-ghost'" (click)="goPage(p)">{{ p }}</button>
+                <button class="cx-btn cx-btn-sm cx-users-page-btn" [class]="p === page ? 'cx-btn-primary' : 'cx-btn-ghost'" (click)="goPage(p)">{{ p }}</button>
               }
-              <button class="cx-btn cx-btn-ghost cx-btn-sm" [disabled]="page >= totalPages" (click)="goPage(page + 1)"><lucide-icon name="chevron-right" [size]="14"></lucide-icon></button>
+              <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" [disabled]="page >= totalPages" (click)="goPage(page + 1)" aria-label="Next page">
+                <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
+              </button>
             </div>
           </div>
         }
@@ -189,51 +212,78 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
     </div>
 
     <!-- Create/Edit Dialog -->
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit User' : 'Create User'" [saving]="saving()" maxWidth="640px" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">First Name *</label><input class="cx-input" [(ngModel)]="form.first_name" /></div>
-          <div><label class="cx-label">Last Name *</label><input class="cx-input" [(ngModel)]="form.last_name" /></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit User' : 'Create User'"
+      [subtitle]="editId ? 'Update user details and access' : 'Add a new team member'"
+      [saving]="saving()" maxWidth="680px" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <!-- Identity -->
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">First Name *</label><input class="cx-input" [(ngModel)]="form.first_name" placeholder="First name" /></div>
+          <div><label class="cx-label">Last Name *</label><input class="cx-input" [(ngModel)]="form.last_name" placeholder="Last name" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Email *</label><input class="cx-input" type="email" [(ngModel)]="form.email" /></div>
-          <div><label class="cx-label">Phone</label><input class="cx-input" [(ngModel)]="form.phone" /></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Email *</label><input class="cx-input" type="email" [(ngModel)]="form.email" placeholder="user@example.com" /></div>
+          <div><label class="cx-label">Phone</label><input class="cx-input" [(ngModel)]="form.phone" placeholder="0801 234 5678" /></div>
         </div>
-        @if (!editId) { <div><label class="cx-label">Password *</label><input class="cx-input" type="password" [(ngModel)]="form.password" placeholder="Min 8 characters" /></div> }
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Department</label>
+        @if (!editId) {
+          <div>
+            <label class="cx-label">Password *</label>
+            <input class="cx-input" type="password" [(ngModel)]="form.password" placeholder="Minimum 8 characters" />
+          </div>
+        }
+
+        <!-- Organization -->
+        <h4 class="cx-form-section-title">Organization</h4>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Department</label>
             <cx-searchable-select [options]="deptOptions()" placeholder="Select department..." [clearable]="true"
               [(ngModel)]="form.department_id" (ngModelChange)="onDeptChange()"></cx-searchable-select>
           </div>
-          <div><label class="cx-label">Team</label>
+          <div>
+            <label class="cx-label">Team</label>
             <cx-searchable-select [options]="teamOptions()" placeholder="Select team..." [clearable]="true"
               [(ngModel)]="form.team_id"></cx-searchable-select>
           </div>
         </div>
-        <div><label class="cx-label">Roles</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+
+        <!-- Access -->
+        <h4 class="cx-form-section-title">Access</h4>
+        <div>
+          <label class="cx-label">Roles</label>
+          <div class="cx-users-chips">
             @for (r of roles(); track r.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="selRoles.includes(r.id) ? 'bg-[var(--cx-primary-50)] border-[var(--cx-primary)] text-[var(--cx-primary)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="selRoles.includes(r.id)" (change)="toggleArr('selRoles', r.id)" class="sr-only" /> {{ r.name }}
-              </label>
+              <button type="button" class="cx-users-chip"
+                      [class.is-selected]="selRoles.includes(r.id)"
+                      (click)="toggleArr('selRoles', r.id)">
+                @if (selRoles.includes(r.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ r.name }}
+              </button>
             }
           </div>
         </div>
-        <div><label class="cx-label">Locations</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+        <div>
+          <label class="cx-label">Locations</label>
+          <div class="cx-users-chips">
             @for (l of locs(); track l.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="selLocs.includes(l.id) ? 'bg-[var(--cx-accent-50)] border-[var(--cx-accent)] text-[var(--cx-accent-dark)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="selLocs.includes(l.id)" (change)="toggleArr('selLocs', l.id)" class="sr-only" /> {{ l.name }}
-              </label>
+              <button type="button" class="cx-users-chip cx-users-chip-gold"
+                      [class.is-selected]="selLocs.includes(l.id)"
+                      (click)="toggleArr('selLocs', l.id)">
+                @if (selLocs.includes(l.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ l.name }}
+              </button>
             }
           </div>
         </div>
         @if (editId) {
-          <div><label class="cx-label">Status</label>
+          <div>
+            <label class="cx-label">Account Status</label>
             <select class="cx-select" [(ngModel)]="form.status">
-              <option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
             </select>
           </div>
         }
@@ -372,6 +422,258 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
       </div>
     }
   `,
+  styles: [`
+    /* ═══ Export dropdown ═══ */
+    .cx-users-export-menu {
+      position: absolute; right: 0; top: calc(100% + 4px);
+      z-index: var(--cx-z-dropdown);
+      min-width: 180px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      box-shadow: var(--cx-shadow-lg);
+      padding: 0.35rem;
+      display: flex; flex-direction: column;
+    }
+    .cx-users-export-option {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.65rem;
+      background: transparent; border: none;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-users-export-option:hover { background: var(--cx-surface-hover); }
+    .cx-users-export-option lucide-icon { color: var(--cx-text-muted); }
+
+    /* ═══ Filters row ═══ */
+    .cx-users-filters {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      padding: 0.85rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 768px) {
+      .cx-users-filters { grid-template-columns: 2fr 1fr 1fr 1fr 1fr; }
+    }
+    .cx-users-filter-search { position: relative; }
+    .cx-users-filter-search-icon {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--cx-text-muted);
+      pointer-events: none;
+    }
+    .cx-users-filter-search-input {
+      width: 100%;
+      padding: 0.55rem 0.85rem 0.55rem 2.15rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-users-filter-search-input:hover { border-color: var(--cx-border); }
+    .cx-users-filter-search-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+
+    /* ═══ Table wrap ═══ */
+    .cx-users-table-wrap {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      overflow: hidden;
+    }
+    .cx-users-state { padding: 4rem 1rem; text-align: center; }
+    .cx-users-loading {
+      display: inline-flex; align-items: center; gap: 0.75rem;
+      color: var(--cx-text-muted);
+      font-size: var(--cx-text-sm);
+    }
+    .cx-users-loading-dots { display: inline-flex; gap: 4px; }
+    .cx-users-loading-dots span {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cx-primary-600);
+      animation: cx-loading-pulse 1.2s infinite var(--cx-ease-premium);
+    }
+    .cx-users-loading-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--cx-accent-500); }
+    .cx-users-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes cx-loading-pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+
+    .cx-users-table-scroll { overflow-x: auto; }
+    .cx-users-table {
+      width: 100%; min-width: 800px;
+      border-collapse: collapse;
+    }
+    .cx-users-table thead {
+      background: var(--cx-surface-2);
+    }
+    .cx-users-table thead tr { border-bottom: 1px solid var(--cx-border); }
+    .cx-users-table th {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      white-space: nowrap;
+      text-align: left;
+      user-select: none;
+    }
+    .cx-users-th-user, .cx-users-th-sortable { cursor: pointer; }
+    .cx-users-th-user:hover, .cx-users-th-sortable:hover { color: var(--cx-text); }
+    .cx-users-th-inner { display: flex; align-items: center; gap: 4px; }
+    .cx-users-sort-icon {
+      color: var(--cx-text-subtle);
+      opacity: 0.6;
+      transition: opacity var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-users-th-user:hover .cx-users-sort-icon,
+    .cx-users-th-sortable:hover .cx-users-sort-icon { opacity: 1; }
+    .cx-users-sort-icon.is-active { color: var(--cx-primary-600); opacity: 1; }
+
+    .cx-users-table tbody td {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      border-bottom: 1px solid var(--cx-border-subtle);
+      vertical-align: middle;
+    }
+    .cx-users-table tbody tr { transition: background var(--cx-dur-fast) var(--cx-ease-premium); }
+    .cx-users-table tbody tr:hover { background: var(--cx-surface-hover); }
+    .cx-users-table tbody tr:last-child td { border-bottom: none; }
+
+    /* ═══ User cell ═══ */
+    .cx-users-user-cell { min-width: 240px; }
+    .cx-users-user { display: flex; align-items: center; gap: 0.75rem; }
+    .cx-users-avatar-img {
+      width: 34px; height: 34px; flex-shrink: 0;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--cx-border-subtle);
+    }
+    .cx-users-avatar-initial {
+      width: 34px; height: 34px; flex-shrink: 0;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .cx-users-user-meta { min-width: 0; }
+    .cx-users-user-name {
+      font-size: var(--cx-text-sm); font-weight: 500;
+      color: var(--cx-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 220px;
+    }
+    .cx-users-user-email {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 220px;
+    }
+
+    /* ═══ Cell content ═══ */
+    .cx-users-role-chip {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px;
+      background: var(--cx-primary-50);
+      color: var(--cx-primary-700);
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs); font-weight: 500;
+      white-space: nowrap;
+    }
+    .cx-users-dept {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .cx-users-team {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+    .cx-users-loc {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+    }
+    .cx-users-muted {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+    .cx-users-joined {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      white-space: nowrap;
+    }
+    .cx-users-actions-col { width: 160px; }
+    .cx-users-row-actions {
+      display: flex; align-items: center; gap: 0.1rem;
+      justify-content: flex-end;
+    }
+
+    /* ═══ Pagination ═══ */
+    .cx-users-pagination {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+    }
+    .cx-users-pagination-info {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+    .cx-users-pagination-controls { display: flex; align-items: center; gap: 0.35rem; }
+    .cx-users-page-btn {
+      min-width: 32px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ═══ Chips (form) ═══ */
+    .cx-users-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 4px;
+    }
+    .cx-users-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-users-chip:hover {
+      border-color: var(--cx-primary-200);
+      color: var(--cx-text);
+    }
+    .cx-users-chip.is-selected {
+      background: var(--cx-primary-50);
+      border-color: var(--cx-primary-600);
+      color: var(--cx-primary-700);
+      font-weight: 500;
+    }
+    .cx-users-chip-gold.is-selected {
+      background: var(--cx-accent-50);
+      border-color: var(--cx-accent-500);
+      color: var(--cx-accent-700);
+    }
+  `],
 })
 export class UsersComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true);

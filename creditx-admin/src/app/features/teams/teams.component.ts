@@ -14,27 +14,41 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Teams" subtitle="Manage teams within departments">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Team</button>
+      <cx-page-header
+        title="Teams"
+        subtitle="Organize staff into functional teams within departments"
+        eyebrow="Organization">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Team</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search teams..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search teams..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Team' : 'Create Team'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Team' : 'Create Team'"
+      [subtitle]="editId ? 'Update team details' : 'Group staff under a shared focus'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Disbursements East" /></div>
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. DISB-E" /></div>
         </div>
-        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description"></textarea></div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Department</label>
+        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description" placeholder="What this team does..."></textarea></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Department</label>
             <cx-searchable-select [options]="deptOptions()" placeholder="Select department..." [clearable]="true" [(ngModel)]="form.department_id"></cx-searchable-select>
           </div>
-          <div><label class="cx-label">Team Lead</label>
+          <div>
+            <label class="cx-label">Team Lead</label>
             <cx-searchable-select [options]="userOptions()" placeholder="Select lead..." [clearable]="true" [(ngModel)]="form.lead_id"></cx-searchable-select>
           </div>
         </div>

@@ -13,57 +13,150 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Loan Products" subtitle="Configure loan products and fee structures">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Product</button>
+      <cx-page-header
+        title="Loan Products"
+        subtitle="Configure loan types, interest methods, and attached fees"
+        eyebrow="Configuration">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Product</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search products..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search products..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Product' : 'Create Product'" [saving]="saving()" maxWidth="680px" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" /></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Product' : 'Create Product'"
+      [subtitle]="editId ? 'Update loan product configuration' : 'Define a new loan product'"
+      [saving]="saving()" maxWidth="720px" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <!-- Identity -->
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Payroll Loan" /></div>
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. PAYROLL" /></div>
         </div>
-        <div><label class="cx-label">Description</label><input class="cx-input" [(ngModel)]="form.description" /></div>
-        <div class="grid grid-cols-3 gap-4">
-          <div><label class="cx-label">Interest Method *</label><select class="cx-select" [(ngModel)]="form.interest_calculation_method"><option value="flat_rate">Flat Rate</option><option value="reducing_balance">Reducing Balance</option><option value="amortized">Amortized (EMI)</option></select></div>
-          <div><label class="cx-label">Interest Rate (%) *</label><input class="cx-input" type="number" [(ngModel)]="form.interest_rate" /></div>
-          <div><label class="cx-label">Allows Top-up</label><select class="cx-select" [(ngModel)]="form.allows_top_up"><option [ngValue]="true">Yes</option><option [ngValue]="false">No</option></select></div>
+        <div><label class="cx-label">Description</label><input class="cx-input" [(ngModel)]="form.description" placeholder="Short product description" /></div>
+
+        <!-- Interest -->
+        <h4 class="cx-form-section-title">Interest</h4>
+        <div class="cx-form-row cx-form-row-3">
+          <div>
+            <label class="cx-label">Method *</label>
+            <select class="cx-select" [(ngModel)]="form.interest_calculation_method">
+              <option value="flat_rate">Flat Rate</option>
+              <option value="reducing_balance">Reducing Balance</option>
+              <option value="amortized">Amortized (EMI)</option>
+            </select>
+          </div>
+          <div><label class="cx-label">Rate (% p.a.)</label><input class="cx-input" type="number" [(ngModel)]="form.interest_rate" placeholder="e.g. 3.5" /></div>
+          <div>
+            <label class="cx-label">Allows Top-up</label>
+            <select class="cx-select" [(ngModel)]="form.allows_top_up">
+              <option [ngValue]="true">Yes</option>
+              <option [ngValue]="false">No</option>
+            </select>
+          </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+
+        <!-- Limits -->
+        <h4 class="cx-form-section-title">Limits</h4>
+        <div class="cx-form-row cx-form-row-2">
           <div><label class="cx-label">Min Amount (₦)</label><input class="cx-input" type="number" [(ngModel)]="form.min_amount" /></div>
           <div><label class="cx-label">Max Amount (₦)</label><input class="cx-input" type="number" [(ngModel)]="form.max_amount" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="cx-form-row cx-form-row-2">
           <div><label class="cx-label">Min Tenure (months)</label><input class="cx-input" type="number" [(ngModel)]="form.min_tenure" /></div>
           <div><label class="cx-label">Max Tenure (months)</label><input class="cx-input" type="number" [(ngModel)]="form.max_tenure" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="cx-form-row cx-form-row-2">
           <div><label class="cx-label">Max Age (years)</label><input class="cx-input" type="number" [(ngModel)]="form.max_age" /></div>
           <div><label class="cx-label">Max Service Years</label><input class="cx-input" type="number" [(ngModel)]="form.max_years_of_service" /></div>
         </div>
+
         <!-- Attached Fees -->
-        <div class="border-t border-[var(--cx-border)] pt-4 mt-4">
-          <div class="flex items-center justify-between mb-2">
-            <label class="cx-label !mb-0">Product Fees</label>
-            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="addFee()"><lucide-icon name="plus" [size]="12"></lucide-icon> Add Fee</button>
+        <div class="cx-lp-fees-section">
+          <div class="cx-lp-fees-header">
+            <h4 class="cx-form-section-title" style="margin: 0; border: none; padding: 0;">Attached Fees</h4>
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="addFee()">
+              <lucide-icon name="plus" [size]="12"></lucide-icon>
+              <span>Add Fee</span>
+            </button>
           </div>
-          @for (fee of fees; track $index; let i = $index) {
-            <div class="flex items-end gap-2 mb-2 p-3 rounded-lg bg-[var(--cx-surface-hover)]">
-              <div class="flex-1"><label class="cx-label">Fee Type</label><select class="cx-select" [(ngModel)]="fee.fee_type_id"><option value="">Select</option>@for (ft of feeTypes(); track ft.id){<option [value]="ft.id">{{ ft.name }}</option>}</select></div>
-              <div class="w-24"><label class="cx-label">Type</label><select class="cx-select" [(ngModel)]="fee.calculation_type"><option value="flat">Flat</option><option value="percentage">%</option></select></div>
-              <div class="w-24"><label class="cx-label">Value</label><input class="cx-input" type="number" [(ngModel)]="fee.value" /></div>
-              <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon text-red-500 mb-0.5" (click)="fees.splice(i,1)"><lucide-icon name="trash-2" [size]="14"></lucide-icon></button>
+          @if (fees.length === 0) {
+            <div class="cx-lp-fees-empty">No fees attached. Click "Add Fee" to configure charges.</div>
+          } @else {
+            <div class="cx-lp-fees-list">
+              @for (fee of fees; track $index; let i = $index) {
+                <div class="cx-lp-fee-row">
+                  <div class="cx-lp-fee-field cx-lp-fee-field-grow">
+                    <label class="cx-label">Fee Type</label>
+                    <select class="cx-select" [(ngModel)]="fee.fee_type_id">
+                      <option value="">Select…</option>
+                      @for (ft of feeTypes(); track ft.id) { <option [value]="ft.id">{{ ft.name }}</option> }
+                    </select>
+                  </div>
+                  <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                    <label class="cx-label">Type</label>
+                    <select class="cx-select" [(ngModel)]="fee.calculation_type">
+                      <option value="flat">Flat</option>
+                      <option value="percentage">%</option>
+                    </select>
+                  </div>
+                  <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                    <label class="cx-label">Value</label>
+                    <input class="cx-input" type="number" [(ngModel)]="fee.value" />
+                  </div>
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-lp-fee-remove" (click)="fees.splice(i,1)" title="Remove">
+                    <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+              }
             </div>
           }
         </div>
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    .cx-lp-fees-section { margin-top: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--cx-border-subtle); }
+    .cx-lp-fees-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .cx-lp-fees-empty {
+      padding: 1.25rem;
+      background: var(--cx-stone-50);
+      border: 1px dashed var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      text-align: center;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+    }
+    .cx-lp-fees-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .cx-lp-fee-row {
+      display: flex; align-items: flex-end; gap: 0.5rem;
+      padding: 0.75rem;
+      background: var(--cx-stone-50);
+      border: 1px solid var(--cx-border-subtle);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-lp-fee-field { display: flex; flex-direction: column; }
+    .cx-lp-fee-field-grow { flex: 1; min-width: 0; }
+    .cx-lp-fee-field-sm { width: 90px; flex-shrink: 0; }
+    .cx-lp-fee-remove { color: var(--cx-danger); margin-bottom: 2px; }
+    .cx-lp-fee-remove:hover { background: var(--cx-danger-50); }
+    @media (max-width: 640px) {
+      .cx-lp-fee-row { flex-wrap: wrap; }
+      .cx-lp-fee-field-grow { flex-basis: 100%; }
+      .cx-lp-fee-field-sm { width: calc(50% - 0.25rem); }
+    }
+  `],
 })
 export class LoanProductsComponent implements OnInit {
   columns: TableColumn[] = [{key:'name',label:'Product Name'},{key:'code',label:'Code'},{key:'interest_calculation_method',label:'Method'},{key:'interest_rate',label:'Rate'},{key:'min_amount',label:'Min',type:'currency'},{key:'max_amount',label:'Max',type:'currency'},{key:'is_active',label:'Active'}];
