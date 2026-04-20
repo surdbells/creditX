@@ -14,174 +14,199 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Messaging" subtitle="Conversations, channels & groups">
-        <button class="cx-btn cx-btn-primary" (click)="openNewChannel()"><lucide-icon name="plus" [size]="16"></lucide-icon> New Channel</button>
+      <cx-page-header
+        title="Messaging"
+        subtitle="Direct messages, channels, and team groups"
+        eyebrow="Communications">
+        <button class="cx-btn cx-btn-primary" (click)="openNewChannel()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>New Channel</span>
+        </button>
       </cx-page-header>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="min-height: 70vh">
-        <!-- Left Panel — Conversations + Channels -->
-        <div class="cx-card !p-4 overflow-hidden flex flex-col">
-          <!-- Tabs -->
-          <div class="flex border-b border-[var(--cx-border)]">
-            <button class="flex-1 py-2.5 text-xs font-semibold text-center transition-colors"
-                    [class]="panel === 'conversations' ? 'text-[var(--cx-primary)] border-b-2 border-[var(--cx-primary)]' : 'text-[var(--cx-text-muted)]'"
-                    (click)="panel = 'conversations'; loadConversations()">Direct Messages</button>
-            <button class="flex-1 py-2.5 text-xs font-semibold text-center transition-colors"
-                    [class]="panel === 'channels' ? 'text-[var(--cx-primary)] border-b-2 border-[var(--cx-primary)]' : 'text-[var(--cx-text-muted)]'"
-                    (click)="panel = 'channels'; loadChannels()">Channels & Groups</button>
+      <div class="cx-msg-shell">
+        <!-- Left panel — list -->
+        <aside class="cx-msg-sidebar">
+          <div class="cx-msg-sidebar-tabs">
+            <button class="cx-msg-tab"
+                    [class.is-active]="panel === 'conversations'"
+                    (click)="panel = 'conversations'; loadConversations()">
+              <lucide-icon name="message-square" [size]="14"></lucide-icon>
+              <span>Direct</span>
+            </button>
+            <button class="cx-msg-tab"
+                    [class.is-active]="panel === 'channels'"
+                    (click)="panel = 'channels'; loadChannels()">
+              <lucide-icon name="hash" [size]="14"></lucide-icon>
+              <span>Channels</span>
+            </button>
           </div>
-          <!-- Search -->
-          <div class="p-3 border-b border-[var(--cx-border)]">
-            <div class="relative">
-              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="14"></lucide-icon>
-              <input type="text" class="cx-input !pl-7 !py-1.5 !text-xs" placeholder="Search..." [(ngModel)]="listSearch" />
-            </div>
+          <div class="cx-msg-sidebar-search">
+            <lucide-icon name="search" [size]="14" class="cx-msg-search-icon"></lucide-icon>
+            <input type="text" class="cx-msg-search-input" placeholder="Search..." [(ngModel)]="listSearch" />
           </div>
-          <!-- List -->
-          <div class="flex-1 overflow-y-auto">
+          <div class="cx-msg-sidebar-list">
             @if (panel === 'conversations') {
               @for (c of filteredConversations(); track c.id) {
-                <button class="w-full text-left px-4 py-3 border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors"
-                        [class.bg-[var(--cx-primary-50)]]="activeId === c.id" (click)="selectConversation(c)">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-[var(--cx-primary)] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {{ c.other_user_name?.[0] || '?' }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium text-[var(--cx-text)] truncate">{{ c.other_user_name }}</div>
-                      <div class="text-xs text-[var(--cx-text-muted)] truncate">{{ c.last_message || 'No messages yet' }}</div>
-                    </div>
+                <button class="cx-msg-list-item"
+                        [class.is-active]="activeId === c.id"
+                        (click)="selectConversation(c)">
+                  <div class="cx-msg-avatar" [style.background]="'linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500))'">
+                    {{ (c.other_user_name || '?').charAt(0).toUpperCase() }}
+                  </div>
+                  <div class="cx-msg-item-meta">
+                    <div class="cx-msg-item-name">{{ c.other_user_name }}</div>
+                    <div class="cx-msg-item-preview">{{ c.last_message || 'No messages yet' }}</div>
                   </div>
                 </button>
               }
-              @if (conversations().length === 0) {
-                <div class="p-6 text-center text-xs text-[var(--cx-text-muted)]">No conversations yet</div>
+              @if (filteredConversations().length === 0) {
+                <div class="cx-msg-sidebar-empty">No conversations yet</div>
               }
             }
             @if (panel === 'channels') {
               @for (ch of filteredChannels(); track ch.id) {
-                <button class="w-full text-left px-4 py-3 border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors"
-                        [class.bg-[var(--cx-primary-50)]]="activeId === ch.id" (click)="selectChannel(ch)">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                         [class]="ch.type === 'channel' ? 'bg-[var(--cx-info)]' : 'bg-[var(--cx-accent)]'">
-                      <lucide-icon [name]="ch.type === 'channel' ? 'hash' : 'users'" [size]="14"></lucide-icon>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium text-[var(--cx-text)] truncate">{{ ch.name }}</div>
-                      <div class="text-xs text-[var(--cx-text-muted)]">{{ ch.type | titlecase }}</div>
-                    </div>
+                <button class="cx-msg-list-item"
+                        [class.is-active]="activeId === ch.id"
+                        (click)="selectChannel(ch)">
+                  <div class="cx-msg-avatar cx-msg-avatar-square"
+                       [class.is-channel]="ch.type === 'channel'"
+                       [class.is-group]="ch.type !== 'channel'">
+                    <lucide-icon [name]="ch.type === 'channel' ? 'hash' : 'users'" [size]="14"></lucide-icon>
+                  </div>
+                  <div class="cx-msg-item-meta">
+                    <div class="cx-msg-item-name">{{ ch.name }}</div>
+                    <div class="cx-msg-item-preview">{{ ch.type | titlecase }}</div>
                   </div>
                 </button>
               }
-              @if (channels().length === 0) {
-                <div class="p-6 text-center text-xs text-[var(--cx-text-muted)]">No channels yet</div>
+              @if (filteredChannels().length === 0) {
+                <div class="cx-msg-sidebar-empty">No channels yet</div>
               }
             }
           </div>
-        </div>
+        </aside>
 
-        <!-- Right Panel — Message Thread -->
-        <div class="lg:col-span-2 cx-card !p-4 overflow-hidden flex flex-col">
+        <!-- Right panel — thread -->
+        <main class="cx-msg-thread">
           @if (!activeId) {
-            <div class="flex-1 flex flex-col items-center justify-center">
-              <lucide-icon name="message-square" [size]="48" class="text-[var(--cx-text-muted)] opacity-20 mb-3"></lucide-icon>
-              <p class="text-sm text-[var(--cx-text-muted)]">Select a conversation or channel</p>
+            <div class="cx-msg-thread-empty">
+              <div class="cx-msg-thread-empty-icon">
+                <lucide-icon name="message-square" [size]="32"></lucide-icon>
+              </div>
+              <div class="cx-msg-thread-empty-title">Pick a conversation</div>
+              <div class="cx-msg-thread-empty-sub">Select someone from the left to view or continue a conversation.</div>
             </div>
           } @else {
-            <!-- Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--cx-border)]">
-              <div class="flex items-center gap-2">
-                <h3 class="text-sm font-semibold text-[var(--cx-text)]">{{ activeName }}</h3>
-                @if (activeType === 'channel') {
-                  <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="openAddMembers()">
-                    <lucide-icon name="users" [size]="14"></lucide-icon> Members
-                  </button>
-                }
+            <header class="cx-msg-thread-header">
+              <div class="cx-msg-thread-header-meta">
+                <div class="cx-eyebrow">{{ activeType === 'channel' ? 'Channel' : 'Direct Message' }}</div>
+                <h3 class="cx-msg-thread-title">{{ activeName }}</h3>
               </div>
-            </div>
-            <!-- Messages -->
-            <div class="flex-1 overflow-y-auto p-4 space-y-3" #msgContainer>
+              @if (activeType === 'channel') {
+                <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openAddMembers()">
+                  <lucide-icon name="users" [size]="14"></lucide-icon>
+                  <span>Members</span>
+                </button>
+              }
+            </header>
+            <div class="cx-msg-thread-scroll" #msgContainer>
               @for (msg of messages(); track msg.id) {
-                <div class="flex gap-3" [class.flex-row-reverse]="msg.sender_id === auth.user()?.id">
-                  <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                       [style.background]="msg.sender_id === auth.user()?.id ? 'var(--cx-primary)' : 'var(--cx-accent)'">
-                    {{ msg.sender_name?.[0] }}
+                <div class="cx-msg-bubble-row" [class.is-me]="msg.sender_id === auth.user()?.id">
+                  <div class="cx-msg-avatar cx-msg-avatar-sm"
+                       [style.background]="msg.sender_id === auth.user()?.id ? 'linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500))' : 'linear-gradient(135deg, var(--cx-accent-600), var(--cx-accent-500))'">
+                    {{ (msg.sender_name || '?').charAt(0).toUpperCase() }}
                   </div>
-                  <div class="max-w-[70%]">
-                    <div class="text-[10px] font-medium mb-0.5" [class]="msg.sender_id === auth.user()?.id ? 'text-right text-[var(--cx-text-muted)]' : 'text-[var(--cx-text-muted)]'">
-                      {{ msg.sender_name }}
-                    </div>
-                    <div class="rounded-xl px-3 py-2 text-sm"
-                         [class]="msg.sender_id === auth.user()?.id ? 'bg-[var(--cx-primary)] text-white rounded-tr-sm' : 'bg-[var(--cx-surface-hover)] text-[var(--cx-text)] rounded-tl-sm'">
+                  <div class="cx-msg-bubble-col">
+                    <div class="cx-msg-sender">{{ msg.sender_name }}</div>
+                    <div class="cx-msg-bubble">
                       {{ msg.body || msg.content }}
                     </div>
-                    <div class="text-[9px] text-[var(--cx-text-muted)] mt-0.5" [class]="msg.sender_id === auth.user()?.id ? 'text-right' : ''">
-                      {{ msg.created_at | date:'short' }}
-                    </div>
+                    <div class="cx-msg-time tabular-nums">{{ msg.created_at | date:'short' }}</div>
                   </div>
                 </div>
               }
               @if (messages().length === 0) {
-                <div class="text-center text-xs text-[var(--cx-text-muted)] py-8">No messages yet. Start the conversation!</div>
+                <div class="cx-msg-thread-empty-small">
+                  <lucide-icon name="message-square" [size]="20"></lucide-icon>
+                  <span>No messages yet. Start the conversation.</span>
+                </div>
               }
             </div>
-            <!-- Input -->
-            <div class="border-t border-[var(--cx-border)] p-3">
-              <div class="flex gap-2">
-                <input type="text" class="cx-input flex-1" placeholder="Type a message..." [(ngModel)]="newMessage"
-                       (keydown.enter)="sendMessage()" />
-                <button class="cx-btn cx-btn-primary" [disabled]="!newMessage.trim()" (click)="sendMessage()">
-                  <lucide-icon name="arrow-up" [size]="16"></lucide-icon>
-                </button>
-              </div>
-            </div>
+            <footer class="cx-msg-composer">
+              <input type="text" class="cx-msg-composer-input" placeholder="Type a message..."
+                     [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" />
+              <button class="cx-btn cx-btn-primary cx-btn-icon" [disabled]="!newMessage.trim()" (click)="sendMessage()" aria-label="Send">
+                <lucide-icon name="arrow-up" [size]="16"></lucide-icon>
+              </button>
+            </footer>
           }
-        </div>
+        </main>
       </div>
     </div>
 
     <!-- Create Channel Dialog -->
-    <cx-form-dialog [open]="showNewChannel()" title="Create Channel / Group" [saving]="channelSaving()" (close)="showNewChannel.set(false)" (save)="saveChannel()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="channelForm.name" /></div>
-        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="channelForm.description"></textarea></div>
-        <div><label class="cx-label">Type</label>
-          <div class="flex gap-2 mt-1">
-            @for (t of ['group','channel']; track t) {
-              <button class="cx-btn cx-btn-sm" [class]="channelForm.type === t ? 'cx-btn-primary' : 'cx-btn-outline'" (click)="channelForm.type = t">{{ t | titlecase }}</button>
-            }
+    <cx-form-dialog
+      [open]="showNewChannel()"
+      title="Create Channel / Group"
+      subtitle="Invite members by department, team, or individually"
+      [saving]="channelSaving()" (close)="showNewChannel.set(false)" (save)="saveChannel()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="channelForm.name" placeholder="e.g. Disbursement Desk" /></div>
+          <div>
+            <label class="cx-label">Type</label>
+            <div class="cx-msg-type-switch">
+              @for (t of ['group','channel']; track t) {
+                <button type="button" class="cx-msg-type-opt"
+                        [class.is-active]="channelForm.type === t"
+                        (click)="channelForm.type = t">
+                  <lucide-icon [name]="t === 'channel' ? 'hash' : 'users'" [size]="12"></lucide-icon>
+                  <span>{{ t | titlecase }}</span>
+                </button>
+              }
+            </div>
           </div>
         </div>
-        <div><label class="cx-label">Add Members by Department</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="channelForm.description" placeholder="What this channel is for..."></textarea></div>
+
+        <h4 class="cx-form-section-title">Add members</h4>
+        <div>
+          <label class="cx-label">By Department</label>
+          <div class="cx-msg-chips">
             @for (d of departments(); track d.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="selDepts.includes(d.id) ? 'bg-[var(--cx-primary-50)] border-[var(--cx-primary)] text-[var(--cx-primary)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="selDepts.includes(d.id)" (change)="toggle('selDepts', d.id)" class="sr-only" /> {{ d.name }}
-              </label>
+              <button type="button" class="cx-msg-chip"
+                      [class.is-selected]="selDepts.includes(d.id)"
+                      (click)="toggle('selDepts', d.id)">
+                @if (selDepts.includes(d.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ d.name }}
+              </button>
             }
           </div>
         </div>
-        <div><label class="cx-label">Add Members by Team</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+        <div>
+          <label class="cx-label">By Team</label>
+          <div class="cx-msg-chips">
             @for (t of teams(); track t.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="selTeams.includes(t.id) ? 'bg-[var(--cx-accent-50)] border-[var(--cx-accent)] text-[var(--cx-accent-dark)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="selTeams.includes(t.id)" (change)="toggle('selTeams', t.id)" class="sr-only" /> {{ t.name }}
-              </label>
+              <button type="button" class="cx-msg-chip cx-msg-chip-gold"
+                      [class.is-selected]="selTeams.includes(t.id)"
+                      (click)="toggle('selTeams', t.id)">
+                @if (selTeams.includes(t.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ t.name }}
+              </button>
             }
           </div>
         </div>
-        <div><label class="cx-label">Add Individual Users</label>
+        <div>
+          <label class="cx-label">Individual Users</label>
           <cx-searchable-select [options]="userOptions()" placeholder="Search user to add..." [clearable]="true"
             (ngModelChange)="onUserSelected($event)" [ngModel]="null"></cx-searchable-select>
           @if (selUsers.length) {
-            <div class="flex flex-wrap gap-1 mt-2">
+            <div class="cx-msg-user-tags">
               @for (uid of selUsers; track uid) {
-                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--cx-surface-hover)] text-xs">
-                  {{ getUserName(uid) }}
-                  <button (click)="selUsers = selUsers.filter(x => x !== uid)" class="text-[var(--cx-text-muted)] hover:text-[var(--cx-danger)]">&times;</button>
+                <span class="cx-msg-user-tag">
+                  <span>{{ getUserName(uid) }}</span>
+                  <button type="button" (click)="selUsers = selUsers.filter(x => x !== uid)" aria-label="Remove">×</button>
                 </span>
               }
             </div>
@@ -191,36 +216,48 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
     </cx-form-dialog>
 
     <!-- Add Members Dialog -->
-    <cx-form-dialog [open]="showAddMembers()" title="Add Members" [saving]="addMembersSaving()" (close)="showAddMembers.set(false)" (save)="saveAddMembers()">
-      <div class="space-y-4">
-        <div><label class="cx-label">By Department</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+    <cx-form-dialog
+      [open]="showAddMembers()"
+      title="Add Members"
+      subtitle="Invite more people to this channel"
+      [saving]="addMembersSaving()" (close)="showAddMembers.set(false)" (save)="saveAddMembers()">
+      <div class="cx-form-stack">
+        <div>
+          <label class="cx-label">By Department</label>
+          <div class="cx-msg-chips">
             @for (d of departments(); track d.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="addDepts.includes(d.id) ? 'bg-[var(--cx-primary-50)] border-[var(--cx-primary)] text-[var(--cx-primary)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="addDepts.includes(d.id)" (change)="toggle('addDepts', d.id)" class="sr-only" /> {{ d.name }}
-              </label>
+              <button type="button" class="cx-msg-chip"
+                      [class.is-selected]="addDepts.includes(d.id)"
+                      (click)="toggle('addDepts', d.id)">
+                @if (addDepts.includes(d.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ d.name }}
+              </button>
             }
           </div>
         </div>
-        <div><label class="cx-label">By Team</label>
-          <div class="flex flex-wrap gap-2 mt-1">
+        <div>
+          <label class="cx-label">By Team</label>
+          <div class="cx-msg-chips">
             @for (t of teams(); track t.id) {
-              <label class="text-xs cursor-pointer px-3 py-1.5 rounded-lg border transition-all"
-                     [class]="addTeams.includes(t.id) ? 'bg-[var(--cx-accent-50)] border-[var(--cx-accent)] text-[var(--cx-accent-dark)] font-medium' : 'border-[var(--cx-border)] text-[var(--cx-text-secondary)]'">
-                <input type="checkbox" [checked]="addTeams.includes(t.id)" (change)="toggle('addTeams', t.id)" class="sr-only" /> {{ t.name }}
-              </label>
+              <button type="button" class="cx-msg-chip cx-msg-chip-gold"
+                      [class.is-selected]="addTeams.includes(t.id)"
+                      (click)="toggle('addTeams', t.id)">
+                @if (addTeams.includes(t.id)) { <lucide-icon name="check" [size]="11"></lucide-icon> }
+                {{ t.name }}
+              </button>
             }
           </div>
         </div>
-        <div><label class="cx-label">Individual Users</label>
+        <div>
+          <label class="cx-label">Individual Users</label>
           <cx-searchable-select [options]="userOptions()" placeholder="Search user..." [clearable]="true"
             (ngModelChange)="onAddUserSelected($event)" [ngModel]="null"></cx-searchable-select>
           @if (addUserIds.length) {
-            <div class="flex flex-wrap gap-1 mt-2">
+            <div class="cx-msg-user-tags">
               @for (uid of addUserIds; track uid) {
-                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--cx-surface-hover)] text-xs">
-                  {{ getUserName(uid) }} <button (click)="addUserIds = addUserIds.filter(x => x !== uid)" class="hover:text-[var(--cx-danger)]">&times;</button>
+                <span class="cx-msg-user-tag">
+                  <span>{{ getUserName(uid) }}</span>
+                  <button type="button" (click)="addUserIds = addUserIds.filter(x => x !== uid)" aria-label="Remove">×</button>
                 </span>
               }
             </div>
@@ -229,6 +266,361 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    :host { display: block; }
+
+    /* ═══ Shell ═══ */
+    .cx-msg-shell {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-2xl);
+      min-height: 70vh;
+      overflow: hidden;
+    }
+    @media (min-width: 900px) {
+      .cx-msg-shell { grid-template-columns: 320px 1fr; }
+    }
+
+    /* ═══ Sidebar ═══ */
+    .cx-msg-sidebar {
+      display: flex; flex-direction: column;
+      border-right: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+      min-height: 0;
+    }
+    .cx-msg-sidebar-tabs {
+      display: flex;
+      padding: 0.5rem;
+      gap: 4px;
+      border-bottom: 1px solid var(--cx-border);
+      background: var(--cx-surface-2);
+    }
+    .cx-msg-tab {
+      flex: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px;
+      padding: 0.45rem 0.65rem;
+      background: transparent; border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-xs); font-weight: 500;
+      color: var(--cx-text-muted);
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-tab:hover:not(.is-active) {
+      color: var(--cx-text);
+      background: var(--cx-surface-hover);
+    }
+    .cx-msg-tab.is-active {
+      background: var(--cx-surface);
+      color: var(--cx-primary-700);
+      border-color: var(--cx-border);
+      box-shadow: var(--cx-shadow-xs);
+    }
+
+    .cx-msg-sidebar-search { position: relative; padding: 0.75rem 0.75rem 0.5rem; }
+    .cx-msg-search-icon {
+      position: absolute; left: 1.35rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--cx-text-muted);
+      pointer-events: none;
+    }
+    .cx-msg-search-input {
+      width: 100%;
+      padding: 0.45rem 0.75rem 0.45rem 2rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-search-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+
+    .cx-msg-sidebar-list {
+      flex: 1; overflow-y: auto;
+      padding: 0.25rem;
+    }
+    .cx-msg-list-item {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.65rem 0.75rem;
+      width: 100%;
+      background: transparent; border: none;
+      border-radius: var(--cx-radius-md);
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+      margin-bottom: 2px;
+    }
+    .cx-msg-list-item:hover { background: var(--cx-surface-hover); }
+    .cx-msg-list-item.is-active {
+      background: var(--cx-primary-50);
+    }
+    .cx-msg-list-item.is-active .cx-msg-item-name { color: var(--cx-primary-700); }
+    .cx-msg-avatar {
+      width: 32px; height: 32px; flex-shrink: 0;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: var(--cx-text-xs); font-weight: 600;
+    }
+    .cx-msg-avatar-square {
+      border-radius: var(--cx-radius-sm);
+    }
+    .cx-msg-avatar-square.is-channel { background: var(--cx-info); }
+    .cx-msg-avatar-square.is-group { background: linear-gradient(135deg, var(--cx-accent-600), var(--cx-accent-500)); }
+    .cx-msg-item-meta { flex: 1; min-width: 0; }
+    .cx-msg-item-name {
+      font-size: var(--cx-text-sm); font-weight: 500;
+      color: var(--cx-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .cx-msg-item-preview {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .cx-msg-sidebar-empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+
+    /* ═══ Thread ═══ */
+    .cx-msg-thread {
+      display: flex; flex-direction: column;
+      min-height: 0;
+      background: var(--cx-bg);
+    }
+    .cx-msg-thread-empty {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    .cx-msg-thread-empty-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-muted);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .cx-msg-thread-empty-icon::before {
+      content: '';
+      position: absolute; inset: -4px;
+      border-radius: 50%;
+      border: 1px dashed var(--cx-border-strong);
+    }
+    .cx-msg-thread-empty-title {
+      font-size: var(--cx-text-md); font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cx-msg-thread-empty-sub {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+      margin-top: 0.35rem;
+      max-width: 24rem;
+      line-height: 1.5;
+    }
+
+    .cx-msg-thread-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+      flex-shrink: 0;
+    }
+    .cx-msg-thread-header-meta { display: flex; flex-direction: column; }
+    .cx-msg-thread-title {
+      margin: 1px 0 0;
+      font-size: var(--cx-text-md); font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+
+    .cx-msg-thread-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.25rem;
+      display: flex; flex-direction: column;
+      gap: 0.85rem;
+      background: var(--cx-bg);
+    }
+    .cx-msg-thread-empty-small {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px;
+      padding: 2rem 1rem;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+
+    .cx-msg-bubble-row {
+      display: flex; gap: 0.65rem;
+      max-width: 75%;
+    }
+    .cx-msg-bubble-row.is-me {
+      flex-direction: row-reverse;
+      align-self: flex-end;
+    }
+    .cx-msg-avatar-sm {
+      width: 28px; height: 28px;
+      font-size: 11px;
+    }
+    .cx-msg-bubble-col {
+      display: flex; flex-direction: column;
+      min-width: 0;
+    }
+    .cx-msg-bubble-row.is-me .cx-msg-bubble-col { align-items: flex-end; }
+    .cx-msg-sender {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-bottom: 3px;
+      padding: 0 2px;
+    }
+    .cx-msg-bubble {
+      padding: 0.55rem 0.85rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border-subtle);
+      border-radius: var(--cx-radius-lg);
+      border-top-left-radius: var(--cx-radius-xs);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .cx-msg-bubble-row.is-me .cx-msg-bubble {
+      background: var(--cx-primary-600);
+      color: #fff;
+      border-color: var(--cx-primary-600);
+      border-top-left-radius: var(--cx-radius-lg);
+      border-top-right-radius: var(--cx-radius-xs);
+    }
+    .cx-msg-time {
+      font-size: 10px;
+      color: var(--cx-text-subtle);
+      margin-top: 3px;
+      padding: 0 2px;
+    }
+
+    .cx-msg-composer {
+      display: flex; gap: 0.5rem;
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+      flex-shrink: 0;
+    }
+    .cx-msg-composer-input {
+      flex: 1;
+      padding: 0.55rem 0.85rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-composer-input:hover { border-color: var(--cx-border); }
+    .cx-msg-composer-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+
+    /* ═══ Chip-style forms ═══ */
+    .cx-msg-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 4px;
+    }
+    .cx-msg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-chip:hover { border-color: var(--cx-primary-200); color: var(--cx-text); }
+    .cx-msg-chip.is-selected {
+      background: var(--cx-primary-50);
+      border-color: var(--cx-primary-600);
+      color: var(--cx-primary-700);
+      font-weight: 500;
+    }
+    .cx-msg-chip-gold.is-selected {
+      background: var(--cx-accent-50);
+      border-color: var(--cx-accent-500);
+      color: var(--cx-accent-700);
+    }
+
+    /* Type switch (group/channel) */
+    .cx-msg-type-switch {
+      display: flex; gap: 6px;
+      padding: 4px;
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+      border: 1px solid var(--cx-border-subtle);
+    }
+    .cx-msg-type-opt {
+      flex: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: transparent; border: none;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-xs); font-weight: 500;
+      color: var(--cx-text-muted);
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-type-opt:hover:not(.is-active) { color: var(--cx-text); }
+    .cx-msg-type-opt.is-active {
+      background: var(--cx-surface);
+      color: var(--cx-primary-700);
+      box-shadow: var(--cx-shadow-xs);
+    }
+
+    .cx-msg-user-tags {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-top: 0.5rem;
+    }
+    .cx-msg-user-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 4px 3px 10px;
+      background: var(--cx-primary-50);
+      color: var(--cx-primary-700);
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+    }
+    .cx-msg-user-tag button {
+      background: transparent; border: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--cx-primary-600);
+      cursor: pointer;
+      font-size: 14px; line-height: 1;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-user-tag button:hover { background: var(--cx-primary-100); }
+  `],
 })
 export class MessagingComponent implements OnInit, OnDestroy {
   panel: 'conversations' | 'channels' = 'conversations';

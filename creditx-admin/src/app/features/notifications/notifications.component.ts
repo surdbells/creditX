@@ -15,59 +15,86 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Notifications" subtitle="Manage templates and send push notifications">
+      <cx-page-header
+        title="Notifications"
+        subtitle="Manage email, SMS, and push notification templates"
+        eyebrow="Communications">
         <div class="flex items-center gap-2">
           @if (auth.hasPermission('notifications.manage')) {
-            <button class="cx-btn cx-btn-outline" (click)="openPushDialog()">
-              <lucide-icon name="bell" [size]="16"></lucide-icon> Send Push
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openPushDialog()">
+              <lucide-icon name="bell" [size]="14"></lucide-icon>
+              <span>Send Push</span>
             </button>
             <button class="cx-btn cx-btn-primary" (click)="openTemplateForm()">
-              <lucide-icon name="plus" [size]="16"></lucide-icon> Template
+              <lucide-icon name="plus" [size]="14"></lucide-icon>
+              <span>New Template</span>
             </button>
           }
         </div>
       </cx-page-header>
 
-      <div class="cx-card !p-4 overflow-hidden">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-          searchPlaceholder="Search notifications..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row>
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openTemplateForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button>
-          </ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
+        searchPlaceholder="Search notifications..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openTemplateForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
 
     <!-- Template Form -->
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Template' : 'Create Template'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveTemplate()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-        <div><label class="cx-label">Subject *</label><input class="cx-input" [(ngModel)]="form.subject" /></div>
-        <div><label class="cx-label">Body *</label><textarea class="cx-input" rows="4" [(ngModel)]="form.body"></textarea></div>
-        <div><label class="cx-label">Channel</label>
-          <select class="cx-select" [(ngModel)]="form.channel"><option>email</option><option>sms</option><option>push</option><option>in_app</option></select>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Template' : 'Create Template'"
+      [subtitle]="editId ? 'Update notification template' : 'Create a reusable notification template'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveTemplate()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Loan Approved" /></div>
+          <div>
+            <label class="cx-label">Channel</label>
+            <select class="cx-select" [(ngModel)]="form.channel">
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="push">Push</option>
+              <option value="in_app">In-app</option>
+            </select>
+          </div>
+        </div>
+        <div><label class="cx-label">Subject *</label><input class="cx-input" [(ngModel)]="form.subject" placeholder="Notification subject" /></div>
+        <div>
+          <label class="cx-label">Body *</label>
+          <textarea class="cx-input" rows="5" [(ngModel)]="form.body" placeholder="Use {{ '{{' }}variable{{ '}}' }} placeholders for dynamic values"></textarea>
         </div>
       </div>
     </cx-form-dialog>
 
     <!-- Send Push Dialog -->
-    <cx-form-dialog [open]="showPush()" title="Send Push Notification" [saving]="pushSending()" saveLabel="Send" (close)="showPush.set(false)" (save)="sendPush()">
-      <div class="space-y-4">
+    <cx-form-dialog
+      [open]="showPush()"
+      title="Send Push Notification"
+      subtitle="Deliver an instant notification to specific users"
+      [saving]="pushSending()" saveLabel="Send Now" (close)="showPush.set(false)" (save)="sendPush()">
+      <div class="cx-form-stack">
         <div><label class="cx-label">Title *</label><input class="cx-input" [(ngModel)]="pushForm.title" placeholder="Notification title" /></div>
-        <div><label class="cx-label">Message *</label><textarea class="cx-input" rows="3" [(ngModel)]="pushForm.body" placeholder="Notification message"></textarea></div>
-        <div><label class="cx-label">Send To</label>
+        <div><label class="cx-label">Message *</label><textarea class="cx-input" rows="3" [(ngModel)]="pushForm.body" placeholder="What do you want to tell them?"></textarea></div>
+        <div>
+          <label class="cx-label">Send To</label>
           <select class="cx-select" [(ngModel)]="pushForm.target" (change)="onPushTargetChange()">
             <option value="user">Specific User</option>
             <option value="role">All Users with Role</option>
           </select>
         </div>
         @if (pushForm.target === 'user') {
-          <div><label class="cx-label">Select User</label>
+          <div>
+            <label class="cx-label">Select User</label>
             <cx-searchable-select [options]="userOptions()" placeholder="Search user..." [(ngModel)]="pushForm.user_id"></cx-searchable-select>
           </div>
         }
         @if (pushForm.target === 'role') {
-          <div><label class="cx-label">Select Role</label>
+          <div>
+            <label class="cx-label">Select Role</label>
             <select class="cx-select" [(ngModel)]="pushForm.role">
               <option value="">Choose...</option>
               <option value="agent">Agent</option>
@@ -76,13 +103,22 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
             </select>
           </div>
         }
-        <div><label class="cx-label">Route (optional)</label>
-          <input class="cx-input" [(ngModel)]="pushForm.route" placeholder="/loan-detail/abc123" />
-          <p class="text-[10px] text-[var(--cx-text-muted)] mt-1">Deep link path to open when user taps the notification</p>
+        <div>
+          <label class="cx-label">Deep Link Route (optional)</label>
+          <input class="cx-input" [(ngModel)]="pushForm.route" placeholder="/loans/abc123" />
+          <p class="cx-notif-hint">Path to open when the user taps the notification.</p>
         </div>
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    .cx-notif-hint {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin: 0.35rem 0 0;
+      line-height: 1.5;
+    }
+  `],
 })
 export class NotificationsComponent implements OnInit {
   columns: TableColumn[] = [
