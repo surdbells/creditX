@@ -6,13 +6,15 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
-
+import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { ToastService } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-dashboard', standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent],
+  imports: [CommonModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './dashboard.component.html',
+  styleUrls: ['./dashboard.component.scss'],
 })
 export class DashboardComponent implements OnInit {
   loading = signal(true);
@@ -20,10 +22,12 @@ export class DashboardComponent implements OnInit {
   portfolio: any = null;
   recentLoans: any[] = [];
   greeting = '';
+  today = '';
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {
     const h = new Date().getHours();
     this.greeting = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+    this.today = new Date().toLocaleDateString('en-NG', { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
   ngOnInit(): void {

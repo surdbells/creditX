@@ -5,67 +5,86 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
+import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
+import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-customer-detail', standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent],
+  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header [title]="customer()?.full_name || 'Customer Detail'" [subtitle]="'Staff ID: ' + (customer()?.staff_id || '—')">
-        <a routerLink="/customers" class="cx-btn cx-btn-outline cx-btn-sm"><lucide-icon name="arrow-left" [size]="14"></lucide-icon> Back</a>
+      <cx-page-header
+        [title]="customer()?.full_name || 'Customer'"
+        [subtitle]="'Staff ID: ' + (customer()?.staff_id || '—')"
+        eyebrow="Customer profile">
+        <a routerLink="/customers" class="cx-btn cx-btn-outline cx-btn-sm">
+          <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+          <span>Back</span>
+        </a>
       </cx-page-header>
 
       @if (loading()) {
-        <div class="cx-card flex items-center justify-center py-16">
-          <div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <cx-loading message="Loading customer..."></cx-loading>
       } @else if (customer()) {
-        <!-- Tab Navigation -->
-        <div class="flex gap-1 mb-4 border-b border-[var(--cx-border)] pb-px">
-          @for (tab of tabs; track tab.key) {
-            <button class="px-4 py-2.5 text-xs font-semibold whitespace-nowrap rounded-t-lg transition-all"
-                    [class]="activeTab === tab.key ? 'text-[var(--cx-primary)] border-b-2 border-[var(--cx-primary)] bg-[var(--cx-surface)]' : 'text-[var(--cx-text-muted)] hover:text-[var(--cx-text)]'"
-                    (click)="setTab(tab.key)">
-              <lucide-icon [name]="tab.icon" [size]="14" class="inline mr-1"></lucide-icon>{{ tab.label }}
-            </button>
-          }
+        <!-- Premium tabs -->
+        <div class="cx-cust-tabs-row">
+          <cx-tabs [tabs]="cxTabs" [(activeId)]="activeTab"></cx-tabs>
         </div>
 
         <!-- PROFILE TAB -->
         @if (activeTab === 'profile') {
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div class="cx-card">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Personal Information</h3>
-              <div class="space-y-1.5 text-sm">
+          <div class="cx-cust-profile-grid">
+            <div class="cx-card cx-cust-card">
+              <div class="cx-cust-card-header">
+                <h3 class="cx-cust-card-title">Personal</h3>
+                <span class="cx-eyebrow">Identity</span>
+              </div>
+              <div class="cx-cust-field-list">
                 @for (f of personalFields; track f.label) {
-                  <div class="flex justify-between py-1.5 border-b border-[var(--cx-border)] last:border-0">
-                    <span class="text-[var(--cx-text-muted)] text-xs">{{ f.label }}</span>
-                    <span class="text-[var(--cx-text)] font-medium text-xs">{{ f.value || '—' }}</span>
+                  <div class="cx-cust-field-row">
+                    <span class="cx-cust-field-label">{{ f.label }}</span>
+                    <span class="cx-cust-field-value">{{ f.value || '—' }}</span>
                   </div>
                 }
               </div>
             </div>
-            <div class="cx-card">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Banking Information</h3>
-              <div class="space-y-1.5 text-sm">
+            <div class="cx-card cx-cust-card">
+              <div class="cx-cust-card-header">
+                <h3 class="cx-cust-card-title">Banking</h3>
+                <span class="cx-eyebrow">Accounts</span>
+              </div>
+              <div class="cx-cust-field-list">
                 @for (f of bankingFields; track f.label) {
-                  <div class="flex justify-between py-1.5 border-b border-[var(--cx-border)] last:border-0">
-                    <span class="text-[var(--cx-text-muted)] text-xs">{{ f.label }}</span>
-                    <span class="text-[var(--cx-text)] font-medium text-xs">{{ f.value || '—' }}</span>
+                  <div class="cx-cust-field-row">
+                    <span class="cx-cust-field-label">{{ f.label }}</span>
+                    <span class="cx-cust-field-value">{{ f.value || '—' }}</span>
                   </div>
                 }
               </div>
             </div>
-            <div class="cx-card">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Next of Kin</h3>
+            <div class="cx-card cx-cust-card">
+              <div class="cx-cust-card-header">
+                <h3 class="cx-cust-card-title">Next of Kin</h3>
+                <span class="cx-eyebrow">Relatives</span>
+              </div>
               @if (customer()?.next_of_kins?.length) {
-                @for (nok of customer()?.next_of_kins; track nok.id) {
-                  <div class="text-sm mb-3 pb-3 border-b border-[var(--cx-border)] last:border-0">
-                    <div class="font-medium text-[var(--cx-text)]">{{ nok.full_name }}</div>
-                    <div class="text-xs text-[var(--cx-text-muted)]">{{ nok.relationship }} &bull; {{ nok.phone }}</div>
-                  </div>
-                }
-              } @else { <p class="text-xs text-[var(--cx-text-muted)]">No next of kin records</p> }
+                <div class="cx-cust-nok-list">
+                  @for (nok of customer()?.next_of_kins; track nok.id) {
+                    <div class="cx-cust-nok">
+                      <div class="cx-cust-nok-avatar">
+                        {{ (nok.full_name || '?').charAt(0).toUpperCase() }}
+                      </div>
+                      <div class="cx-cust-nok-info">
+                        <div class="cx-cust-nok-name">{{ nok.full_name }}</div>
+                        <div class="cx-cust-nok-meta">{{ nok.relationship }} &bull; {{ nok.phone }}</div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="cx-cust-empty-mini">No next of kin records</div>
+              }
             </div>
           </div>
         }
@@ -217,6 +236,91 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       }
     </div>
   `,
+  styles: [`
+    :host { display: block; }
+
+    .cx-cust-tabs-row { margin-bottom: 1.25rem; }
+
+    .cx-cust-profile-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 1024px) {
+      .cx-cust-profile-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .cx-cust-card { display: flex; flex-direction: column; gap: 0.85rem; }
+    .cx-cust-card-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-cust-card-title {
+      margin: 0;
+      font-size: var(--cx-text-md); font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+
+    .cx-cust-field-list { display: flex; flex-direction: column; }
+    .cx-cust-field-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-cust-field-row:last-child { border-bottom: none; }
+    .cx-cust-field-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      flex-shrink: 0;
+    }
+    .cx-cust-field-value {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      font-weight: 500;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Next of Kin */
+    .cx-cust-nok-list { display: flex; flex-direction: column; gap: 0.85rem; }
+    .cx-cust-nok {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.65rem;
+      background: var(--cx-stone-50);
+      border-radius: var(--cx-radius-md);
+      border: 1px solid var(--cx-border-subtle);
+    }
+    .cx-cust-nok-avatar {
+      width: 36px; height: 36px; flex-shrink: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: var(--cx-text-sm); font-weight: 600;
+    }
+    .cx-cust-nok-info { flex: 1; min-width: 0; }
+    .cx-cust-nok-name {
+      font-size: var(--cx-text-sm); font-weight: 500;
+      color: var(--cx-text);
+    }
+    .cx-cust-nok-meta {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+
+    .cx-cust-empty-mini {
+      padding: 1.5rem 0.5rem;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+      text-align: center;
+    }
+  `],
 })
 export class CustomerDetailComponent implements OnInit {
   @Input() id = '';
@@ -227,13 +331,13 @@ export class CustomerDetailComponent implements OnInit {
   ledgerLoading = signal(false);
   selectedLoan: any = null;
   totalDebit = 0; totalCredit = 0;
-  activeTab = 'profile';
+  activeTab: string = 'profile';
 
-  tabs = [
-    { key: 'profile', label: 'Profile', icon: 'users' },
-    { key: 'loans', label: 'Loans', icon: 'file-text' },
-    { key: 'ledger', label: 'Loan Ledger', icon: 'arrow-left-right' },
-    { key: 'documents', label: 'Documents', icon: 'file-text' },
+  cxTabs: CxTab[] = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'loans', label: 'Loans' },
+    { id: 'ledger', label: 'Loan Ledger' },
+    { id: 'documents', label: 'Documents' },
   ];
 
   constructor(private api: ApiService) {}

@@ -15,54 +15,135 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
   imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Loan Management" subtitle="{{ totalRecords | number }} loans">
-        <div class="flex items-center gap-2">
-          <div class="relative">
-            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
-              <lucide-icon name="download" [size]="14"></lucide-icon> Export <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
-            </button>
-            @if (exportOpen) {
-              <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--cx-surface)] border border-[var(--cx-border)] rounded-xl shadow-xl z-50 overflow-hidden">
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('csv')">Export CSV</button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('excel')">Export Excel</button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('pdf')">Export PDF</button>
-              </div>
-            }
-          </div>
+      <cx-page-header
+        title="Loan Portfolio"
+        subtitle="{{ totalRecords | number }} total loans in system"
+        eyebrow="Loans">
+        <div class="relative">
+          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
+            <lucide-icon name="download" [size]="14"></lucide-icon>
+            <span>Export</span>
+            <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
+          </button>
+          @if (exportOpen) {
+            <div class="cx-loans-export-menu cx-animate-in">
+              <button class="cx-loans-export-option" (click)="exportData('csv')">
+                <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                <span>CSV</span>
+              </button>
+              <button class="cx-loans-export-option" (click)="exportData('excel')">
+                <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                <span>Excel</span>
+              </button>
+              <button class="cx-loans-export-option" (click)="exportData('pdf')">
+                <lucide-icon name="file-text" [size]="14"></lucide-icon>
+                <span>PDF</span>
+              </button>
+            </div>
+          }
         </div>
       </cx-page-header>
 
       <!-- Filters -->
-      <div class="cx-card !p-4 mb-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div class="lg:col-span-2 relative">
-            <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
-            <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by App ID, customer name..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
-          </div>
-          <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
-            <option value="">All Status</option>
-            <option value="pending">Pending</option><option value="approved">Approved</option>
-            <option value="disbursed">Disbursed</option><option value="active">Active</option>
-            <option value="overdue">Overdue</option><option value="closed">Closed</option>
-            <option value="rejected">Rejected</option>
-          </select>
-          <select class="cx-select" [(ngModel)]="filters.product_id" (change)="onFilterChange()">
-            <option value="">All Products</option>
-            @for (p of products(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
-          </select>
+      <div class="cx-loans-filters">
+        <div class="cx-loans-filter-search">
+          <lucide-icon name="search" [size]="14" class="cx-loans-filter-search-icon"></lucide-icon>
+          <input type="text" class="cx-loans-filter-search-input"
+            placeholder="Search by App ID, customer name, staff ID..."
+            [(ngModel)]="filters.search" (input)="onFilterChange()" />
         </div>
+        <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="disbursed">Disbursed</option>
+          <option value="active">Active</option>
+          <option value="overdue">Overdue</option>
+          <option value="closed">Closed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.product_id" (change)="onFilterChange()">
+          <option value="">All Products</option>
+          @for (p of products(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+        </select>
       </div>
 
-      <div class="cx-card !p-4 overflow-hidden">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-          [searchPlaceholder]="''" [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row>
-            <a [routerLink]="['/loans', row.id]" class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" title="View"><lucide-icon name="eye" [size]="14"></lucide-icon></a>
-          </ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
+        [searchPlaceholder]="''" [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <a [routerLink]="['/loans', row.id]" class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" title="View">
+            <lucide-icon name="eye" [size]="14"></lucide-icon>
+          </a>
+        </ng-template>
+      </cx-data-table>
     </div>
   `,
+  styles: [`
+    .cx-loans-export-menu {
+      position: absolute; right: 0; top: calc(100% + 4px);
+      z-index: var(--cx-z-dropdown);
+      min-width: 180px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      box-shadow: var(--cx-shadow-lg);
+      padding: 0.35rem;
+      display: flex; flex-direction: column;
+    }
+    .cx-loans-export-option {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.65rem;
+      background: transparent; border: none;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-loans-export-option:hover { background: var(--cx-surface-hover); }
+    .cx-loans-export-option lucide-icon { color: var(--cx-text-muted); }
+
+    .cx-loans-filters {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      padding: 0.85rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 768px) {
+      .cx-loans-filters {
+        grid-template-columns: 2fr 1fr 1fr;
+      }
+    }
+    .cx-loans-filter-search { position: relative; }
+    .cx-loans-filter-search-icon {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--cx-text-muted);
+      pointer-events: none;
+    }
+    .cx-loans-filter-search-input {
+      width: 100%;
+      padding: 0.55rem 0.85rem 0.55rem 2.15rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-loans-filter-search-input:hover { border-color: var(--cx-border); }
+    .cx-loans-filter-search-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+  `],
 })
 export class LoansComponent implements OnInit {
   columns: TableColumn[] = [

@@ -1,115 +1,134 @@
-<div class="cx-animate-in">
-  <!-- Welcome Banner -->
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-xl font-bold text-[var(--cx-text)]">Good {{ greeting }}, {{ auth.user()?.first_name }}.</h1>
-      <p class="text-xs text-[var(--cx-text-muted)] mt-1">Here's your loan portfolio overview for today.</p>
+<div class="cx-dash cx-animate-in">
+  <!-- Hero greeting -->
+  <div class="cx-dash-hero">
+    <div class="cx-dash-hero-main">
+      <div class="cx-dash-hero-eyebrow">
+        <span class="cx-dash-hero-date">{{ today }}</span>
+        <span class="cx-dash-hero-dot">•</span>
+        <span class="cx-dash-hero-role">{{ auth.user()?.roles?.[0]?.name || 'Admin' }}</span>
+      </div>
+      <h1 class="cx-dash-hero-title">
+        Good {{ greeting }}, <span class="cx-dash-hero-name">{{ auth.user()?.first_name }}</span>.
+      </h1>
+      <p class="cx-dash-hero-subtitle">Here's your portfolio pulse for today.</p>
     </div>
-    <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-[var(--cx-border)] bg-[var(--cx-surface)]">
-        <div class="w-2 h-2 rounded-full" [class]="agentAccepting() ? 'bg-[var(--cx-success)] animate-pulse' : 'bg-gray-400'"></div>
-        <span class="text-xs font-semibold text-[var(--cx-text)]">Agent Loans</span>
-        <button class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
-                [style.background]="agentAccepting() ? 'var(--cx-success)' : '#cbd5e1'"
-                (click)="toggleAgentAccepting()">
-          <span class="absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200"
-                [style.left]="agentAccepting() ? '22px' : '2px'"></span>
+    <div class="cx-dash-toggle-wrap">
+      <div class="cx-dash-toggle">
+        <div class="cx-dash-toggle-state">
+          <div class="cx-dash-toggle-dot" [class.is-on]="agentAccepting()"></div>
+          <div class="cx-dash-toggle-meta">
+            <div class="cx-dash-toggle-label">Agent Loan Intake</div>
+            <div class="cx-dash-toggle-value">{{ agentAccepting() ? 'Open' : 'Paused' }}</div>
+          </div>
+        </div>
+        <button class="cx-dash-switch" [class.is-on]="agentAccepting()" (click)="toggleAgentAccepting()" aria-label="Toggle agent loan intake">
+          <span class="cx-dash-switch-thumb"></span>
         </button>
       </div>
     </div>
   </div>
 
   <!-- Stats Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="cx-dash-stats cx-stagger">
     <cx-stat-card
       label="Active Loans"
       [value]="loading() ? '—' : (getStatusCount('active') + getStatusCount('overdue'))"
       icon="file-text"
-      iconBg="var(--cx-primary-50)" iconColor="var(--cx-primary)"
+      iconBg="var(--cx-primary-50)" iconColor="var(--cx-primary-600)"
+      [subtext]="loading() ? '' : getStatusCount('overdue') + ' overdue'"
+      [subtextColor]="getStatusCount('overdue') > 0 ? 'var(--cx-danger)' : 'var(--cx-text-muted)'"
     ></cx-stat-card>
     <cx-stat-card
       label="Total Disbursed"
       [value]="loading() ? '—' : '₦' + formatNum(portfolio?.total_disbursed)"
       icon="banknote"
-      iconBg="var(--cx-success-light)" iconColor="var(--cx-success)"
+      iconBg="var(--cx-success-50)" iconColor="var(--cx-primary-700)"
     ></cx-stat-card>
     <cx-stat-card
       label="Total Collected"
       [value]="loading() ? '—' : '₦' + formatNum(portfolio?.total_collected)"
       icon="credit-card"
-      iconBg="var(--cx-info-light)" iconColor="var(--cx-info)"
+      iconBg="var(--cx-info-50)" iconColor="var(--cx-info)"
     ></cx-stat-card>
     <cx-stat-card
       label="Collection Rate"
       [value]="loading() ? '—' : (portfolio?.collection_rate || 0) + '%'"
       icon="trending-up"
-      iconBg="var(--cx-accent-50)" iconColor="var(--cx-accent)"
+      iconBg="var(--cx-accent-50)" iconColor="var(--cx-accent-700)"
     ></cx-stat-card>
   </div>
 
   <!-- Status Breakdown + Recent Loans -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="cx-dash-grid">
     <!-- Status Breakdown -->
-    <div class="cx-card">
-      <h2 class="text-sm font-bold text-[var(--cx-text)] mb-4">Loan Status Breakdown</h2>
+    <div class="cx-card cx-dash-panel">
+      <div class="cx-dash-panel-header">
+        <h2 class="cx-dash-panel-title">Portfolio Status</h2>
+        <span class="cx-eyebrow">Breakdown</span>
+      </div>
       @if (loading()) {
-        <div class="flex items-center justify-center py-8">
-          <div class="w-5 h-5 border-2 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <cx-loading size="sm" message="Loading..."></cx-loading>
       } @else if (portfolio?.status_breakdown?.length) {
-        <div class="space-y-3">
+        <div class="cx-dash-status-list">
           @for (item of portfolio.status_breakdown; track item.status) {
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <div class="w-2.5 h-2.5 rounded-full" [style.background]="statusDotColor(item.status)"></div>
-                <span class="text-sm text-[var(--cx-text-secondary)] capitalize">{{ item.status }}</span>
+            <div class="cx-dash-status-item">
+              <div class="cx-dash-status-head">
+                <div class="cx-dash-status-label">
+                  <span class="cx-dash-status-dot" [style.background]="statusDotColor(item.status)"></span>
+                  <span>{{ item.status | titlecase }}</span>
+                </div>
+                <span class="cx-dash-status-count tabular-nums">{{ item.count | number }}</span>
               </div>
-              <span class="text-sm font-bold text-[var(--cx-text)]">{{ item.count | number }}</span>
-            </div>
-            <div class="w-full h-1.5 bg-[var(--cx-surface-hover)] rounded-full overflow-hidden -mt-1">
-              <div class="h-full rounded-full transition-all duration-500" [style.width]="statusBarWidth(item)" [style.background]="statusDotColor(item.status)"></div>
+              <div class="cx-dash-status-track">
+                <div class="cx-dash-status-bar" [style.width]="statusBarWidth(item)" [style.background]="statusDotColor(item.status)"></div>
+              </div>
             </div>
           }
         </div>
       } @else {
-        <p class="text-sm text-[var(--cx-text-muted)] text-center py-4">No loan data yet</p>
+        <cx-empty-state title="No portfolio data" description="Loans will appear once captured." icon="inbox"></cx-empty-state>
       }
     </div>
 
     <!-- Recent Loans -->
-    <div class="cx-card lg:col-span-2">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-bold text-[var(--cx-text)]">Recent Loan Applications</h2>
-        <a routerLink="/loans" class="text-xs text-[var(--cx-primary)] font-semibold hover:underline">View All →</a>
+    <div class="cx-card cx-dash-panel cx-dash-recent">
+      <div class="cx-dash-panel-header">
+        <div>
+          <h2 class="cx-dash-panel-title">Recent Applications</h2>
+          <span class="cx-dash-panel-subtitle">Latest 10 loans captured</span>
+        </div>
+        <a routerLink="/loans" class="cx-dash-link">
+          <span>View all</span>
+          <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
+        </a>
       </div>
       @if (recentLoans.length) {
-        <div class="overflow-x-auto">
-          <table class="w-full">
+        <div class="cx-dash-recent-table-wrap">
+          <table class="cx-dash-recent-table">
             <thead>
-              <tr class="border-b border-[var(--cx-border)]">
-                <th class="pb-2.5 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">App ID</th>
-                <th class="pb-2.5 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Customer</th>
-                <th class="pb-2.5 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Amount</th>
-                <th class="pb-2.5 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Status</th>
+              <tr>
+                <th>App ID</th>
+                <th>Customer</th>
+                <th class="cx-dash-right">Amount</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               @for (loan of recentLoans; track loan.id) {
-                <tr class="border-b border-[var(--cx-border)] last:border-0 hover:bg-[var(--cx-surface-hover)] transition-colors">
-                  <td class="py-3 font-mono text-xs text-[var(--cx-primary)] font-medium">{{ loan.application_id }}</td>
-                  <td class="py-3 text-sm text-[var(--cx-text)]">{{ loan.customer_name }}</td>
-                  <td class="py-3 text-sm text-right font-medium text-[var(--cx-text)]">₦{{ loan.amount_requested | number:'1.0-0' }}</td>
-                  <td class="py-3"><cx-status-badge [status]="loan.status"></cx-status-badge></td>
+                <tr>
+                  <td>
+                    <span class="cx-dash-app-id">{{ loan.application_id }}</span>
+                  </td>
+                  <td class="cx-dash-customer">{{ loan.customer_name }}</td>
+                  <td class="cx-dash-right tabular-nums cx-dash-amount">₦{{ loan.amount_requested | number:'1.0-0' }}</td>
+                  <td><cx-status-badge [status]="loan.status"></cx-status-badge></td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
       } @else {
-        <div class="flex flex-col items-center justify-center py-8">
-          <lucide-icon name="file-text" [size]="36" class="text-[var(--cx-text-muted)] opacity-30 mb-2"></lucide-icon>
-          <p class="text-sm text-[var(--cx-text-muted)]">No loan applications yet</p>
-        </div>
+        <cx-empty-state title="No applications yet" description="New captures from agents will appear here." icon="file-text"></cx-empty-state>
       }
     </div>
   </div>

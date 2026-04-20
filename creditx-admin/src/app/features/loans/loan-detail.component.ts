@@ -9,81 +9,107 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
+import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-loan-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header [title]="'Loan ' + (loan()?.application_id || '')" [subtitle]="loan()?.customer_name || ''">
+      <cx-page-header
+        [title]="'Loan ' + (loan()?.application_id || '—')"
+        [subtitle]="loan()?.customer_name || ''"
+        eyebrow="Loan details">
         <div class="flex items-center gap-2">
           @if (loan()?.status === 'approved' && auth.hasPermission('loans.disburse')) {
-            <button class="cx-btn cx-btn-primary" (click)="showDisburse.set(true)"><lucide-icon name="banknote" [size]="16"></lucide-icon> Disburse</button>
+            <button class="cx-btn cx-btn-primary" (click)="showDisburse.set(true)">
+              <lucide-icon name="banknote" [size]="14"></lucide-icon>
+              <span>Disburse</span>
+            </button>
           }
-          <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm"><lucide-icon name="arrow-left" [size]="14"></lucide-icon> Back</a>
+          <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm">
+            <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+            <span>Back</span>
+          </a>
         </div>
       </cx-page-header>
 
       @if (loading()) {
-        <div class="cx-card flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
+        <cx-loading message="Loading loan details..."></cx-loading>
       } @else if (loan()) {
         <!-- KPI Summary -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+        <div class="cx-loan-kpis cx-stagger">
           @for (kpi of kpis; track kpi.label) {
-            <div class="cx-card !p-4">
-              <div class="text-[10px] font-bold text-[var(--cx-text-muted)] uppercase tracking-wider">{{ kpi.label }}</div>
-              <div class="text-lg font-bold mt-1" [class]="kpi.color || 'text-[var(--cx-text)]'">{{ kpi.value }}</div>
+            <div class="cx-loan-kpi">
+              <div class="cx-eyebrow">{{ kpi.label }}</div>
+              <div class="cx-loan-kpi-value tabular-nums" [class]="kpi.color || ''">{{ kpi.value }}</div>
             </div>
           }
         </div>
 
-        <!-- Tabs -->
-        <div class="flex gap-1 mb-4 border-b border-[var(--cx-border)] pb-px overflow-x-auto">
-          @for (tab of tabs; track tab.key) {
-            <button class="px-4 py-2.5 text-xs font-semibold whitespace-nowrap rounded-t-lg transition-all"
-                    [class]="activeTab === tab.key ? 'text-[var(--cx-primary)] border-b-2 border-[var(--cx-primary)] bg-[var(--cx-surface)]' : 'text-[var(--cx-text-muted)] hover:text-[var(--cx-text)]'"
-                    (click)="activeTab = tab.key">{{ tab.label }}</button>
-          }
+        <!-- Premium tabs -->
+        <div class="cx-loan-tabs-row">
+          <cx-tabs [tabs]="cxTabs" [(activeId)]="activeTab"></cx-tabs>
         </div>
 
         <!-- SUMMARY TAB -->
         @if (activeTab === 'summary') {
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="cx-card">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Loan Details</h3>
-              <div class="space-y-1.5">
+          <div class="cx-loan-summary-grid">
+            <div class="cx-card cx-loan-detail-card">
+              <div class="cx-loan-card-header">
+                <h3 class="cx-loan-card-title">Loan Details</h3>
+                <span class="cx-eyebrow">Application</span>
+              </div>
+              <div class="cx-loan-field-list">
                 @for (f of loanFields; track f.label) {
-                  <div class="flex justify-between py-1.5 border-b border-[var(--cx-border)] last:border-0">
-                    <span class="text-xs text-[var(--cx-text-muted)]">{{ f.label }}</span>
-                    <span class="text-xs font-medium text-[var(--cx-text)]">{{ f.value }}</span>
+                  <div class="cx-loan-field-row">
+                    <span class="cx-loan-field-label">{{ f.label }}</span>
+                    <span class="cx-loan-field-value">{{ f.value }}</span>
                   </div>
                 }
               </div>
             </div>
-            <div class="cx-card">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Customer</h3>
-              <div class="space-y-1.5">
+            <div class="cx-card cx-loan-detail-card">
+              <div class="cx-loan-card-header">
+                <h3 class="cx-loan-card-title">Customer</h3>
+                <span class="cx-eyebrow">Contact</span>
+              </div>
+              <div class="cx-loan-field-list">
                 @for (f of customerFields; track f.label) {
-                  <div class="flex justify-between py-1.5 border-b border-[var(--cx-border)] last:border-0">
-                    <span class="text-xs text-[var(--cx-text-muted)]">{{ f.label }}</span>
-                    <span class="text-xs font-medium text-[var(--cx-text)]">{{ f.value }}</span>
+                  <div class="cx-loan-field-row">
+                    <span class="cx-loan-field-label">{{ f.label }}</span>
+                    <span class="cx-loan-field-value">{{ f.value }}</span>
                   </div>
                 }
               </div>
-              <a [routerLink]="'/customers/' + loan()?.customer_id" class="cx-btn cx-btn-outline cx-btn-sm w-full mt-3"><lucide-icon name="external-link" [size]="12"></lucide-icon> View Customer</a>
+              <a [routerLink]="'/customers/' + loan()?.customer_id" class="cx-btn cx-btn-outline cx-btn-sm" style="width:100%; margin-top: 1rem;">
+                <lucide-icon name="external-link" [size]="12"></lucide-icon>
+                <span>View Customer Profile</span>
+              </a>
             </div>
           </div>
           @if (loan()?.fee_breakdowns?.length) {
-            <div class="cx-card mt-4">
-              <h3 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider mb-3">Fee Breakdown</h3>
-              <table class="w-full text-sm">
-                <thead><tr class="border-b border-[var(--cx-border)]">
-                  <th class="px-3 py-2 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase">Fee</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase">Amount</th>
-                </tr></thead>
+            <div class="cx-card cx-loan-fees-card">
+              <div class="cx-loan-card-header">
+                <h3 class="cx-loan-card-title">Fee Breakdown</h3>
+                <span class="cx-eyebrow">Charges</span>
+              </div>
+              <table class="cx-loan-fees-table">
+                <thead>
+                  <tr>
+                    <th>Fee Type</th>
+                    <th>Calculation</th>
+                    <th class="cx-dash-right">Amount</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  @for (fee of loan()?.fee_breakdowns; track fee.id) {
-                    <tr class="border-b border-[var(--cx-border)]"><td class="px-3 py-2">{{ fee.fee_name }}</td><td class="px-3 py-2 text-right font-mono">₦{{ fee.amount | number:'1.2-2' }}</td></tr>
+                  @for (fee of loan().fee_breakdowns; track fee.name) {
+                    <tr>
+                      <td>{{ fee.name }}</td>
+                      <td class="cx-loan-fee-calc">{{ fee.calculation_type || 'Flat' }} @if (fee.percentage) { · {{ fee.percentage }}% }</td>
+                      <td class="cx-dash-right tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</td>
+                    </tr>
                   }
                 </tbody>
               </table>
@@ -95,7 +121,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
         @if (activeTab === 'schedule') {
           <div class="cx-card !p-0 overflow-hidden">
             @if (scheduleLoading()) {
-              <div class="py-12 text-center"><div class="w-6 h-6 border-2 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+              <cx-loading size="sm" message="Loading schedule..."></cx-loading>
             } @else if (schedule().length === 0) {
               <div class="py-12 text-center text-sm text-[var(--cx-text-muted)]">No repayment schedule generated</div>
             } @else {
@@ -221,6 +247,110 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    :host { display: block; }
+
+    .cx-loan-kpis {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (min-width: 1024px) {
+      .cx-loan-kpis { grid-template-columns: repeat(5, 1fr); }
+    }
+    .cx-loan-kpi {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      padding: 0.95rem 1rem;
+      transition: box-shadow var(--cx-dur-base) var(--cx-ease-premium), transform var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cx-loan-kpi:hover { box-shadow: var(--cx-shadow-sm); transform: translateY(-1px); }
+    .cx-loan-kpi .cx-eyebrow { margin-bottom: 0.45rem; }
+    .cx-loan-kpi-value {
+      font-size: var(--cx-text-lg);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    .cx-loan-tabs-row { margin-bottom: 1.25rem; }
+
+    .cx-loan-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media (min-width: 1024px) {
+      .cx-loan-summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .cx-loan-detail-card { display: flex; flex-direction: column; gap: 0.85rem; }
+    .cx-loan-card-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-loan-card-title {
+      margin: 0;
+      font-size: var(--cx-text-md); font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+
+    .cx-loan-field-list {
+      display: flex; flex-direction: column;
+    }
+    .cx-loan-field-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-loan-field-row:last-child { border-bottom: none; }
+    .cx-loan-field-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      flex-shrink: 0;
+    }
+    .cx-loan-field-value {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      font-weight: 500;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cx-loan-fees-card { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+    .cx-loan-fees-table { width: 100%; border-collapse: collapse; }
+    .cx-loan-fees-table thead th {
+      font-size: var(--cx-text-xs); font-weight: 600;
+      color: var(--cx-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--cx-border);
+      text-align: left;
+    }
+    .cx-loan-fees-table tbody td {
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid var(--cx-border-subtle);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+    }
+    .cx-loan-fees-table tbody tr:last-child td { border-bottom: none; }
+    .cx-loan-fee-calc {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      text-transform: capitalize;
+    }
+
+    .cx-dash-right { text-align: right; }
+  `],
 })
 export class LoanDetailComponent implements OnInit {
   @Input() id = '';
@@ -230,17 +360,17 @@ export class LoanDetailComponent implements OnInit {
   scheduleLoading = signal(false);
   payments = signal<any[]>([]);
   approvals = signal<any[]>([]);
-  activeTab = 'summary';
+  activeTab: string = 'summary';
   showDisburse = signal(false);
   disbursing = signal(false);
   disburseNotes = '';
 
-  tabs = [
-    { key: 'summary', label: 'Summary' },
-    { key: 'schedule', label: 'Repayment Schedule' },
-    { key: 'payments', label: 'Payments' },
-    { key: 'approvals', label: 'Approval Trail' },
-    { key: 'trail', label: 'Loan Trail' },
+  cxTabs: CxTab[] = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'schedule', label: 'Repayment Schedule' },
+    { id: 'payments', label: 'Payments' },
+    { id: 'approvals', label: 'Approval Trail' },
+    { id: 'trail', label: 'Loan Trail' },
   ];
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}

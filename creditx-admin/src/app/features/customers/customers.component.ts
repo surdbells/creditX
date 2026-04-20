@@ -18,22 +18,30 @@ import { NIGERIA_STATES } from '../../core/data/nigeria-states';
   imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Customer Management" subtitle="{{ totalRecords | number }} customers">
+      <cx-page-header
+        title="Customers"
+        subtitle="{{ totalRecords | number }} customers in your database"
+        eyebrow="Directory">
         @if (auth.hasPermission('customers.create')) {
-          <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Customer</button>
+          <button class="cx-btn cx-btn-primary" (click)="openForm()">
+            <lucide-icon name="plus" [size]="14"></lucide-icon>
+            <span>Add Customer</span>
+          </button>
         }
       </cx-page-header>
-      <div class="cx-card !p-4 overflow-hidden">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-          searchPlaceholder="Search customers by name, phone, BVN..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row>
-            <div class="flex items-center gap-1">
-              <a [routerLink]="['/customers', row.id]" class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" title="View"><lucide-icon name="eye" [size]="14"></lucide-icon></a>
-              <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit"><lucide-icon name="pencil" [size]="14"></lucide-icon></button>
-            </div>
-          </ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
+        searchPlaceholder="Search customers by name, phone, BVN..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <div class="flex items-center gap-1 justify-end">
+            <a [routerLink]="['/customers', row.id]" class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" title="View">
+              <lucide-icon name="eye" [size]="14"></lucide-icon>
+            </a>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+              <lucide-icon name="pencil" [size]="14"></lucide-icon>
+            </button>
+          </div>
+        </ng-template>
+      </cx-data-table>
     </div>
     <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Customer' : 'Create Customer'" [saving]="saving()" maxWidth="720px" (close)="showForm.set(false)" (save)="saveForm()">
       <div class="space-y-4">
