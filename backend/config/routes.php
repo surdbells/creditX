@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Action\Auth;
+use App\Action\Agent;
 use App\Action\Storage;
 use App\Action\User;
 use App\Action\Location;
@@ -79,6 +80,9 @@ return function (App $app): void {
             $group->get('/me', Auth\MeAction::class);
             $group->post('/change-password', Auth\ChangePasswordAction::class);
         });
+
+        // ─── Agent dashboard (authenticated, no specific permission — own data only) ───
+        $api->get('/agent/dashboard-stats', Agent\GetDashboardStatsAction::class);
 
         // ─── Users ───
         $api->group('/users', function (RouteCollectorProxy $group) {

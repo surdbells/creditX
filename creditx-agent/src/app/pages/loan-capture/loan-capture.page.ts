@@ -86,6 +86,12 @@ import { ApiService } from '../../core/services/api.service';
             @if (staffError()) {
               <div class="p-3 rounded-xl bg-red-50 text-red-600 text-sm">{{ staffError() }}</div>
             }
+            @if (existingCustomer() && staffRecord()) {
+              <div class="p-3 rounded-xl bg-[#C9A227]/10 border border-[#C9A227]/20 text-xs text-[#8a6f1a] flex items-start gap-2">
+                <ion-icon name="information-circle-outline" class="text-base flex-shrink-0 mt-0.5"></ion-icon>
+                <div>Existing customer found. Contact details have been pre-filled — you can edit them as needed.</div>
+              </div>
+            }
           </div>
         }
 
@@ -123,8 +129,17 @@ import { ApiService } from '../../core/services/api.service';
             @for (field of personalFields; track field.key) {
               <div>
                 <label class="text-xs font-medium text-gray-500 mb-1 block">{{ field.label }}</label>
-                <input [type]="field.type || 'text'" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"
-                       [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''" />
+                @if (field.key === 'bank_name') {
+                  <input type="text" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"
+                         [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''"
+                         list="banks-list" autocomplete="off" />
+                  <datalist id="banks-list">
+                    @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
+                  </datalist>
+                } @else {
+                  <input [type]="field.type || 'text'" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"
+                         [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''" />
+                }
               </div>
             }
           </div>
@@ -142,17 +157,32 @@ import { ApiService } from '../../core/services/api.service';
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-medium text-gray-800">{{ docType.label }}</span>
                   @if (getUploadedDoc(docType.key)) {
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Uploaded</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1">
+                      <ion-icon name="checkmark-circle" class="text-xs"></ion-icon>
+                      Ready
+                    </span>
                   }
                 </div>
-                @if (getUploadedDoc(docType.key)) {
-                  <div class="text-xs text-gray-500">{{ getUploadedDoc(docType.key)?.name }}</div>
+                @if (getUploadedDoc(docType.key); as docFile) {
+                  <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                      <ion-icon name="document-outline" class="text-base text-gray-400 flex-shrink-0"></ion-icon>
+                      <div class="min-w-0">
+                        <div class="text-xs text-gray-700 truncate">{{ docFile.name }}</div>
+                        <div class="text-[10px] text-gray-400">{{ formatFileSize(docFile.file.size) }}</div>
+                      </div>
+                    </div>
+                    <button type="button" class="text-red-500 p-1" (click)="removeUpload(docType.key)" aria-label="Remove">
+                      <ion-icon name="close-circle" class="text-lg"></ion-icon>
+                    </button>
+                  </div>
                 } @else {
                   <div class="flex gap-2">
                     <label class="flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-center cursor-pointer hover:border-[#0A4F2A]/30 transition-colors">
                       <input type="file" class="hidden" [accept]="docType.accept" (change)="onFileSelected($event, docType.key)" />
                       <ion-icon name="cloud-upload-outline" class="text-xl text-gray-400 block mx-auto"></ion-icon>
                       <span class="text-xs text-gray-500 mt-1 block">Tap to select file</span>
+                      <span class="text-[10px] text-gray-400 block">Max 10MB</span>
                     </label>
                   </div>
                 }
@@ -180,6 +210,57 @@ import { ApiService } from '../../core/services/api.service';
                 <div class="flex justify-between"><span class="text-gray-500">Monthly Payment</span><span class="font-semibold text-[#C9A227]">₦{{ calcResult()?.mr_principal_interest | number:'1.2-2' }}</span></div>
               }
             </div>
+
+            <!-- Upload Progress (visible after loan is submitted) -->
+            @if (submittedLoanId() && uploadedDocs.size > 0) {
+              <div class="p-4 rounded-xl bg-white border border-gray-100 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-sm font-semibold text-gray-800">Uploading Documents</h4>
+                  @if (uploadsComplete()) {
+                    <ion-icon name="checkmark-circle" class="text-green-600 text-lg"></ion-icon>
+                  } @else {
+                    <ion-spinner name="crescent" class="w-4 h-4"></ion-spinner>
+                  }
+                </div>
+                @for (docType of docTypes; track docType.key) {
+                  @if (getUploadedDoc(docType.key); as doc) {
+                    <div class="space-y-1">
+                      <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-700 truncate pr-2">{{ docType.label }}</span>
+                        @if (getUploadState(docType.key); as state) {
+                          @if (state.status === 'done') {
+                            <span class="text-green-600 font-medium flex items-center gap-1 flex-shrink-0">
+                              <ion-icon name="checkmark-circle"></ion-icon> Done
+                            </span>
+                          } @else if (state.status === 'error') {
+                            <button class="text-red-600 font-medium flex items-center gap-1 flex-shrink-0" (click)="retryUpload(docType.key, submittedLoanId()!)">
+                              <ion-icon name="refresh-outline"></ion-icon> Retry
+                            </button>
+                          } @else {
+                            <span class="text-[#0A4F2A] font-medium flex-shrink-0">{{ state.progress }}%</span>
+                          }
+                        }
+                      </div>
+                      <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        @if (getUploadState(docType.key); as state) {
+                          <div class="h-full transition-all duration-300 rounded-full"
+                               [class]="state.status === 'error' ? 'bg-red-500' : state.status === 'done' ? 'bg-green-500' : 'bg-[#0A4F2A]'"
+                               [style.width.%]="state.progress"></div>
+                        }
+                      </div>
+                      @if (getUploadState(docType.key)?.status === 'error') {
+                        <div class="text-[10px] text-red-600">{{ getUploadState(docType.key)?.error }}</div>
+                      }
+                    </div>
+                  }
+                }
+                @if (uploadsComplete()) {
+                  <button class="w-full py-2 rounded-lg bg-[#0A4F2A] text-white text-sm font-medium mt-2" (click)="proceedAfterUploads()">
+                    Continue to Loan
+                  </button>
+                }
+              </div>
+            }
           </div>
         }
 
@@ -217,6 +298,7 @@ export class LoanCapturePage implements OnInit {
   staffRecord = signal<any>(null);
   staffLoading = signal(false);
   staffError = signal<string | null>(null);
+  existingCustomer = signal<any>(null);
   calcResult = signal<any>(null);
   calcLoading = signal(false);
   submitting = signal(false);
@@ -246,6 +328,7 @@ export class LoanCapturePage implements OnInit {
   ];
 
   agentBlocked = signal(false);
+  banks = signal<{code: string; name: string}[]>([]);
 
   constructor(private api: ApiService, public router: Router) {
     addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline });
@@ -267,6 +350,11 @@ export class LoanCapturePage implements OnInit {
       next: res => { this.products.set(res.data || []); this.productsLoading.set(false); },
       error: () => this.productsLoading.set(false),
     });
+
+    this.api.get('/banks').subscribe({
+      next: res => this.banks.set(res.data || []),
+      error: () => {},
+    });
   }
 
   selectProduct(product: any): void { this.form['product_id'] = product.id; }
@@ -280,9 +368,34 @@ export class LoanCapturePage implements OnInit {
     this.api.get('/government-records', { search: this.form['staff_id'], per_page: 1 }).subscribe({
       next: res => {
         const records = res.data || [];
-        if (records.length > 0) this.staffRecord.set(records[0]);
-        else this.staffError.set('No government record found for this Staff ID');
-        this.staffLoading.set(false);
+        if (records.length > 0) {
+          const rec = records[0];
+          this.staffRecord.set(rec);
+          // Auto-fill from government record (still editable)
+          if (!this.form['phone'] && rec.telephone_number) this.form['phone'] = rec.telephone_number;
+          if (!this.form['bank_name'] && rec.bank_name) this.form['bank_name'] = rec.bank_name;
+          if (!this.form['account_number'] && rec.account_number) this.form['account_number'] = rec.account_number;
+          // Check for existing customer (richer data: email, address, etc)
+          this.api.get('/customers', { search: rec.staff_id, per_page: 1 }).subscribe({
+            next: cres => {
+              const customers = cres.data || [];
+              if (customers.length > 0) {
+                const c = customers[0];
+                // Only overwrite if form field is empty — don't clobber agent edits
+                if (!this.form['phone'] && c.phone) this.form['phone'] = c.phone;
+                if (!this.form['email'] && c.email) this.form['email'] = c.email;
+                if (!this.form['bank_name'] && c.bank_name) this.form['bank_name'] = c.bank_name;
+                if (!this.form['account_number'] && c.account_number) this.form['account_number'] = c.account_number;
+                this.existingCustomer.set(c);
+              }
+              this.staffLoading.set(false);
+            },
+            error: () => this.staffLoading.set(false),
+          });
+        } else {
+          this.staffError.set('No government record found for this Staff ID');
+          this.staffLoading.set(false);
+        }
       },
       error: () => { this.staffError.set('Lookup failed'); this.staffLoading.set(false); },
     });
@@ -315,6 +428,19 @@ export class LoanCapturePage implements OnInit {
     return this.uploadedDocs.get(key);
   }
 
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  removeUpload(docKey: string): void {
+    this.uploadedDocs.delete(docKey);
+    const states = new Map(this.uploadStates());
+    states.delete(docKey);
+    this.uploadStates.set(states);
+  }
+
   onFileSelected(event: Event, docKey: string): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
@@ -328,17 +454,73 @@ export class LoanCapturePage implements OnInit {
     }
   }
 
+  // Per-document upload state: docKey -> { progress: 0-100, status: 'pending'|'uploading'|'done'|'error', error?: string }
+  uploadStates = signal<Map<string, { progress: number; status: 'pending' | 'uploading' | 'done' | 'error'; error?: string }>>(new Map());
+
   private uploadDocuments(loanId: string): void {
+    const states = new Map(this.uploadStates());
+    this.uploadedDocs.forEach((_, docType) => {
+      states.set(docType, { progress: 0, status: 'pending' });
+    });
+    this.uploadStates.set(states);
+
     this.uploadedDocs.forEach((doc, docType) => {
       const formData = new FormData();
       formData.append('file', doc.file);
       formData.append('type', docType);
       formData.append('loan_id', loanId);
-      this.api.upload(`/documents`, formData).subscribe({
-        error: () => { /* silent — loan is already created */ },
+
+      this.setUploadState(docType, { progress: 0, status: 'uploading' });
+
+      this.api.uploadWithProgress(`/documents`, formData).subscribe({
+        next: (event: any) => {
+          if (event.type === 1 /* HttpEventType.UploadProgress */ && event.total) {
+            const pct = Math.round((event.loaded / event.total) * 100);
+            this.setUploadState(docType, { progress: pct, status: 'uploading' });
+          } else if (event.type === 4 /* HttpEventType.Response */) {
+            this.setUploadState(docType, { progress: 100, status: 'done' });
+          }
+        },
+        error: (err) => {
+          const msg = err?.error?.message || err?.message || 'Upload failed';
+          this.setUploadState(docType, { progress: 0, status: 'error', error: msg });
+        },
       });
     });
   }
+
+  private setUploadState(docKey: string, state: { progress: number; status: 'pending' | 'uploading' | 'done' | 'error'; error?: string }): void {
+    const next = new Map(this.uploadStates());
+    next.set(docKey, state);
+    this.uploadStates.set(next);
+  }
+
+  getUploadState(docKey: string) {
+    return this.uploadStates().get(docKey);
+  }
+
+  retryUpload(docKey: string, loanId: string): void {
+    const doc = this.uploadedDocs.get(docKey);
+    if (!doc || !loanId) return;
+    const formData = new FormData();
+    formData.append('file', doc.file);
+    formData.append('type', docKey);
+    formData.append('loan_id', loanId);
+    this.setUploadState(docKey, { progress: 0, status: 'uploading' });
+    this.api.uploadWithProgress(`/documents`, formData).subscribe({
+      next: (event: any) => {
+        if (event.type === 1 && event.total) {
+          this.setUploadState(docKey, { progress: Math.round((event.loaded / event.total) * 100), status: 'uploading' });
+        } else if (event.type === 4) {
+          this.setUploadState(docKey, { progress: 100, status: 'done' });
+        }
+      },
+      error: (err) => this.setUploadState(docKey, { progress: 0, status: 'error', error: err?.error?.message || 'Upload failed' }),
+    });
+  }
+
+  submittedLoanId = signal<string | null>(null);
+  uploadsComplete = signal(false);
 
   submit(): void {
     this.submitting.set(true);
@@ -357,10 +539,38 @@ export class LoanCapturePage implements OnInit {
       next: res => {
         this.submitting.set(false);
         const loanId = res.data?.id || '';
-        if (loanId && this.uploadedDocs.size > 0) { this.uploadDocuments(loanId); }
-        this.router.navigate(['/loans', loanId]);
+        this.submittedLoanId.set(loanId);
+        if (loanId && this.uploadedDocs.size > 0) {
+          this.uploadDocuments(loanId);
+          this.pollUploadsComplete(loanId);
+        } else {
+          this.router.navigate(['/loans', loanId]);
+        }
       },
       error: () => this.submitting.set(false),
     });
+  }
+
+  private pollUploadsComplete(loanId: string): void {
+    const iv = setInterval(() => {
+      const states = Array.from(this.uploadStates().values());
+      if (states.length === 0) return;
+      const allDone = states.every(s => s.status === 'done' || s.status === 'error');
+      if (allDone) {
+        clearInterval(iv);
+        this.uploadsComplete.set(true);
+        // If all succeeded, auto-navigate after a brief success pause
+        const allSucceeded = states.every(s => s.status === 'done');
+        if (allSucceeded) {
+          setTimeout(() => this.router.navigate(['/loans', loanId]), 800);
+        }
+        // Otherwise stay on page so user can retry failed uploads
+      }
+    }, 400);
+  }
+
+  proceedAfterUploads(): void {
+    const loanId = this.submittedLoanId();
+    if (loanId) this.router.navigate(['/loans', loanId]);
   }
 }

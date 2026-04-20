@@ -57,6 +57,50 @@ import { AuthService } from '../../core/services/auth.service';
           </a>
         </div>
 
+        <!-- Monthly Target Progress -->
+        @if (targetStats()) {
+          <div class="p-4 rounded-2xl bg-gradient-to-br from-[#0A4F2A] to-[#0d6538] text-white shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <div class="text-xs text-white/70">Monthly Target</div>
+                <div class="text-xs font-medium text-[#C9A227]">{{ targetStats()?.month_label }}</div>
+              </div>
+              <ion-icon name="trending-up-outline" class="text-xl text-[#C9A227]"></ion-icon>
+            </div>
+            <div class="flex items-center gap-4">
+              <!-- Circular Progress -->
+              <div class="relative w-20 h-20 flex-shrink-0">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"></circle>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#C9A227" stroke-width="3"
+                          stroke-linecap="round"
+                          [attr.stroke-dasharray]="100"
+                          [attr.stroke-dashoffset]="100 - (targetStats()?.progress_pct || 0)"
+                          style="transition: stroke-dashoffset 0.6s ease"></circle>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <span class="text-base font-bold">{{ targetStats()?.progress_pct }}%</span>
+                </div>
+              </div>
+              <!-- Stats -->
+              <div class="flex-1 space-y-1.5">
+                <div class="flex justify-between items-baseline">
+                  <span class="text-xs text-white/70">Disbursed</span>
+                  <span class="text-sm font-bold">{{ targetStats()?.disbursed_count }} <span class="text-xs text-white/60">of {{ targetStats()?.target }}</span></span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-xs text-white/70">Remaining</span>
+                  <span class="text-sm font-bold text-[#C9A227]">{{ targetStats()?.remaining }} loans</span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-xs text-white/70">Value</span>
+                  <span class="text-xs font-semibold">₦{{ targetStats()?.disbursed_amount | number:'1.0-0' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Stats -->
         <div class="grid grid-cols-3 gap-3">
           @for (stat of stats(); track stat.label) {
@@ -106,6 +150,7 @@ export class DashboardPage implements OnInit {
   stats = signal<{label: string; value: string|number; color: string}[]>([]);
   recentLoans = signal<any[]>([]);
   unreadCount = signal(0);
+  targetStats = signal<any>(null);
   today = new Date().toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   constructor(public auth: AuthService, private api: ApiService) {
@@ -115,18 +160,36 @@ export class DashboardPage implements OnInit {
   ngOnInit(): void { this.loadData(); }
 
   loadData(): void {
-    this.api.get('/loans', { per_page: 5, sort_by: 'created_at', sort_dir: 'DESC' }).subscribe({
+    // Agent monthly target stats
+    this.api.get('/agent/dashboard-stats').subscribe({
       next: res => {
-        this.recentLoans.set(res.data || []);
-        const total = res.meta?.total || 0;
-        const active = (res.data || []).filter((l: any) => ['active','overdue','disbursed'].includes(l.status)).length;
-        const pending = (res.data || []).filter((l: any) => ['submitted','under_review','captured'].includes(l.status)).length;
+        this.targetStats.set(res.data);
+        const bs = res.data?.by_status || {};
         this.stats.set([
-          { label: 'Total', value: total, color: '#0A4F2A' },
-          { label: 'Active', value: active, color: '#16a34a' },
-          { label: 'Pending', value: pending, color: '#C9A227' },
+          { label: 'Submitted', value: (bs.submitted || 0) + (bs.under_review || 0), color: '#C9A227' },
+          { label: 'Approved', value: bs.approved || 0, color: '#16a34a' },
+          { label: 'Rejected', value: bs.rejected || 0, color: '#dc2626' },
         ]);
       },
+      error: () => {
+        // Fallback for non-agent users (admin view)
+        this.api.get('/loans', { per_page: 5, sort_by: 'created_at', sort_dir: 'DESC' }).subscribe({
+          next: res => {
+            const total = res.meta?.total || 0;
+            const active = (res.data || []).filter((l: any) => ['active','overdue','disbursed'].includes(l.status)).length;
+            const pending = (res.data || []).filter((l: any) => ['submitted','under_review','captured'].includes(l.status)).length;
+            this.stats.set([
+              { label: 'Total', value: total, color: '#0A4F2A' },
+              { label: 'Active', value: active, color: '#16a34a' },
+              { label: 'Pending', value: pending, color: '#C9A227' },
+            ]);
+          },
+        });
+      },
+    });
+    // Recent loans
+    this.api.get('/loans', { per_page: 5, sort_by: 'created_at', sort_dir: 'DESC' }).subscribe({
+      next: res => this.recentLoans.set(res.data || []),
     });
     this.api.get('/notifications', { per_page: 1, is_read: false }).subscribe({
       next: res => this.unreadCount.set((res as any).unread_count || 0),

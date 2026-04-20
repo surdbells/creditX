@@ -10,11 +10,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { NIGERIA_STATES } from '../../core/data/nigeria-states';
 
 @Component({
   selector: 'app-customers', standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, FormDialogComponent],
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Customer Management" subtitle="{{ totalRecords | number }} customers">
@@ -112,11 +113,17 @@ import { NIGERIA_STATES } from '../../core/data/nigeria-states';
 
         <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Banking</h4>
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Bank Name</label><input class="cx-input" [(ngModel)]="form.bank_name" /></div>
+          <div><label class="cx-label">Bank Name</label>
+            <cx-searchable-select [options]="bankOptions()" placeholder="Select bank..." [clearable]="true"
+              [(ngModel)]="form.bank_name" name="bank_name"></cx-searchable-select>
+          </div>
           <div><label class="cx-label">Account Number</label><input class="cx-input" [(ngModel)]="form.account_number" /></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Alt Bank Name</label><input class="cx-input" [(ngModel)]="form.alt_bank_name" /></div>
+          <div><label class="cx-label">Alt Bank Name</label>
+            <cx-searchable-select [options]="bankOptions()" placeholder="Select bank..." [clearable]="true"
+              [(ngModel)]="form.alt_bank_name" name="alt_bank_name"></cx-searchable-select>
+          </div>
           <div><label class="cx-label">Alt Account Number</label><input class="cx-input" [(ngModel)]="form.alt_account_number" /></div>
         </div>
       </div>
@@ -138,6 +145,7 @@ export class CustomersComponent implements OnInit {
 
   states = NIGERIA_STATES;
   filteredLgas: string[] = [];
+  bankOptions = signal<SelectOption[]>([]);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
@@ -153,7 +161,13 @@ export class CustomersComponent implements OnInit {
   }
 
   removeNok(i: number): void { this.form.next_of_kins.splice(i, 1); }
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    this.load();
+    this.api.get('/banks').subscribe({
+      next: r => this.bankOptions.set((r.data || []).map((b: any) => ({ value: b.name, label: b.name, sublabel: b.code }))),
+      error: () => {},
+    });
+  }
 
   load(p?: any) {
     this.loading.set(true);

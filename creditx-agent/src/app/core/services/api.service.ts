@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpRequest, HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models';
@@ -25,5 +25,16 @@ export class ApiService {
 
   upload<T = any>(path: string, formData: FormData): Observable<ApiResponse<T>> {
     return this.http.post<ApiResponse<T>>(`${this.base}${path}`, formData);
+  }
+
+  /**
+   * Upload with progress events. Emits HttpEvents — use reportProgress.
+   * Subscriber gets UploadProgress (0-100) events and a final success event.
+   */
+  uploadWithProgress<T = any>(path: string, formData: FormData): Observable<HttpEvent<ApiResponse<T>>> {
+    const req = new HttpRequest('POST', `${this.base}${path}`, formData, {
+      reportProgress: true,
+    });
+    return this.http.request<ApiResponse<T>>(req);
   }
 }

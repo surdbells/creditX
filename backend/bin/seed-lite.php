@@ -131,6 +131,7 @@ $settingsDef = [
     ['general.max_upload_size_mb', '10', 'integer', 'general', 'Maximum file upload size in MB'],
     ['general.company_name', 'CreditX Financial Services', 'string', 'general', 'Company display name'],
     ['general.support_email', 'support@dostsuite.com', 'string', 'general', 'Support email address'],
+    ['agent.monthly_target', '20', 'integer', 'general', 'Monthly disbursed loan target per agent'],
 ];
 
 $settingsCount = 0;
