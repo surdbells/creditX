@@ -8,35 +8,119 @@ import { LucideAngularModule } from 'lucide-angular';
   imports: [CommonModule, LucideAngularModule],
   template: `
     @if (open) {
-      <div class="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] sm:items-center sm:pt-0" (click)="onBackdropClick($event)">
-        <div class="fixed inset-0 bg-black/40"></div>
-        <div class="relative bg-[var(--cx-surface)] rounded-2xl shadow-2xl w-full mx-4 cx-animate-in overflow-hidden flex flex-col"
-             [style.max-width]="maxWidth" [style.max-height]="'90vh'">
-          <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--cx-border)] flex-shrink-0">
-            <h2 class="text-base font-semibold text-[var(--cx-text)]">{{ title }}</h2>
-            <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="close.emit()">
+      <div class="cx-form-dialog-root" (click)="onBackdropClick($event)">
+        <div class="cx-form-dialog-backdrop"></div>
+        <div class="cx-form-dialog-panel" [style.max-width]="maxWidth">
+          <header class="cx-form-dialog-header">
+            <div>
+              <h2 class="cx-form-dialog-title">{{ title }}</h2>
+              @if (subtitle) {
+                <p class="cx-form-dialog-subtitle">{{ subtitle }}</p>
+              }
+            </div>
+            <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="close.emit()" aria-label="Close">
               <lucide-icon name="x" [size]="18"></lucide-icon>
             </button>
-          </div>
-          <div class="px-6 py-4 overflow-y-auto flex-1 min-h-0">
+          </header>
+          <div class="cx-form-dialog-body">
             <ng-content></ng-content>
           </div>
-          <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--cx-border)] flex-shrink-0 bg-[var(--cx-surface)]">
-            <button class="cx-btn cx-btn-outline" (click)="close.emit()" [disabled]="saving">Cancel</button>
+          <footer class="cx-form-dialog-footer">
+            <button class="cx-btn cx-btn-outline" (click)="close.emit()" [disabled]="saving">{{ cancelLabel }}</button>
             <button class="cx-btn cx-btn-primary" (click)="save.emit()" [disabled]="saving || saveDisabled">
-              @if (saving) { <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> }
+              @if (saving) {
+                <span class="cx-form-dialog-spinner"></span>
+              }
               {{ saveLabel }}
             </button>
-          </div>
+          </footer>
         </div>
       </div>
     }
   `,
+  styles: [`
+    .cx-form-dialog-root {
+      position: fixed; inset: 0;
+      z-index: var(--cx-z-modal);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 5vh;
+    }
+    @media (min-width: 640px) {
+      .cx-form-dialog-root { align-items: center; padding-top: 0; }
+    }
+    .cx-form-dialog-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(15, 28, 22, 0.52);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      animation: cx-fade-in var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cx-form-dialog-panel {
+      position: relative;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-2xl);
+      box-shadow: var(--cx-shadow-xl);
+      border: 1px solid var(--cx-border);
+      width: 100%;
+      margin: 0 1rem;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: cx-dialog-in var(--cx-dur-slow) var(--cx-ease-premium);
+    }
+    @keyframes cx-dialog-in {
+      from { opacity: 0; transform: translateY(16px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .cx-form-dialog-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem 1.5rem 1rem;
+      border-bottom: 1px solid var(--cx-border);
+      flex-shrink: 0;
+    }
+    .cx-form-dialog-title {
+      margin: 0;
+      font-size: var(--cx-text-md); font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cx-form-dialog-subtitle {
+      margin: 0.25rem 0 0;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+    }
+    .cx-form-dialog-body {
+      padding: 1.25rem 1.5rem;
+      overflow-y: auto;
+      flex: 1; min-height: 0;
+    }
+    .cx-form-dialog-footer {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 0.5rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--cx-border);
+      background: var(--cx-surface-2);
+      flex-shrink: 0;
+    }
+    .cx-form-dialog-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: cx-spin 0.7s linear infinite;
+    }
+    @keyframes cx-spin {
+      to { transform: rotate(360deg); }
+    }
+  `],
 })
 export class FormDialogComponent {
   @Input() open = false;
   @Input() title = '';
+  @Input() subtitle = '';
   @Input() saveLabel = 'Save';
+  @Input() cancelLabel = 'Cancel';
   @Input() saving = false;
   @Input() saveDisabled = false;
   @Input() maxWidth = '560px';
@@ -44,6 +128,10 @@ export class FormDialogComponent {
   @Output() save = new EventEmitter<void>();
 
   onBackdropClick(event: Event): void {
-    if ((event.target as HTMLElement).classList.contains('fixed')) this.close.emit();
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('cx-form-dialog-root') || target.classList.contains('cx-form-dialog-backdrop')) {
+      this.close.emit();
+    }
   }
 }
+

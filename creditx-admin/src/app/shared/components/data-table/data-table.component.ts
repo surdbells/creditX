@@ -40,138 +40,329 @@ export interface TableQueryEvent {
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
-    <!-- Toolbar -->
-    <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-center gap-2 flex-1 min-w-0">
-        <div class="relative flex-1 max-w-sm">
-          <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
-          <input type="text" class="cx-input !pl-8" [placeholder]="searchPlaceholder"
+    <div class="cx-dtable">
+      <!-- Toolbar -->
+      <div class="cx-dtable-toolbar">
+        <div class="cx-dtable-search">
+          <lucide-icon name="search" [size]="14" class="cx-dtable-search-icon"></lucide-icon>
+          <input type="text" class="cx-dtable-search-input" [placeholder]="searchPlaceholder"
             [ngModel]="searchTerm()" (ngModelChange)="onSearchChange($event)" />
         </div>
-      </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <div class="relative">
-          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="showColumnPicker.set(!showColumnPicker())">
-            <lucide-icon name="columns-3" [size]="14"></lucide-icon>
-            <span class="hidden sm:inline">Columns</span>
-          </button>
-          @if (showColumnPicker()) {
-            <div class="absolute right-0 top-full mt-1 z-50 bg-[var(--cx-surface)] border border-[var(--cx-border)] rounded-xl p-3 min-w-[200px] shadow-xl cx-animate-in">
-              @for (col of allColumns; track col.key) {
-                <label class="flex items-center gap-2 py-1.5 cursor-pointer text-xs font-medium">
-                  <input type="checkbox" [checked]="isColumnVisible(col.key)" (change)="toggleColumn(col.key)" class="rounded" />
-                  <span class="text-[var(--cx-text)]">{{ col.label }}</span>
-                </label>
-              }
-            </div>
+        <div class="cx-dtable-actions">
+          <div style="position: relative;">
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="showColumnPicker.set(!showColumnPicker())">
+              <lucide-icon name="columns-3" [size]="14"></lucide-icon>
+              <span class="hidden sm:inline">Columns</span>
+            </button>
+            @if (showColumnPicker()) {
+              <div class="cx-dtable-col-picker">
+                <div class="cx-dtable-col-picker-title">Toggle columns</div>
+                @for (col of allColumns; track col.key) {
+                  <label class="cx-dtable-col-option">
+                    <input type="checkbox" [checked]="isColumnVisible(col.key)" (change)="toggleColumn(col.key)" />
+                    <span>{{ col.label }}</span>
+                  </label>
+                }
+              </div>
+            }
+          </div>
+          @if (exportable) {
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="onExport.emit()">
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+              <span class="hidden sm:inline">Export</span>
+            </button>
           }
+          <ng-content select="[tableActions]"></ng-content>
         </div>
-        @if (exportable) {
-          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="onExport.emit()">
-            <lucide-icon name="download" [size]="14"></lucide-icon> <span class="hidden sm:inline">Export</span>
-          </button>
-        }
-        <ng-content select="[tableActions]"></ng-content>
       </div>
-    </div>
 
-    <!-- Table -->
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="border-b border-[var(--cx-border)]">
-            @for (col of visibleColumns(); track col.key) {
-              <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider whitespace-nowrap select-none"
-                [class.cursor-pointer]="col.sortable !== false"
-                [style.width]="col.width || 'auto'" [style.text-align]="col.align || 'left'"
-                (click)="col.sortable !== false ? onSort(col.key) : null">
-                <div class="flex items-center gap-1">
-                  {{ col.label }}
-                  @if (col.sortable !== false && currentSort() === col.key) {
-                    <lucide-icon [name]="currentSortDir() === 'ASC' ? 'arrow-up' : 'arrow-down'" [size]="12"></lucide-icon>
-                  }
-                </div>
-              </th>
-            }
-            @if (hasActions) {
-              <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider w-[100px]">Actions</th>
-            }
-          </tr>
-        </thead>
-        <tbody>
-          @if (loading) {
+      <!-- Table -->
+      <div class="cx-dtable-scroll">
+        <table class="cx-dtable-table">
+          <thead>
             <tr>
-              <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="px-4 py-16 text-center">
-                <div class="flex flex-col items-center gap-3">
-                  <div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div>
-                  <span class="text-sm text-[var(--cx-text-muted)]">Loading...</span>
-                </div>
-              </td>
-            </tr>
-          } @else if (!rows || rows.length === 0) {
-            <tr>
-              <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="px-4 py-16 text-center">
-                <div class="flex flex-col items-center gap-2">
-                  <lucide-icon name="database" [size]="36" class="text-[var(--cx-text-muted)] opacity-30"></lucide-icon>
-                  <span class="text-sm text-[var(--cx-text-muted)]">{{ emptyMessage }}</span>
-                </div>
-              </td>
-            </tr>
-          } @else {
-            @for (row of rows; track trackByFn(row)) {
-              <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors">
-                @for (col of visibleColumns(); track col.key) {
-                  <td class="px-4 py-3 text-sm" [style.text-align]="col.align || 'left'">
-                    @if (col.type === 'badge' && col.badgeMap) {
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                            [ngClass]="col.badgeMap[row[col.key]]?.class || 'bg-gray-100 text-gray-700'">
-                        {{ col.badgeMap[row[col.key]]?.label || row[col.key] }}
-                      </span>
-                    } @else if (col.type === 'currency') {
-                      <span class="font-medium">₦{{ row[col.key] | number:'1.0-0' }}</span>
-                    } @else if (col.type === 'date') {
-                      <span class="text-xs text-[var(--cx-text-muted)]">{{ row[col.key] | date:'mediumDate' }}</span>
-                    } @else if (col.type === 'custom' && cellTemplate) {
-                      <ng-container *ngTemplateOutlet="cellTemplate; context: { $implicit: row, column: col }"></ng-container>
-                    } @else {
-                      {{ row[col.key] }}
+              @for (col of visibleColumns(); track col.key) {
+                <th [class.is-sortable]="col.sortable !== false"
+                  [class.is-sorted]="currentSort() === col.key"
+                  [style.width]="col.width || 'auto'"
+                  [style.text-align]="col.align || 'left'"
+                  (click)="col.sortable !== false ? onSort(col.key) : null">
+                  <div class="cx-dtable-th-inner" [style.justify-content]="col.align === 'right' ? 'flex-end' : col.align === 'center' ? 'center' : 'flex-start'">
+                    <span>{{ col.label }}</span>
+                    @if (col.sortable !== false) {
+                      @if (currentSort() === col.key) {
+                        <lucide-icon [name]="currentSortDir() === 'ASC' ? 'arrow-up' : 'arrow-down'" [size]="12" class="cx-dtable-sort-icon is-active"></lucide-icon>
+                      } @else {
+                        <lucide-icon name="chevrons-up-down" [size]="12" class="cx-dtable-sort-icon"></lucide-icon>
+                      }
                     }
-                  </td>
-                }
-                @if (hasActions && rowActionsTemplate) {
-                  <td class="px-4 py-3 text-right">
-                    <ng-container *ngTemplateOutlet="rowActionsTemplate; context: { $implicit: row }"></ng-container>
-                  </td>
-                }
+                  </div>
+                </th>
+              }
+              @if (hasActions) {
+                <th class="cx-dtable-actions-col">Actions</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @if (loading) {
+              <tr>
+                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="cx-dtable-state">
+                  <div class="cx-dtable-loading">
+                    <div class="cx-dtable-loading-dots"><span></span><span></span><span></span></div>
+                    <span>Loading...</span>
+                  </div>
+                </td>
               </tr>
+            } @else if (!rows || rows.length === 0) {
+              <tr>
+                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="cx-dtable-state">
+                  <div class="cx-dtable-empty">
+                    <lucide-icon name="database" [size]="28"></lucide-icon>
+                    <span>{{ emptyMessage }}</span>
+                  </div>
+                </td>
+              </tr>
+            } @else {
+              @for (row of rows; track trackByFn(row)) {
+                <tr>
+                  @for (col of visibleColumns(); track col.key) {
+                    <td [style.text-align]="col.align || 'left'">
+                      @if (col.type === 'badge' && col.badgeMap) {
+                        <span class="cx-badge"
+                              [ngClass]="col.badgeMap[row[col.key]]?.class || 'cx-badge-neutral'">
+                          {{ col.badgeMap[row[col.key]]?.label || row[col.key] }}
+                        </span>
+                      } @else if (col.type === 'currency') {
+                        <span class="cx-dtable-currency tabular-nums">₦{{ row[col.key] | number:'1.0-0' }}</span>
+                      } @else if (col.type === 'date') {
+                        <span class="cx-dtable-date">{{ row[col.key] | date:'mediumDate' }}</span>
+                      } @else if (col.type === 'custom' && cellTemplate) {
+                        <ng-container *ngTemplateOutlet="cellTemplate; context: { $implicit: row, column: col }"></ng-container>
+                      } @else {
+                        {{ row[col.key] }}
+                      }
+                    </td>
+                  }
+                  @if (hasActions && rowActionsTemplate) {
+                    <td class="cx-dtable-row-actions">
+                      <ng-container *ngTemplateOutlet="rowActionsTemplate; context: { $implicit: row }"></ng-container>
+                    </td>
+                  }
+                </tr>
+              }
             }
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    @if (pagination) {
-      <div class="flex flex-col gap-3 mt-0 px-4 py-3 border-t border-[var(--cx-border)] sm:flex-row sm:items-center sm:justify-between">
-        <div class="text-xs text-[var(--cx-text-muted)]">
-          Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}–{{ Math.min(pagination.page * pagination.per_page, pagination.total) }}
-          of {{ pagination.total | number }} entries
-        </div>
-        <div class="flex items-center gap-1">
-          <select class="cx-select !w-auto !py-1 !text-xs !rounded-lg" [ngModel]="pagination.per_page" (ngModelChange)="onPerPageChange($event)">
-            <option [value]="10">10</option><option [value]="20">20</option><option [value]="50">50</option><option [value]="100">100</option>
-          </select>
-          <button class="cx-btn cx-btn-ghost cx-btn-sm" [disabled]="pagination.page <= 1" (click)="onPageChange(pagination.page - 1)">
-            <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
-          </button>
-          <span class="text-xs px-2 font-medium text-[var(--cx-text-muted)]">{{ pagination.page }} / {{ pagination.total_pages }}</span>
-          <button class="cx-btn cx-btn-ghost cx-btn-sm" [disabled]="pagination.page >= pagination.total_pages" (click)="onPageChange(pagination.page + 1)">
-            <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
-          </button>
-        </div>
+          </tbody>
+        </table>
       </div>
-    }
+
+      <!-- Pagination -->
+      @if (pagination) {
+        <div class="cx-dtable-pagination">
+          <div class="cx-dtable-pagination-info">
+            Showing <span class="tabular-nums">{{ ((pagination.page - 1) * pagination.per_page) + 1 }}</span>&ndash;<span class="tabular-nums">{{ Math.min(pagination.page * pagination.per_page, pagination.total) }}</span>
+            of <span class="tabular-nums">{{ pagination.total | number }}</span>
+          </div>
+          <div class="cx-dtable-pagination-controls">
+            <select class="cx-dtable-per-page" [ngModel]="pagination.per_page" (ngModelChange)="onPerPageChange($event)">
+              <option [value]="10">10 / page</option>
+              <option [value]="20">20 / page</option>
+              <option [value]="50">50 / page</option>
+              <option [value]="100">100 / page</option>
+            </select>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" [disabled]="pagination.page <= 1" (click)="onPageChange(pagination.page - 1)" aria-label="Previous page">
+              <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+            </button>
+            <span class="cx-dtable-page-indicator tabular-nums">{{ pagination.page }} / {{ pagination.total_pages }}</span>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" [disabled]="pagination.page >= pagination.total_pages" (click)="onPageChange(pagination.page + 1)" aria-label="Next page">
+              <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
   `,
+  styles: [`
+    .cx-dtable {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      overflow: hidden;
+    }
+    .cx-dtable-toolbar {
+      display: flex; flex-direction: column; gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+    }
+    @media (min-width: 640px) {
+      .cx-dtable-toolbar { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+    .cx-dtable-search {
+      position: relative; flex: 1; max-width: 24rem;
+    }
+    .cx-dtable-search-icon {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--cx-text-muted); pointer-events: none;
+    }
+    .cx-dtable-search-input {
+      width: 100%;
+      padding: 0.45rem 0.75rem 0.45rem 2.15rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-search-input:hover { border-color: var(--cx-border); }
+    .cx-dtable-search-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+    .cx-dtable-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+    .cx-dtable-col-picker {
+      position: absolute; right: 0; top: calc(100% + 4px);
+      z-index: var(--cx-z-dropdown);
+      min-width: 220px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      box-shadow: var(--cx-shadow-lg);
+      padding: 0.5rem;
+      animation: cx-fade-in var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cx-dtable-col-picker-title {
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      padding: 0.35rem 0.5rem 0.5rem;
+    }
+    .cx-dtable-col-option {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-sm);
+      cursor: pointer;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-col-option:hover { background: var(--cx-surface-hover); }
+
+    .cx-dtable-scroll { overflow-x: auto; }
+    .cx-dtable-table { width: 100%; border-collapse: collapse; }
+
+    .cx-dtable-table thead {
+      background: var(--cx-surface-2);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .cx-dtable-table thead tr {
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-dtable-table th {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      white-space: nowrap;
+      user-select: none;
+      transition: color var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-table th.is-sortable { cursor: pointer; }
+    .cx-dtable-table th.is-sortable:hover { color: var(--cx-text); }
+    .cx-dtable-table th.is-sorted { color: var(--cx-primary-700); }
+    .cx-dtable-th-inner { display: flex; align-items: center; gap: 4px; }
+    .cx-dtable-sort-icon {
+      color: var(--cx-text-subtle);
+      opacity: 0.6;
+      transition: opacity var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-table th:hover .cx-dtable-sort-icon { opacity: 1; }
+    .cx-dtable-sort-icon.is-active { color: var(--cx-primary-600); opacity: 1; }
+
+    .cx-dtable-table td {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-dtable-table tbody tr {
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-table tbody tr:hover { background: var(--cx-surface-hover); }
+    .cx-dtable-table tbody tr:last-child td { border-bottom: none; }
+
+    .cx-dtable-actions-col {
+      text-align: right !important;
+      width: 100px;
+    }
+    .cx-dtable-row-actions { text-align: right; }
+
+    .cx-dtable-currency { font-weight: 500; color: var(--cx-text); }
+    .cx-dtable-date { font-size: var(--cx-text-xs); color: var(--cx-text-muted); }
+
+    .cx-dtable-state { padding: 4rem 1rem; text-align: center; }
+    .cx-dtable-loading { display: inline-flex; align-items: center; gap: 0.75rem; color: var(--cx-text-muted); }
+    .cx-dtable-loading-dots { display: inline-flex; gap: 4px; }
+    .cx-dtable-loading-dots span {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cx-primary-600);
+      animation: cx-loading-pulse 1.2s infinite var(--cx-ease-premium);
+    }
+    .cx-dtable-loading-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--cx-accent-500); }
+    .cx-dtable-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes cx-loading-pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    .cx-dtable-empty {
+      display: inline-flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      color: var(--cx-text-muted);
+      font-size: var(--cx-text-sm);
+    }
+    .cx-dtable-empty lucide-icon { opacity: 0.3; }
+
+    .cx-dtable-pagination {
+      display: flex; flex-direction: column; gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+    }
+    @media (min-width: 640px) {
+      .cx-dtable-pagination { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+    .cx-dtable-pagination-info {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+    .cx-dtable-pagination-controls { display: flex; align-items: center; gap: 0.35rem; }
+    .cx-dtable-per-page {
+      padding: 0.3rem 1.75rem 0.3rem 0.65rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text);
+      cursor: pointer; outline: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6965' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-dtable-per-page:hover { background-color: var(--cx-surface); border-color: var(--cx-border); }
+    .cx-dtable-page-indicator {
+      font-size: var(--cx-text-xs); font-weight: 500;
+      color: var(--cx-text-secondary);
+      padding: 0 0.5rem;
+      min-width: 60px; text-align: center;
+    }
+
+    /* Dark mode */
+    :host-context(.dark) .cx-dtable-search-input { background: var(--cx-surface-2); }
+  `],
 })
 export class DataTableComponent {
   @Input() allColumns: TableColumn[] = [];
