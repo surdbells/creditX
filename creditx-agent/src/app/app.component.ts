@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { PushService } from './core/services/push.service';
 import { AuthService } from './core/services/auth.service';
+import { FontScaleService } from './core/services/font-scale.service';
 
 @Component({
   selector: 'app-root',
@@ -10,7 +11,7 @@ import { AuthService } from './core/services/auth.service';
   template: '<ion-app><ion-router-outlet></ion-router-outlet></ion-app>',
 })
 export class AppComponent implements OnInit {
-  constructor(private push: PushService, private auth: AuthService) {}
+  constructor(private push: PushService, private auth: AuthService, private _fs: FontScaleService) {}
 
   ngOnInit(): void {
     // Init push notifications if user is already logged in

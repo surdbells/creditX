@@ -43,6 +43,9 @@ class User
     #[ORM\Column(type: 'string', length: 500, nullable: true)]
     private ?string $avatarPath = null;
 
+    #[ORM\Column(name: 'font_scale', type: 'decimal', precision: 3, scale: 2, options: ['default' => '1.00'])]
+    private string $fontScale = '1.00';
+
     #[ORM\ManyToOne(targetEntity: Department::class)]
     #[ORM\JoinColumn(name: 'department_id', referencedColumnName: 'id', nullable: true)]
     private ?Department $department = null;
@@ -198,6 +201,14 @@ class User
     public function getAvatarPath(): ?string { return $this->avatarPath; }
     public function setAvatarPath(?string $v): void { $this->avatarPath = $v; }
 
+    public function getFontScale(): float { return (float) $this->fontScale; }
+    public function setFontScale(float $v): void {
+        // Clamp to supported range
+        if ($v < 0.85) $v = 0.85;
+        if ($v > 1.20) $v = 1.20;
+        $this->fontScale = number_format($v, 2, '.', '');
+    }
+
     public function getResetToken(): ?string { return $this->resetToken; }
     public function setResetToken(?string $v): void { $this->resetToken = $v; }
     public function getResetTokenExpiresAt(): ?string { return $this->resetTokenExpiresAt; }
@@ -305,6 +316,7 @@ class User
             'email'         => $this->email,
             'phone'         => $this->phone,
             'avatar_path'   => $this->avatarPath,
+            'font_scale'    => (float) $this->fontScale,
             'department_id'   => $this->department?->getId(),
             'department_name' => $this->department?->getName(),
             'team_id'         => $this->team?->getId(),

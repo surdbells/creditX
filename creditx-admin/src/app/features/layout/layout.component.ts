@@ -9,13 +9,15 @@ import { ToastService } from '../../core/services/toast.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ToastContainerComponent } from '../../shared/components/toast/toast.component';
 import { ChatBubbleComponent } from '../../shared/components/chat-bubble/chat-bubble.component';
+import { FontScaleControlComponent } from '../../shared/components/font-scale-control/font-scale-control.component';
+import { FontScaleService } from '../../core/services/font-scale.service';
 
 interface NavItem { label: string; icon: string; route: string; permission?: string; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 @Component({
   selector: 'app-layout', standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent, ChatBubbleComponent],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, ToastContainerComponent, ChatBubbleComponent, FontScaleControlComponent],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss',
 })
@@ -71,7 +73,7 @@ export class LayoutComponent {
     { label: 'Menu', icon: 'menu', route: '' },
   ];
 
-  constructor(public auth: AuthService, public theme: ThemeService, private router: Router, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, public theme: ThemeService, private router: Router, private api: ApiService, private toast: ToastService, private _fontScale: FontScaleService) {}
 
   get filteredGroups(): NavGroup[] {
     return this.navGroups.map(g => ({ ...g, items: g.items.filter(i => !i.permission || this.auth.hasPermission(i.permission)) })).filter(g => g.items.length > 0);

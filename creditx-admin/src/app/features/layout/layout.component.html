@@ -110,6 +110,7 @@
         <span class="text-sm text-[var(--cx-text-secondary)]">Welcome, <strong class="text-[var(--cx-text)]">{{ auth.user()?.first_name }}</strong></span>
       </div>
       <div class="flex items-center gap-2">
+        <cx-font-scale-control></cx-font-scale-control>
         <button class="cx-btn cx-btn-ghost cx-btn-icon hidden sm:flex" (click)="theme.toggle()">
           <lucide-icon [name]="theme.isDark() ? 'sun' : 'moon'" [size]="18"></lucide-icon>
         </button>

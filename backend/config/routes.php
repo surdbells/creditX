@@ -86,6 +86,9 @@ return function (App $app): void {
 
         // ─── Users ───
         $api->group('/users', function (RouteCollectorProxy $group) {
+            // Self-service preferences (no RBAC — authenticated user edits own record)
+            $group->patch('/me/preferences', User\UpdateMyPreferencesAction::class);
+
             $group->get('', User\ListUsersAction::class)
                 ->add(new RbacMiddleware('users.view'));
             $group->post('', User\CreateUserAction::class)
