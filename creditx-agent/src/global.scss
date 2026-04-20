@@ -41,65 +41,240 @@
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
 
-/* ─── CreditX Agent — Premium Global Styles ─── */
+/* ═══════════════════════════════════════════════════════════════
+   CreditX Agent — Premium Global Styles
+   Mirrors admin design system (styles.scss). Keep in sync.
+═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --cx-primary: #0A4F2A;
-  --cx-primary-light: #1a7a45;
-  --cx-primary-dark: #063a1e;
-  --cx-accent: #C9A227;
-  --cx-danger: #dc2626;
-  --cx-success: #16a34a;
+  /* ─── Brand ramps ─── */
+  --cx-primary-50:  #e8f5ee;
+  --cx-primary-100: #c6e6d2;
+  --cx-primary-200: #a0d4b4;
+  --cx-primary-300: #72bd8f;
+  --cx-primary-400: #3ea069;
+  --cx-primary-500: #1a7a45;
+  --cx-primary-600: #0A4F2A;
+  --cx-primary-700: #083d21;
+  --cx-primary-800: #063018;
+  --cx-primary-900: #042010;
+
+  --cx-accent-50:  #fdf6e3;
+  --cx-accent-100: #fbecc2;
+  --cx-accent-200: #f5dd89;
+  --cx-accent-300: #ebc84e;
+  --cx-accent-400: #dbb428;
+  --cx-accent-500: #C9A227;
+  --cx-accent-600: #a6841c;
+  --cx-accent-700: #846916;
+  --cx-accent-800: #5c4a0f;
+  --cx-accent-900: #3d320a;
+
+  --cx-primary: var(--cx-primary-600);
+  --cx-primary-light: var(--cx-primary-500);
+  --cx-primary-dark: var(--cx-primary-700);
+  --cx-accent: var(--cx-accent-500);
+
+  /* ─── Warm stone neutrals ─── */
+  --cx-stone-50:  #fafaf8;
+  --cx-stone-100: #f4f3ee;
+  --cx-stone-200: #e7e5dc;
+  --cx-stone-300: #d3d0c4;
+  --cx-stone-400: #a8a59a;
+  --cx-stone-500: #8a877e;
+  --cx-stone-600: #6b6965;
+  --cx-stone-700: #4d4b47;
+  --cx-stone-800: #2e2d2b;
+  --cx-stone-900: #1a1a18;
+
+  /* ─── Semantic ─── */
+  --cx-danger: #c13030;
+  --cx-danger-50: #fceceb;
+  --cx-warning: #c48414;
+  --cx-warning-50: #fdf3de;
+  --cx-success: #1a7a45;
+  --cx-success-50: #e8f5ee;
+  --cx-info: #1e5ca8;
+  --cx-info-50: #e6eff9;
+
+  /* ─── Surfaces ─── */
+  --cx-bg: var(--cx-stone-100);
+  --cx-surface: #ffffff;
+  --cx-surface-2: var(--cx-stone-50);
+  --cx-surface-hover: var(--cx-stone-100);
+
+  /* ─── Text ─── */
+  --cx-text: var(--cx-stone-900);
+  --cx-text-secondary: var(--cx-stone-600);
+  --cx-text-muted: var(--cx-stone-500);
+
+  /* ─── Borders ─── */
+  --cx-border: var(--cx-stone-200);
+  --cx-border-strong: var(--cx-stone-300);
+  --cx-border-subtle: rgba(46,45,43,0.06);
+
+  /* ─── Radii ─── */
+  --cx-radius-sm: 8px;
+  --cx-radius-md: 10px;
+  --cx-radius-lg: 12px;
+  --cx-radius-xl: 16px;
+  --cx-radius-2xl: 20px;
+  --cx-radius-pill: 999px;
+
+  /* ─── Shadows ─── */
+  --cx-shadow-xs: 0 1px 2px rgba(10,79,42,0.04);
+  --cx-shadow-sm: 0 1px 3px rgba(10,79,42,0.06), 0 1px 2px rgba(10,79,42,0.04);
+  --cx-shadow-md: 0 4px 12px rgba(10,79,42,0.06), 0 2px 4px rgba(10,79,42,0.04);
+  --cx-shadow-lg: 0 12px 24px rgba(10,79,42,0.08), 0 4px 8px rgba(10,79,42,0.04);
+  --cx-shadow-gold: 0 4px 12px rgba(201,162,39,0.18);
+
+  /* ─── Motion ─── */
+  --cx-ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --cx-dur-fast: 120ms;
+  --cx-dur-base: 200ms;
+  --cx-dur-slow: 320ms;
+
+  /* ─── Typography ─── */
+  --cx-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --cx-font-scale: 1;
+  --cx-text-xs:   calc(11px * var(--cx-font-scale));
+  --cx-text-sm:   calc(12.5px * var(--cx-font-scale));
+  --cx-text-base: calc(14px * var(--cx-font-scale));
+  --cx-text-md:   calc(15px * var(--cx-font-scale));
+  --cx-text-lg:   calc(17px * var(--cx-font-scale));
+  --cx-text-xl:   calc(20px * var(--cx-font-scale));
+  --cx-text-2xl:  calc(24px * var(--cx-font-scale));
+
+  /* ─── Ionic theme integration ─── */
+  --ion-color-primary: var(--cx-primary-600);
+  --ion-color-primary-rgb: 10, 79, 42;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: var(--cx-primary-700);
+  --ion-color-primary-tint: var(--cx-primary-500);
+  --ion-color-secondary: var(--cx-accent-500);
+  --ion-color-secondary-rgb: 201, 162, 39;
+  --ion-color-secondary-contrast: var(--cx-accent-900);
+  --ion-color-success: var(--cx-success);
+  --ion-color-danger: var(--cx-danger);
+  --ion-color-warning: var(--cx-warning);
+  --ion-background-color: var(--cx-bg);
+  --ion-text-color: var(--cx-text);
+  --ion-toolbar-background: var(--cx-surface);
+  --ion-card-background: var(--cx-surface);
 }
 
-/* Dark mode via system preference (already imported dark.system.css) */
 body.dark, .dark {
-  --ion-background-color: #0f172a;
-  --ion-text-color: #f1f5f9;
-  --ion-card-background: #1e293b;
-  --ion-toolbar-background: #1e293b;
-  --ion-item-background: #1e293b;
-  --ion-tab-bar-background: #1e293b;
+  --cx-bg: #0a1410;
+  --cx-surface: #121d17;
+  --cx-surface-2: #0f1813;
+  --cx-surface-hover: #182822;
+  --cx-border: rgba(255,255,255,0.08);
+  --cx-border-strong: rgba(255,255,255,0.14);
+  --cx-text: #e8efe9;
+  --cx-text-secondary: #9aa59c;
+  --cx-text-muted: #6b756d;
+  --ion-background-color: var(--cx-bg);
+  --ion-text-color: var(--cx-text);
+  --ion-toolbar-background: var(--cx-surface);
+  --ion-card-background: var(--cx-surface);
+  --ion-item-background: var(--cx-surface);
+  --ion-tab-bar-background: var(--cx-surface);
 }
 
-/* Premium typography */
-* { -webkit-font-smoothing: antialiased; }
-ion-content { --background: #f4f6f8; }
-body.dark ion-content { --background: #0f172a; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--cx-font-sans);
+  font-size: var(--cx-text-base);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+ion-content { --background: var(--cx-bg); }
+ion-toolbar {
+  --background: var(--cx-surface);
+  --color: var(--cx-text);
+  --border-color: var(--cx-border);
+}
 
 /* Premium cards */
 ion-card {
-  border-radius: 16px !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+  border-radius: var(--cx-radius-xl) !important;
+  box-shadow: var(--cx-shadow-xs) !important;
   margin: 8px !important;
-}
-body.dark ion-card {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+  border: 1px solid var(--cx-border);
 }
 
 /* Premium buttons */
 ion-button {
-  --border-radius: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  --border-radius: var(--cx-radius-lg);
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  --transition: all var(--cx-dur-base) var(--cx-ease-premium);
 }
 
-/* Bottom tabs */
+/* Bottom tab bar */
 ion-tab-bar {
-  --background: #ffffff;
-  border-top: 1px solid #e2e8f0;
+  --background: var(--cx-surface);
+  border-top: 1px solid var(--cx-border);
   padding-bottom: env(safe-area-inset-bottom);
 }
-body.dark ion-tab-bar {
-  --background: #1e293b;
-  border-top-color: #334155;
+ion-tab-button {
+  --color: var(--cx-text-muted);
+  --color-selected: var(--cx-primary-600);
 }
 
-/* Toolbar */
-ion-toolbar {
-  --background: #ffffff;
-  --color: #1a1a2e;
+/* ═══════════════════════════════════════════════════════════════
+   Tabs — in-page tabs matching admin style
+═══════════════════════════════════════════════════════════════ */
+
+.cx-tabs {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  background: var(--cx-stone-100);
+  border: 1px solid var(--cx-border-subtle);
+  border-radius: var(--cx-radius-lg);
+  gap: 2px;
 }
-body.dark ion-toolbar {
-  --background: #1e293b;
-  --color: #f1f5f9;
+.cx-tabs-tab {
+  padding: 7px 16px;
+  background: transparent; border: none;
+  border-radius: var(--cx-radius-sm);
+  font-size: var(--cx-text-sm); font-weight: 400;
+  color: var(--cx-text-muted);
+  cursor: pointer;
+  transition: all var(--cx-dur-base) var(--cx-ease-premium);
+  white-space: nowrap;
+  font-family: var(--cx-font-sans);
 }
+.cx-tabs-tab.is-active {
+  background: var(--cx-surface);
+  color: var(--cx-text);
+  font-weight: 500;
+  box-shadow: var(--cx-shadow-xs), 0 0 0 0.5px var(--cx-border);
+}
+.cx-tabs-full { display: flex; width: 100%; }
+.cx-tabs-full .cx-tabs-tab { flex: 1; }
+.cx-tabs-sm .cx-tabs-tab { padding: 5px 12px; font-size: var(--cx-text-xs); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Animations
+═══════════════════════════════════════════════════════════════ */
+
+@keyframes cx-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cx-animate-in { animation: cx-fade-in var(--cx-dur-slow) var(--cx-ease-premium); }
+
+/* ─── Utilities ─── */
+.tabular-nums { font-variant-numeric: tabular-nums; }
