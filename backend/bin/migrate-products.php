@@ -16,6 +16,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use App\Domain\Entity\{LoanProduct, ProductFee, FeeType};
 use App\Domain\Enum\{InterestMethod, FeeCalculationType, FeeAppliesTo};
+use App\Infrastructure\Data\NigerianBanks;
 use App\Infrastructure\Persistence\DoctrineEntityManagerFactory;
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');

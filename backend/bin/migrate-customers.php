@@ -28,6 +28,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
+use App\Infrastructure\Data\NigerianBanks;
+
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
@@ -217,7 +219,7 @@ foreach ($legacy as $idx => $row) {
                 ':number_of_children' => cleanInt($row['number_children'] ?? null),
                 ':bank' => cleanStr($gov['bank_name']),
                 ':account' => cleanStr($gov['account_number']),
-                ':alt_bank' => cleanStr($row['alternate_bank'] ?? null),
+                ':alt_bank' => \App\Infrastructure\Data\NigerianBanks::resolve(cleanStr($row['alternate_bank'] ?? null)) ?? cleanStr($row['alternate_bank'] ?? null),
                 ':alt_account' => cleanStr($row['alternate_account'] ?? null),
                 ':created_at' => $now,
                 ':updated_at' => $now,

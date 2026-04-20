@@ -32,6 +32,7 @@ use App\Action\DsaTarget;
 use App\Action\Department;
 use App\Action\Team;
 use App\Action\Reconciliation;
+use App\Action\ListBanksAction;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
@@ -65,6 +66,9 @@ return function (App $app): void {
 
     // ─── Public Storage (avatars, uploads) ───
     $app->get('/storage/{path:.*}', Storage\ServeFileAction::class);
+
+    // ─── Public utility endpoints ───
+    $app->get('/api/banks', ListBanksAction::class);
 
     // ─── Authenticated routes ───
     $app->group('/api', function (RouteCollectorProxy $api) {

@@ -132,10 +132,11 @@ class SystemSetting
         return [
             'id'          => $this->id,
             'key'         => $this->key,
-            'value'       => $this->isEncrypted ? '********' : $this->getValue(),
+            'value'       => $this->isEncrypted ? '********' : $this->value, // raw string so frontend comparisons work
             'type'        => $this->type->value,
             'category'    => $this->category->value,
             'description' => $this->description,
+            'is_encrypted' => $this->isEncrypted,
             'updated_at'  => $this->updatedAt->format('Y-m-d H:i:s'),
         ];
     }

@@ -45,7 +45,10 @@ final class UploadAvatarAction
         $filename = 'avatars/' . Uuid::uuid4()->toString() . '.' . $ext;
 
         // Use Flysystem local adapter
-        $storagePath = $_ENV['STORAGE_PATH'] ?? dirname(__DIR__, 3) . '/storage';
+        $configuredPath = $_ENV['STORAGE_PATH'] ?? '';
+        $storagePath = ($configuredPath !== '' && str_starts_with($configuredPath, '/'))
+            ? $configuredPath
+            : dirname(__DIR__, 3) . '/storage';
         $adapter = new LocalFilesystemAdapter($storagePath);
         $fs = new Filesystem($adapter);
 

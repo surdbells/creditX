@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -6,10 +6,11 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 
 @Component({
   selector: 'app-audit-logs', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Audit Trail" subtitle="{{ totalRecords | number }} events logged">
@@ -32,13 +33,15 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
       <!-- Filters -->
       <div class="cx-card !p-4 mb-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
           <div class="lg:col-span-2">
             <div class="relative">
               <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
               <input type="text" class="cx-input !pl-8 w-full" placeholder="Search by user, entity, description..." [(ngModel)]="filters.search" (input)="onFilterChange()" />
             </div>
           </div>
+          <cx-searchable-select class="w-48" [options]="userOptions()" placeholder="All Users" [clearable]="true"
+            [(ngModel)]="filters.user_id" (ngModelChange)="onFilterChange()"></cx-searchable-select>
           <select class="cx-select" [(ngModel)]="filters.action" (change)="onFilterChange()">
             <option value="">All Actions</option>
             <option value="create">Create</option>
@@ -179,18 +182,26 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 })
 export class AuditLogsComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true);
-  filters: any = { search: '', action: '', entity_type: '', date_from: '', date_to: '', sort_by: 'createdAt', sort_dir: 'DESC' };
+  users = signal<any[]>([]);
+  userOptions = computed<SelectOption[]>(() =>
+    this.users().map(u => ({ value: u.id, label: u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Unknown' }))
+  );
+  filters: any = { search: '', user_id: '', action: '', entity_type: '', date_from: '', date_to: '', sort_by: 'createdAt', sort_dir: 'DESC' };
   page = 1; perPage = 50; totalRecords = 0; totalPages = 0;
   exportOpen = false; detailRow: any = null;
   private filterTimeout: any;
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.load();
+    this.api.get('/users', { per_page: 500, sort_by: 'firstName', sort_dir: 'ASC' }).subscribe({ next: r => this.users.set(r.data || []) });
+  }
 
   load(): void {
     this.loading.set(true);
     const params: any = { page: this.page, per_page: this.perPage, sort_by: this.filters.sort_by, sort_dir: this.filters.sort_dir };
     if (this.filters.search) params.search = this.filters.search;
+    if (this.filters.user_id) params.user_id = this.filters.user_id;
     if (this.filters.action) params.action = this.filters.action;
     if (this.filters.entity_type) params.entity_type = this.filters.entity_type;
     if (this.filters.date_from) params.date_from = this.filters.date_from;

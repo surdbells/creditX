@@ -15,7 +15,10 @@ final class ServeFileAction
             return $response->withStatus(404);
         }
 
-        $storagePath = $_ENV['STORAGE_PATH'] ?? dirname(__DIR__, 3) . '/storage';
+        $configuredPath = $_ENV['STORAGE_PATH'] ?? '';
+        $storagePath = ($configuredPath !== '' && str_starts_with($configuredPath, '/'))
+            ? $configuredPath
+            : dirname(__DIR__, 3) . '/storage';
         $fullPath = $storagePath . '/' . $path;
 
         if (!file_exists($fullPath)) {
