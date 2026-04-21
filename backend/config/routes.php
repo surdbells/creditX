@@ -415,6 +415,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('messaging.send'));
             $group->delete('/{id}/members/{userId}', Channel\RemoveChannelMemberAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
+            $group->post('/{id}/mark-read', Channel\MarkChannelReadAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
         });
 
         // ─── Unread Count ───
