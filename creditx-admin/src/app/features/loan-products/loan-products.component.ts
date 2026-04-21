@@ -99,21 +99,21 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
             <div class="cx-lp-fees-list">
               @for (fee of fees; track $index; let i = $index) {
                 <div class="cx-lp-fee-row">
-                  <div class="cx-lp-fee-field cx-lp-fee-field-grow">
+                  <div class="cx-lp-fee-field">
                     <label class="cx-label">Fee Type</label>
                     <select class="cx-select" [(ngModel)]="fee.fee_type_id">
                       <option value="">Select…</option>
                       @for (ft of feeTypes(); track ft.id) { <option [value]="ft.id">{{ ft.name }}</option> }
                     </select>
                   </div>
-                  <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                  <div class="cx-lp-fee-field">
                     <label class="cx-label">Type</label>
                     <select class="cx-select" [(ngModel)]="fee.calculation_type">
                       <option value="flat">Flat</option>
                       <option value="percentage">%</option>
                     </select>
                   </div>
-                  <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                  <div class="cx-lp-fee-field">
                     <label class="cx-label">
                       {{ fee.calculation_type === 'percentage' ? 'Fraction' : 'Amount (₦)' }}
                     </label>
@@ -127,7 +127,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
                       <div class="cx-field-hint">0.02 = 2%</div>
                     }
                   </div>
-                  <div class="cx-lp-fee-field cx-lp-fee-field-grow">
+                  <div class="cx-lp-fee-field">
                     <label class="cx-label">Effect</label>
                     <select class="cx-select" [(ngModel)]="fee.effect">
                       <option value="adds_to_gross">Adds to Gross Loan</option>
@@ -142,13 +142,17 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
                     </div>
                   </div>
                   @if (fee.calculation_type === 'percentage') {
-                    <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                    <div class="cx-lp-fee-field">
                       <label class="cx-label">Base</label>
                       <select class="cx-select" [(ngModel)]="fee.applies_to">
                         <option value="principal">Principal</option>
                         <option value="gross_loan">Gross Loan</option>
                       </select>
                     </div>
+                  } @else {
+                    <!-- Placeholder cell for flat fees so the delete button
+                         stays in the correct grid column (right edge). -->
+                    <div aria-hidden="true"></div>
                   }
                   <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-lp-fee-remove" (click)="fees.splice(i,1)" title="Remove">
                     <lucide-icon name="trash-2" [size]="14"></lucide-icon>
@@ -177,22 +181,82 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
       color: var(--cx-text-muted);
     }
     .cx-lp-fees-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+    /* Grid-based fee row. One row per fee. Columns are sized so the
+       longest dropdown labels ("Deducted from Disbursement",
+       "Adds to Gross Loan") fit without truncation. Hints appear in a
+       second grid row that's only populated where relevant, so they
+       never shift input alignment. */
     .cx-lp-fee-row {
-      display: flex; align-items: flex-end; gap: 0.5rem;
+      display: grid;
+      grid-template-columns:
+        minmax(140px, 1.4fr)     /* Fee Type           */
+        84px                      /* Type (flat/%)       */
+        minmax(96px, 120px)       /* Amount / Fraction   */
+        minmax(200px, 1.6fr)      /* Effect              */
+        minmax(96px, 120px)       /* Base (if %)         */
+        32px;                     /* Delete button       */
+      grid-auto-rows: min-content;
+      column-gap: 0.5rem;
+      row-gap: 0.25rem;
+      align-items: start;
       padding: 0.75rem;
       background: var(--cx-stone-50);
       border: 1px solid var(--cx-border-subtle);
       border-radius: var(--cx-radius-md);
     }
-    .cx-lp-fee-field { display: flex; flex-direction: column; }
-    .cx-lp-fee-field-grow { flex: 1; min-width: 0; }
-    .cx-lp-fee-field-sm { width: 90px; flex-shrink: 0; }
-    .cx-lp-fee-remove { color: var(--cx-danger); margin-bottom: 2px; }
+
+    .cx-lp-fee-field { display: flex; flex-direction: column; min-width: 0; }
+
+    /* The delete button sits at the end of the grid. Vertically aligned
+       with the input (labels are above inputs, button has no label). */
+    .cx-lp-fee-remove {
+      align-self: end;
+      color: var(--cx-danger);
+      margin-bottom: 2px;
+    }
     .cx-lp-fee-remove:hover { background: var(--cx-danger-50); }
+
+    /* Hints: small muted helper text below the inputs. Don't affect
+       alignment of sibling fields because each hint is scoped to its
+       own field's flex column. */
+    .cx-lp-fee-field .cx-field-hint {
+      margin-top: 0.2rem;
+      line-height: 1.35;
+    }
+
+    /* When the "Base" column isn't rendered (flat fees), leave the
+       cell empty so the grid column structure stays stable. This
+       prevents the delete button from jumping left. */
+
+    /* Tablet — tighter columns, slightly smaller Effect minmax */
+    @media (max-width: 960px) {
+      .cx-lp-fee-row {
+        grid-template-columns:
+          minmax(120px, 1.2fr)
+          72px
+          minmax(88px, 110px)
+          minmax(170px, 1.4fr)
+          minmax(88px, 110px)
+          32px;
+      }
+    }
+
+    /* Mobile — stack everything into two columns. Fee Type spans full
+       width; the others flow two-per-row. Delete button sits in the
+       top-right corner. */
     @media (max-width: 640px) {
-      .cx-lp-fee-row { flex-wrap: wrap; }
-      .cx-lp-fee-field-grow { flex-basis: 100%; }
-      .cx-lp-fee-field-sm { width: calc(50% - 0.25rem); }
+      .cx-lp-fee-row {
+        grid-template-columns: 1fr 1fr 32px;
+      }
+      /* Fee Type spans all three columns on its own row */
+      .cx-lp-fee-row > .cx-lp-fee-field:first-child { grid-column: 1 / 4; }
+      /* Delete sits floated in the corner */
+      .cx-lp-fee-row > .cx-lp-fee-remove {
+        grid-column: 3 / 4;
+        grid-row: 1 / 2;
+        align-self: center;
+      }
     }
   `],
 })
