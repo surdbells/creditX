@@ -7,11 +7,10 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
-import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-customer-detail', standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

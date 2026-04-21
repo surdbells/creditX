@@ -173,7 +173,6 @@ import { ApiService } from '../../core/services/api.service';
       gap: 6px;
     }
 
-    ion-segment { --background: transparent; }
     ion-fab-button { --background: var(--cx-primary-600); --background-activated: var(--cx-primary-700); }
   `],
 })

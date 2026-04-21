@@ -1,7 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -15,7 +14,7 @@ interface DrillLevel { label: string; key: string; value?: string; }
 
 @Component({
   selector: 'app-reports', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

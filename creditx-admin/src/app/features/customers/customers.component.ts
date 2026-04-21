@@ -8,14 +8,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
-import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { NIGERIA_STATES } from '../../core/data/nigeria-states';
 
 @Component({
   selector: 'app-customers', standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
