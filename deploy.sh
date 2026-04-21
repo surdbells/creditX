@@ -54,21 +54,71 @@ echo "  Backend only: $BACKEND_ONLY"
 echo "  Frontend only:$FRONTEND_ONLY"
 echo "  Current HEAD: $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
 
-# Refuse to deploy if there are uncommitted changes on the server
-# (they'd block git pull --ff-only and signal something was edited in place)
-if [[ -n "$(git status --porcelain)" ]]; then
-  red "✘ Uncommitted changes detected in $ROOT:"
-  git status --short | sed 's/^/    /' >&2
-  red "  Commit, stash, or reset before deploying."
+# ─── Pre-flight: check for uncommitted changes ───────────────────────────
+# Filter what we care about: changes to tracked source code (backend/src,
+# config, frontend src, routes, deploy script itself). We tolerate:
+#   - mode/timestamp-only changes on .gitkeep files (runtime writes)
+#   - untracked runtime files in backend/public/.well-known, backend/public/storage
+#     (these should be gitignored but might not be on older checkouts)
+#   - composer.lock (picked up automatically by composer install)
+# Anything else blocks the deploy.
+SUSPICIOUS=$(git status --porcelain | awk '
+  {
+    status = substr($0, 1, 2); path = substr($0, 4);
+    # Strip trailing renamed path marker
+    sub(/ -> .*/, "", path);
+    # Skip runtime noise
+    if (path ~ /^backend\/storage\/(uploads|exports)\/\.gitkeep$/) next;
+    if (path ~ /^backend\/public\/\.well-known\//) next;
+    if (path ~ /^backend\/public\/storage\//) next;
+    if (path ~ /^backend\/public\/storage$/) next;
+    # Everything else is suspicious
+    print $0;
+  }
+')
+
+if [[ -n "$SUSPICIOUS" ]]; then
+  red "✘ Uncommitted source changes detected in $ROOT:"
+  echo "$SUSPICIOUS" | sed 's/^/    /' >&2
+  red "  Commit, stash, or reset these before deploying."
+  red "  (Runtime files in storage/ and public/.well-known are tolerated.)"
   exit 1
+fi
+
+# Note any tolerated runtime changes so the operator knows they were skipped
+IGNORED=$(git status --porcelain | awk '
+  {
+    path = substr($0, 4); sub(/ -> .*/, "", path);
+    if (path ~ /^backend\/storage\/(uploads|exports)\/\.gitkeep$/ ||
+        path ~ /^backend\/public\/\.well-known\// ||
+        path ~ /^backend\/public\/storage\//  ||
+        path ~ /^backend\/public\/storage$/) print $0;
+  }
+')
+if [[ -n "$IGNORED" ]]; then
+  yellow "⚠ Tolerated runtime changes (not blocking):"
+  echo "$IGNORED" | sed 's/^/    /'
 fi
 
 # ─── 1. Git pull ─────────────────────────────────────────────────────────
 step "1/5 Pulling latest from git"
+# Stash any runtime changes first so git pull --ff-only doesn't choke on them
+STASHED=0
+if [[ -n "$(git status --porcelain)" ]]; then
+  git stash push -u -m "deploy.sh runtime stash $(date +%s)" -- \
+    backend/storage backend/public/.well-known backend/public/storage >/dev/null 2>&1 && STASHED=1 || true
+fi
+
 git fetch --prune
 BEFORE=$(git rev-parse HEAD)
 git pull --ff-only origin main
 AFTER=$(git rev-parse HEAD)
+
+# Restore stashed runtime changes if any
+if [[ $STASHED -eq 1 ]]; then
+  git stash pop >/dev/null 2>&1 || warn "Could not pop runtime stash — inspect 'git stash list'"
+fi
+
 if [[ "$BEFORE" == "$AFTER" ]]; then
   warn "Already up to date — no changes"
 else

@@ -10,3 +10,15 @@ Thumbs.db
 # ─── OS ───
 .DS_Store
 *.log
+
+# ─── Backend runtime ───
+# ACME / Let's Encrypt challenges — created by the web server, never source
+backend/public/.well-known/
+# Storage symlink / runtime directory — created by deploy or first request
+backend/public/storage
+backend/public/storage/
+# Runtime artifacts inside storage dirs — never committed, only the .gitkeep
+backend/storage/uploads/*
+backend/storage/exports/*
+!backend/storage/uploads/.gitkeep
+!backend/storage/exports/.gitkeep
