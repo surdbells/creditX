@@ -20,5 +20,7 @@ backend/public/storage/
 # Runtime artifacts inside storage dirs — never committed, only the .gitkeep
 backend/storage/uploads/*
 backend/storage/exports/*
+backend/storage/avatars/*
 !backend/storage/uploads/.gitkeep
 !backend/storage/exports/.gitkeep
+!backend/storage/avatars/.gitkeep

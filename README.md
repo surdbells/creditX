@@ -37,6 +37,12 @@ See individual project READMEs:
 - [Admin](./creditx-admin/README.md)
 - [Agent](./creditx-agent/README.md)
 
+## Deployment
+
+Production deployment is performed manually. See [DEPLOY.md](./DEPLOY.md)
+for the step-by-step guide — git pull, schema update, cache clear,
+opcache reload, frontend builds.
+
 ## License
 
 Proprietary — Kodek Innovations Limited
