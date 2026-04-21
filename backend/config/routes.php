@@ -403,6 +403,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('messaging.view'));
             $group->post('', Channel\CreateChannelAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
+            $group->patch('/{id}', Channel\UpdateChannelAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
             $group->get('/{id}/messages', Channel\GetChannelMessagesAction::class)
                 ->add(new RbacMiddleware('messaging.view'));
             $group->post('/{id}/messages', Channel\SendChannelMessageAction::class)
@@ -410,6 +412,8 @@ return function (App $app): void {
             $group->get('/{id}/members', Channel\GetChannelMembersAction::class)
                 ->add(new RbacMiddleware('messaging.view'));
             $group->post('/{id}/members', Channel\AddChannelMembersAction::class)
+                ->add(new RbacMiddleware('messaging.send'));
+            $group->delete('/{id}/members/{userId}', Channel\RemoveChannelMemberAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
         });
 
