@@ -15,42 +15,66 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Payments & Repayments" subtitle="{{ totalRecords | number }} records">
+      <cx-page-header
+        title="Payments & Repayments"
+        [subtitle]="(totalRecords | number) + ' payment records'"
+        eyebrow="Finance">
         <div class="flex items-center gap-2">
           <div class="relative">
             <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportOpen = !exportOpen">
-              <lucide-icon name="download" [size]="14"></lucide-icon> Export <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+              <span>Export</span>
+              <lucide-icon name="chevron-down" [size]="12"></lucide-icon>
             </button>
             @if (exportOpen) {
-              <div class="absolute right-0 top-full mt-1 w-44 bg-[var(--cx-surface)] border border-[var(--cx-border)] rounded-xl shadow-xl z-50 overflow-hidden">
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('csv')">Export CSV</button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('excel')">Export Excel</button>
-                <button class="w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-[var(--cx-surface-hover)]" (click)="exportData('pdf')">Export PDF</button>
+              <div class="cx-pay-export-menu cx-animate-in">
+                <button class="cx-pay-export-option" (click)="exportData('csv')">
+                  <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                  <span>CSV</span>
+                </button>
+                <button class="cx-pay-export-option" (click)="exportData('excel')">
+                  <lucide-icon name="file-spreadsheet" [size]="14"></lucide-icon>
+                  <span>Excel</span>
+                </button>
+                <button class="cx-pay-export-option" (click)="exportData('pdf')">
+                  <lucide-icon name="file-text" [size]="14"></lucide-icon>
+                  <span>PDF</span>
+                </button>
               </div>
             }
           </div>
           @if (auth.hasPermission('payments.create')) {
-            <button class="cx-btn cx-btn-outline" (click)="openBulk()"><lucide-icon name="upload" [size]="14"></lucide-icon> Bulk Upload</button>
-            <button class="cx-btn cx-btn-primary" (click)="openRepayment()"><lucide-icon name="plus" [size]="16"></lucide-icon> Post Repayment</button>
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openBulk()">
+              <lucide-icon name="upload" [size]="14"></lucide-icon>
+              <span>Bulk Upload</span>
+            </button>
+            <button class="cx-btn cx-btn-primary" (click)="openRepayment()">
+              <lucide-icon name="plus" [size]="14"></lucide-icon>
+              <span>Post Repayment</span>
+            </button>
           }
         </div>
       </cx-page-header>
-      <div class="cx-card !p-4 overflow-hidden">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-          searchPlaceholder="Search payments..." [hasActions]="false" (query)="onQuery($event)">
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
+        searchPlaceholder="Search payments by reference, customer, loan..." [hasActions]="false" (query)="onQuery($event)">
+      </cx-data-table>
     </div>
 
     <!-- Post Individual Repayment -->
-    <cx-form-dialog [open]="showRepayment()" title="Post Repayment" [saving]="repSaving()" (close)="showRepayment.set(false)" (save)="saveRepayment()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Loan *</label>
+    <cx-form-dialog
+      [open]="showRepayment()"
+      title="Post Repayment"
+      subtitle="Record a loan repayment transaction"
+      [saving]="repSaving()" (close)="showRepayment.set(false)" (save)="saveRepayment()">
+      <div class="cx-form-stack">
+        <div>
+          <label class="cx-label">Loan *</label>
           <cx-searchable-select [options]="loanOptions()" placeholder="Search loan by App ID..." [(ngModel)]="repForm.loan_id"></cx-searchable-select>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="cx-form-row cx-form-row-2">
           <div><label class="cx-label">Amount (₦) *</label><input class="cx-input" type="number" [(ngModel)]="repForm.amount" /></div>
-          <div><label class="cx-label">Payment Method</label>
+          <div>
+            <label class="cx-label">Payment Method</label>
             <select class="cx-select" [(ngModel)]="repForm.payment_method">
               <option value="bank_transfer">Bank Transfer</option>
               <option value="cash">Cash</option>
@@ -60,54 +84,157 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
             </select>
           </div>
         </div>
-        <div><label class="cx-label">Reference</label><input class="cx-input" [(ngModel)]="repForm.reference" placeholder="Transaction reference" /></div>
-        <div><label class="cx-label">Payment Date</label><input class="cx-input" type="date" [(ngModel)]="repForm.payment_date" /></div>
-        <div><label class="cx-label">Narration</label><textarea class="cx-input" rows="2" [(ngModel)]="repForm.narration"></textarea></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Reference</label><input class="cx-input" [(ngModel)]="repForm.reference" placeholder="Transaction reference" /></div>
+          <div><label class="cx-label">Payment Date</label><input class="cx-input" type="date" [(ngModel)]="repForm.payment_date" /></div>
+        </div>
+        <div><label class="cx-label">Narration</label><textarea class="cx-input" rows="2" [(ngModel)]="repForm.narration" placeholder="Optional notes..."></textarea></div>
       </div>
     </cx-form-dialog>
 
     <!-- Bulk Upload Dialog -->
-    <cx-form-dialog [open]="showBulk()" title="Bulk Repayment Upload" [saving]="bulkSaving()" saveLabel="Upload & Process" (close)="showBulk.set(false)" (save)="processBulk()">
-      <div class="space-y-4">
-        <div class="p-4 rounded-xl bg-[var(--cx-info-light)] border border-[var(--cx-info)]/20">
-          <h4 class="text-xs font-bold text-[var(--cx-info)] mb-1">CSV Format Required</h4>
-          <p class="text-[10px] text-[var(--cx-info)]/70">Columns: <strong>loan_application_id, amount, payment_method, reference, payment_date, narration</strong></p>
-          <button class="cx-btn cx-btn-sm cx-btn-outline mt-2 !text-[10px]" (click)="downloadTemplate()">
-            <lucide-icon name="download" [size]="12"></lucide-icon> Download Template
+    <cx-form-dialog
+      [open]="showBulk()"
+      title="Bulk Repayment Upload"
+      subtitle="Upload a CSV to post multiple repayments at once"
+      [saving]="bulkSaving()" saveLabel="Upload & Process" (close)="showBulk.set(false)" (save)="processBulk()">
+      <div class="cx-form-stack">
+        <div class="cx-pay-bulk-info">
+          <div class="cx-pay-bulk-info-head">
+            <lucide-icon name="info" [size]="14"></lucide-icon>
+            <span>CSV Format</span>
+          </div>
+          <p class="cx-pay-bulk-info-text">
+            Required columns: <strong>loan_application_id</strong>, <strong>amount</strong>,
+            <strong>payment_method</strong>, <strong>reference</strong>, <strong>payment_date</strong>, <strong>narration</strong>.
+          </p>
+          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="downloadTemplate()">
+            <lucide-icon name="download" [size]="12"></lucide-icon>
+            <span>Download Template</span>
           </button>
         </div>
         <div>
           <label class="cx-label">Upload CSV File *</label>
-          <input type="file" accept=".csv" class="cx-input !py-2" (change)="onBulkFile($event)" #bulkFileInput />
+          <input type="file" accept=".csv" class="cx-input cx-pay-file-input" (change)="onBulkFile($event)" #bulkFileInput />
         </div>
         @if (bulkPreview().length) {
           <div>
-            <div class="text-xs font-bold text-[var(--cx-text-muted)] mb-1">Preview ({{ bulkPreview().length }} rows)</div>
-            <div class="max-h-40 overflow-y-auto rounded-lg border border-[var(--cx-border)]">
-              <table class="w-full text-xs">
-                <thead><tr class="bg-[var(--cx-surface-hover)]">
-                  <th class="px-2 py-1.5 text-left">Loan ID</th><th class="px-2 py-1.5 text-right">Amount</th><th class="px-2 py-1.5">Method</th><th class="px-2 py-1.5">Reference</th>
-                </tr></thead>
+            <div class="cx-pay-preview-title">Preview · <span class="tabular-nums">{{ bulkPreview().length }}</span> rows</div>
+            <div class="cx-pay-preview-scroll">
+              <table class="cx-pay-preview-table">
+                <thead>
+                  <tr>
+                    <th>Loan ID</th>
+                    <th class="cx-pay-right">Amount</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                  </tr>
+                </thead>
                 <tbody>
                   @for (row of bulkPreview().slice(0, 10); track $index) {
-                    <tr class="border-t border-[var(--cx-border)]">
-                      <td class="px-2 py-1 font-mono">{{ row.loan_application_id }}</td>
-                      <td class="px-2 py-1 text-right">{{ row.amount }}</td>
-                      <td class="px-2 py-1">{{ row.payment_method }}</td>
-                      <td class="px-2 py-1">{{ row.reference }}</td>
+                    <tr>
+                      <td class="cx-pay-mono">{{ row.loan_application_id }}</td>
+                      <td class="cx-pay-right tabular-nums">{{ row.amount }}</td>
+                      <td>{{ row.payment_method }}</td>
+                      <td>{{ row.reference }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
             @if (bulkPreview().length > 10) {
-              <p class="text-[10px] text-[var(--cx-text-muted)] mt-1">...and {{ bulkPreview().length - 10 }} more rows</p>
+              <p class="cx-pay-preview-more">…and {{ bulkPreview().length - 10 }} more rows</p>
             }
           </div>
         }
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    .cx-pay-export-menu {
+      position: absolute; right: 0; top: calc(100% + 4px);
+      z-index: var(--cx-z-dropdown);
+      min-width: 180px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      box-shadow: var(--cx-shadow-lg);
+      padding: 0.35rem;
+      display: flex; flex-direction: column;
+    }
+    .cx-pay-export-option {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.65rem;
+      background: transparent; border: none;
+      border-radius: var(--cx-radius-sm);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-pay-export-option:hover { background: var(--cx-surface-hover); }
+    .cx-pay-export-option lucide-icon { color: var(--cx-text-muted); }
+
+    .cx-pay-bulk-info {
+      padding: 0.85rem 1rem;
+      background: var(--cx-info-50);
+      border: 1px solid rgba(30, 92, 168, 0.15);
+      border-radius: var(--cx-radius-md);
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .cx-pay-bulk-info-head {
+      display: flex; align-items: center; gap: 6px;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-info);
+    }
+    .cx-pay-bulk-info-text {
+      margin: 0;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+      line-height: 1.55;
+    }
+    .cx-pay-file-input { padding: 0.45rem 0.55rem; }
+
+    .cx-pay-preview-title {
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .cx-pay-preview-scroll {
+      max-height: 12rem;
+      overflow-y: auto;
+      border: 1px solid var(--cx-border-subtle);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-pay-preview-table { width: 100%; border-collapse: collapse; font-size: var(--cx-text-xs); }
+    .cx-pay-preview-table thead {
+      background: var(--cx-surface-2);
+      position: sticky; top: 0;
+    }
+    .cx-pay-preview-table th {
+      padding: 0.45rem 0.65rem;
+      font-weight: 600;
+      color: var(--cx-text-muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      text-align: left;
+      font-size: 10px;
+    }
+    .cx-pay-preview-table tbody td {
+      padding: 0.4rem 0.65rem;
+      border-top: 1px solid var(--cx-border-subtle);
+      color: var(--cx-text);
+    }
+    .cx-pay-right { text-align: right; }
+    .cx-pay-mono { font-family: var(--cx-font-mono); color: var(--cx-primary-700); }
+    .cx-pay-preview-more {
+      margin: 0.35rem 0 0;
+      font-size: 10px;
+      color: var(--cx-text-muted);
+    }
+  `],
 })
 export class PaymentsComponent implements OnInit {
   columns: TableColumn[] = [

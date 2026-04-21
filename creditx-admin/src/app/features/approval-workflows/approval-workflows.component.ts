@@ -15,71 +15,137 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Approval Workflows" subtitle="Configure loan approval pipelines">
+      <cx-page-header
+        title="Approval Workflows"
+        subtitle="Define multi-step approval pipelines per loan product"
+        eyebrow="Workflow">
         @if (auth.hasPermission('products.create')) {
-          <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> New Workflow</button>
+          <button class="cx-btn cx-btn-primary" (click)="openForm()">
+            <lucide-icon name="plus" [size]="14"></lucide-icon>
+            <span>New Workflow</span>
+          </button>
         }
       </cx-page-header>
-      <div class="cx-card !p-0 overflow-hidden">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-          searchPlaceholder="Search workflows..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row>
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit"><lucide-icon name="pencil" [size]="14"></lucide-icon></button>
-          </ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
+        searchPlaceholder="Search workflows..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
 
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Workflow' : 'Create Workflow'" [saving]="saving()" maxWidth="700px" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Workflow Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-          <div><label class="cx-label">Loan Product *</label>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Workflow' : 'Create Workflow'"
+      [subtitle]="editId ? 'Update approval pipeline' : 'Configure a new approval pipeline'"
+      [saving]="saving()" maxWidth="720px" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Workflow Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Payroll Loan Approval" /></div>
+          <div>
+            <label class="cx-label">Loan Product *</label>
             <cx-searchable-select [options]="productOptions()" placeholder="Select product..." [(ngModel)]="form.product_id"></cx-searchable-select>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Mode</label>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Mode</label>
             <select class="cx-select" [(ngModel)]="form.mode">
               <option value="sequential">Sequential</option>
               <option value="parallel">Parallel</option>
             </select>
           </div>
-          <div><label class="cx-label">Active</label>
+          <div>
+            <label class="cx-label">Status</label>
             <select class="cx-select" [(ngModel)]="form.is_active">
-              <option [ngValue]="true">Yes</option>
-              <option [ngValue]="false">No</option>
+              <option [ngValue]="true">Active</option>
+              <option [ngValue]="false">Inactive</option>
             </select>
           </div>
         </div>
 
         <!-- Approval Steps -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <label class="cx-label !mb-0">Approval Steps</label>
+        <div class="cx-wf-steps-section">
+          <div class="cx-wf-steps-header">
+            <h4 class="cx-form-section-title" style="margin: 0; border: none; padding: 0;">Approval Steps</h4>
             <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="addStep()">
-              <lucide-icon name="plus" [size]="12"></lucide-icon> Add Step
+              <lucide-icon name="plus" [size]="12"></lucide-icon>
+              <span>Add Step</span>
             </button>
           </div>
-          @for (step of form.steps; track $index; let i = $index) {
-            <div class="flex items-center gap-3 mb-2 p-3 rounded-xl border border-[var(--cx-border)] bg-[var(--cx-surface-hover)]/50">
-              <span class="text-xs font-bold text-[var(--cx-text-muted)] w-6">{{ i + 1 }}</span>
-              <div class="flex-1 grid grid-cols-2 gap-2">
-                <input class="cx-input !py-1.5 !text-xs" placeholder="Step name" [(ngModel)]="step.name" />
-                <cx-searchable-select [options]="roleOptions()" placeholder="Approver role..." [(ngModel)]="step.role_id"></cx-searchable-select>
-              </div>
-              <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon text-[var(--cx-danger)]" (click)="removeStep(i)">
-                <lucide-icon name="trash-2" [size]="14"></lucide-icon>
-              </button>
-            </div>
-          }
           @if (!form.steps?.length) {
-            <p class="text-xs text-[var(--cx-text-muted)] text-center py-3">No approval steps defined. Add at least one step.</p>
+            <div class="cx-wf-steps-empty">No approval steps defined. Add at least one step.</div>
+          } @else {
+            <div class="cx-wf-steps-list">
+              @for (step of form.steps; track $index; let i = $index) {
+                <div class="cx-wf-step">
+                  <div class="cx-wf-step-number">{{ i + 1 }}</div>
+                  <div class="cx-wf-step-fields">
+                    <div>
+                      <label class="cx-label">Step Name</label>
+                      <input class="cx-input" placeholder="e.g. Credit Manager Review" [(ngModel)]="step.name" />
+                    </div>
+                    <div>
+                      <label class="cx-label">Approver Role</label>
+                      <cx-searchable-select [options]="roleOptions()" placeholder="Select role..." [(ngModel)]="step.role_id"></cx-searchable-select>
+                    </div>
+                  </div>
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-wf-step-remove" (click)="removeStep(i)" title="Remove">
+                    <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+              }
+            </div>
           }
         </div>
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    .cx-wf-steps-section { margin-top: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--cx-border-subtle); }
+    .cx-wf-steps-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .cx-wf-steps-empty {
+      padding: 1.25rem;
+      background: var(--cx-stone-50);
+      border: 1px dashed var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      text-align: center;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+    }
+    .cx-wf-steps-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .cx-wf-step {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      padding: 0.85rem;
+      background: var(--cx-stone-50);
+      border: 1px solid var(--cx-border-subtle);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-wf-step-number {
+      width: 28px; height: 28px; flex-shrink: 0;
+      border-radius: 50%;
+      background: var(--cx-primary-600);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      margin-top: 18px;
+    }
+    .cx-wf-step-fields {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    @media (max-width: 640px) { .cx-wf-step-fields { grid-template-columns: 1fr; } }
+    .cx-wf-step-remove { color: var(--cx-danger); margin-top: 22px; }
+    .cx-wf-step-remove:hover { background: var(--cx-danger-50); }
+  `],
 })
 export class ApprovalWorkflowsComponent implements OnInit {
   columns: TableColumn[] = [

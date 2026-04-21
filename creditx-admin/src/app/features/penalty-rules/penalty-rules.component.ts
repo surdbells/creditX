@@ -13,26 +13,50 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Penalty Rules" subtitle="Configure late payment penalties">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Rule</button>
+      <cx-page-header
+        title="Penalty Rules"
+        subtitle="Configure penalty charges for late payments, per product"
+        eyebrow="Configuration">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Rule</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search penalty rules..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search penalty rules..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Rule' : 'Create Rule'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Product *</label><select class="cx-select" [(ngModel)]="form.product_id"><option value="">Select</option>@for(p of products();track p.id){<option [value]="p.id">{{p.name}}</option>}</select></div>
-        <div><label class="cx-label">Rule Name *</label><input class="cx-input" [(ngModel)]="form.name" /></div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Type</label><select class="cx-select" [(ngModel)]="form.calculation_type"><option value="flat">Flat Amount</option><option value="percentage">Percentage</option></select></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Rule' : 'Create Rule'"
+      [subtitle]="editId ? 'Update penalty calculation' : 'Define how late-payment penalties are computed'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div>
+          <label class="cx-label">Product *</label>
+          <select class="cx-select" [(ngModel)]="form.product_id">
+            <option value="">Select product...</option>
+            @for (p of products(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+          </select>
+        </div>
+        <div><label class="cx-label">Rule Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. Late Payment Standard" /></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Calculation</label>
+            <select class="cx-select" [(ngModel)]="form.calculation_type">
+              <option value="flat">Flat Amount</option>
+              <option value="percentage">Percentage</option>
+            </select>
+          </div>
           <div><label class="cx-label">Value *</label><input class="cx-input" type="number" [(ngModel)]="form.value" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Grace Period (days)</label><input class="cx-input" type="number" [(ngModel)]="form.grace_period_days" /></div>
-          <div><label class="cx-label">Max Amount Cap</label><input class="cx-input" type="number" [(ngModel)]="form.max_amount" /></div>
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Grace Period (days)</label><input class="cx-input" type="number" [(ngModel)]="form.grace_period_days" placeholder="0" /></div>
+          <div><label class="cx-label">Max Amount Cap</label><input class="cx-input" type="number" [(ngModel)]="form.max_amount" placeholder="Optional" /></div>
         </div>
       </div>
     </cx-form-dialog>

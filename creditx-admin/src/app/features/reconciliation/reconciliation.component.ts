@@ -6,63 +6,102 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
+import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-reconciliation', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Reconciliation" subtitle="Match and resolve transaction discrepancies">
+      <cx-page-header
+        title="Reconciliation"
+        subtitle="Match and resolve transaction discrepancies"
+        eyebrow="Finance Operations">
         <button class="cx-btn cx-btn-primary" (click)="runRecon()">
-          <lucide-icon name="refresh-cw" [size]="16"></lucide-icon> Run Reconciliation
+          <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
+          <span>Run Reconciliation</span>
         </button>
       </cx-page-header>
 
-      <div class="cx-card !p-4 overflow-hidden">
+      <div class="cx-recon-wrap">
         @if (loading()) {
-          <div class="flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
+          <cx-loading message="Loading reconciliations..."></cx-loading>
         } @else if (rows().length === 0) {
-          <div class="flex flex-col items-center justify-center py-16">
-            <lucide-icon name="check-circle" [size]="48" class="text-[var(--cx-success)] opacity-50 mb-3"></lucide-icon>
-            <h3 class="text-base font-semibold text-[var(--cx-text)]">All Clear</h3>
-            <p class="text-sm text-[var(--cx-text-muted)] mt-1">No reconciliation records found. Run a reconciliation to check for discrepancies.</p>
-          </div>
+          <cx-empty-state title="All Clear" description="No reconciliation records found. Run a reconciliation to check for discrepancies." icon="check-circle"></cx-empty-state>
         } @else {
-          <table class="w-full">
-            <thead><tr class="border-b border-[var(--cx-border)]">
-              <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Description</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Amount</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 w-20"></th>
-            </tr></thead>
-            <tbody>
-              @for (row of rows(); track row.id) {
-                <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)]">
-                  <td class="px-4 py-3 text-xs font-mono text-[var(--cx-text-muted)]">{{ row.created_at | date:'shortDate' }}</td>
-                  <td class="px-4 py-3 text-sm text-[var(--cx-text)]">{{ row.type || row.reconciliation_type || '—' }}</td>
-                  <td class="px-4 py-3 text-sm text-[var(--cx-text-secondary)]">{{ row.description || '—' }}</td>
-                  <td class="px-4 py-3 text-right text-sm font-medium">@if (row.amount) { ₦{{ row.amount | number:'1.2-2' }} } @else { — }</td>
-                  <td class="px-4 py-3">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                          [class]="row.status === 'resolved' ? 'bg-[var(--cx-success-light)] text-[var(--cx-success)]' : 'bg-[var(--cx-warning-light)] text-[var(--cx-warning)]'">
-                      {{ row.status | titlecase }}
-                    </span>
-                  </td>
-                  <td class="px-4 py-3">
-                    @if (row.status !== 'resolved') {
-                      <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="resolve(row.id)">Resolve</button>
-                    }
-                  </td>
+          <div class="cx-recon-scroll">
+            <table class="cx-recon-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th class="cx-recon-right">Amount</th>
+                  <th>Status</th>
+                  <th class="cx-recon-actions-col"></th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (row of rows(); track row.id) {
+                  <tr>
+                    <td class="cx-recon-date">{{ row.created_at | date:'MMM d, y' }}</td>
+                    <td class="cx-recon-type">{{ row.type || row.reconciliation_type || '—' }}</td>
+                    <td class="cx-recon-desc">{{ row.description || '—' }}</td>
+                    <td class="cx-recon-right cx-recon-amount tabular-nums">
+                      @if (row.amount) { ₦{{ row.amount | number:'1.2-2' }} } @else { — }
+                    </td>
+                    <td><cx-status-badge [status]="row.status"></cx-status-badge></td>
+                    <td class="cx-recon-actions-col">
+                      @if (row.status !== 'resolved') {
+                        <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="resolve(row.id)">Resolve</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       </div>
     </div>
   `,
+  styles: [`
+    .cx-recon-wrap {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      overflow: hidden;
+    }
+    .cx-recon-scroll { overflow-x: auto; }
+    .cx-recon-table { width: 100%; border-collapse: collapse; }
+    .cx-recon-table thead { background: var(--cx-surface-2); }
+    .cx-recon-table thead tr { border-bottom: 1px solid var(--cx-border); }
+    .cx-recon-table th {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      text-align: left;
+      white-space: nowrap;
+    }
+    .cx-recon-right { text-align: right; }
+    .cx-recon-actions-col { width: 100px; text-align: right; }
+    .cx-recon-table tbody td {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-recon-table tbody tr { transition: background var(--cx-dur-fast) var(--cx-ease-premium); }
+    .cx-recon-table tbody tr:hover { background: var(--cx-surface-hover); }
+    .cx-recon-table tbody tr:last-child td { border-bottom: none; }
+    .cx-recon-date { font-size: var(--cx-text-xs); color: var(--cx-text-muted); }
+    .cx-recon-type { font-weight: 500; }
+    .cx-recon-desc { color: var(--cx-text-secondary); }
+    .cx-recon-amount { font-weight: 500; }
+  `],
 })
 export class ReconciliationComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true);

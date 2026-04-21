@@ -13,20 +13,34 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Record Types" subtitle="Manage government employee record types">
-        <button class="cx-btn cx-btn-primary" (click)="openForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Type</button>
+      <cx-page-header
+        title="Record Types"
+        subtitle="Define categories of government employee records (IPPIS, GIFMIS, etc.)"
+        eyebrow="Configuration">
+        <button class="cx-btn cx-btn-primary" (click)="openForm()">
+          <lucide-icon name="plus" [size]="14"></lucide-icon>
+          <span>Add Type</span>
+        </button>
       </cx-page-header>
-      <div class="cx-card !p-4">
-        <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search record types..." [hasActions]="true" (query)="onQuery($event)">
-          <ng-template #rowActions let-row><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></ng-template>
-        </cx-data-table>
-      </div>
+      <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search record types..." [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
+            <lucide-icon name="pencil" [size]="14"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
     </div>
-    <cx-form-dialog [open]="showForm()" [title]="editId ? 'Edit Record Type' : 'Create Record Type'" [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
-      <div class="space-y-4">
-        <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. IPPIS" /></div>
-        <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. IPPIS" /></div>
-        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description"></textarea></div>
+    <cx-form-dialog
+      [open]="showForm()"
+      [title]="editId ? 'Edit Record Type' : 'Create Record Type'"
+      [subtitle]="editId ? 'Update record type definition' : 'Add a new category of government record'"
+      [saving]="saving()" (close)="showForm.set(false)" (save)="saveForm()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Name *</label><input class="cx-input" [(ngModel)]="form.name" placeholder="e.g. IPPIS" /></div>
+          <div><label class="cx-label">Code *</label><input class="cx-input" [(ngModel)]="form.code" placeholder="e.g. IPPIS" /></div>
+        </div>
+        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="form.description" placeholder="What this record type represents..."></textarea></div>
       </div>
     </cx-form-dialog>
   `,

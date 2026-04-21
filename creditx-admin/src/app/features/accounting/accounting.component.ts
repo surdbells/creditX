@@ -7,172 +7,335 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
+import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 @Component({
   selector: 'app-accounting', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header title="Accounting" subtitle="General Ledger & Financial Management"></cx-page-header>
-
-      <!-- Tab Navigation -->
-      <div class="flex gap-1 mb-4 border-b border-[var(--cx-border)] pb-px">
-        @for (tab of tabs; track tab.key) {
-          <button class="px-4 py-2.5 text-xs font-semibold transition-all rounded-t-lg"
-                  [class]="activeTab === tab.key ? 'text-[var(--cx-primary)] border-b-2 border-[var(--cx-primary)] bg-[var(--cx-surface)]' : 'text-[var(--cx-text-muted)] hover:text-[var(--cx-text)]'"
-                  (click)="setTab(tab.key)">
-            <lucide-icon [name]="tab.icon" [size]="14" class="inline mr-1.5"></lucide-icon>{{ tab.label }}
+      <cx-page-header
+        title="Accounting"
+        subtitle="General ledger, trial balance, and financial transactions"
+        eyebrow="Finance">
+        @if (activeTab === 'coa' && auth.hasPermission('accounting.create')) {
+          <button class="cx-btn cx-btn-primary" (click)="openCoaForm()">
+            <lucide-icon name="plus" [size]="14"></lucide-icon>
+            <span>New GL Account</span>
           </button>
         }
+      </cx-page-header>
+
+      <!-- Tabs -->
+      <div class="cx-acc-tabs-row">
+        <cx-tabs [tabs]="cxTabs" [activeId]="activeTab" (activeIdChange)="setTab($event)"></cx-tabs>
       </div>
 
       <!-- CHART OF ACCOUNTS TAB -->
       @if (activeTab === 'coa') {
-        <div class="cx-card !p-4 mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="relative flex-1 max-w-sm">
-              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
-              <input type="text" class="cx-input !pl-8" placeholder="Search accounts..." [(ngModel)]="coaSearch" (input)="loadCoa()" />
-            </div>
-            <button class="cx-btn cx-btn-primary" (click)="openCoaForm()"><lucide-icon name="plus" [size]="16"></lucide-icon> Add Account</button>
+        <div class="cx-acc-filters">
+          <div class="cx-acc-filter-search">
+            <lucide-icon name="search" [size]="14" class="cx-acc-filter-search-icon"></lucide-icon>
+            <input type="text" class="cx-acc-filter-search-input"
+              placeholder="Search accounts by code or name..." [(ngModel)]="coaSearch" (input)="loadCoa()" />
           </div>
         </div>
-        <div class="cx-card !p-4 overflow-hidden">
+
+        <div class="cx-acc-table-wrap">
           @if (coaLoading()) {
-            <div class="flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
+            <div class="cx-acc-state"><cx-loading message="Loading chart of accounts..."></cx-loading></div>
+          } @else if (coaRows().length === 0) {
+            <div class="cx-acc-state"><cx-empty-state title="No GL accounts" description="Start by adding your first general ledger account." icon="landmark"></cx-empty-state></div>
           } @else {
-            <table class="w-full">
-              <thead><tr class="border-b border-[var(--cx-border)]">
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Code</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Account Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Ledger</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Balance</th>
-                <th class="px-4 py-3 w-16"></th>
-              </tr></thead>
-              <tbody>
-                @for (a of coaRows(); track a.id) {
-                  <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors">
-                    <td class="px-4 py-3 font-mono text-sm font-medium text-[var(--cx-primary)]">{{ a.account_code }}</td>
-                    <td class="px-4 py-3 text-sm font-medium text-[var(--cx-text)]">{{ a.account_name }}</td>
-                    <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" [class]="acctTypeClass(a.account_type)">{{ a.account_type }}</span></td>
-                    <td class="px-4 py-3 text-xs text-[var(--cx-text-secondary)]">{{ a.ledger_type }}</td>
-                    <td class="px-4 py-3 text-right text-sm font-medium">₦{{ (a.balance || 0) | number:'1.2-2' }}</td>
-                    <td class="px-4 py-3"><button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openCoaForm(a)"><lucide-icon name="pencil" [size]="14"></lucide-icon></button></td>
+            <div class="cx-acc-scroll">
+              <table class="cx-acc-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Account Name</th>
+                    <th>Type</th>
+                    <th>Ledger</th>
+                    <th class="cx-acc-right">Balance</th>
+                    <th class="cx-acc-actions-col"></th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (a of coaRows(); track a.id) {
+                    <tr>
+                      <td><span class="cx-acc-code">{{ a.account_code }}</span></td>
+                      <td class="cx-acc-name">{{ a.account_name }}</td>
+                      <td><span class="cx-acc-type-chip" [attr.data-type]="a.account_type?.toLowerCase()">{{ a.account_type }}</span></td>
+                      <td class="cx-acc-ledger">{{ a.ledger_type }}</td>
+                      <td class="cx-acc-right cx-acc-balance tabular-nums">₦{{ (a.balance || 0) | number:'1.2-2' }}</td>
+                      <td class="cx-acc-actions-col">
+                        <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openCoaForm(a)" title="Edit">
+                          <lucide-icon name="pencil" [size]="14"></lucide-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           }
         </div>
       }
 
       <!-- TRIAL BALANCE TAB -->
       @if (activeTab === 'trial') {
-        <div class="cx-card !p-4 overflow-hidden">
+        <div class="cx-acc-table-wrap">
           @if (trialLoading()) {
-            <div class="flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
+            <div class="cx-acc-state"><cx-loading message="Generating trial balance..."></cx-loading></div>
+          } @else if (trialRows().length === 0) {
+            <div class="cx-acc-state"><cx-empty-state title="No data for trial balance" description="Post some transactions first to generate a trial balance." icon="bar-chart-3"></cx-empty-state></div>
           } @else {
-            <table class="w-full">
-              <thead><tr class="border-b border-[var(--cx-border)]">
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Code</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Account Name</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Debit (₦)</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Credit (₦)</th>
-              </tr></thead>
-              <tbody>
-                @for (row of trialRows(); track row.account_code) {
-                  <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)]">
-                    <td class="px-4 py-3 font-mono text-sm text-[var(--cx-primary)]">{{ row.account_code }}</td>
-                    <td class="px-4 py-3 text-sm text-[var(--cx-text)]">{{ row.account_name }}</td>
-                    <td class="px-4 py-3 text-right text-sm">{{ (row.debit || 0) | number:'1.2-2' }}</td>
-                    <td class="px-4 py-3 text-right text-sm">{{ (row.credit || 0) | number:'1.2-2' }}</td>
+            <div class="cx-acc-scroll">
+              <table class="cx-acc-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Account Name</th>
+                    <th class="cx-acc-right">Debit (₦)</th>
+                    <th class="cx-acc-right">Credit (₦)</th>
                   </tr>
-                }
-              </tbody>
-              <tfoot>
-                <tr class="bg-[var(--cx-surface-hover)] font-semibold border-t-2 border-[var(--cx-border)]">
-                  <td class="px-4 py-3" colspan="2">Total</td>
-                  <td class="px-4 py-3 text-right">₦{{ trialTotalDebit | number:'1.2-2' }}</td>
-                  <td class="px-4 py-3 text-right">₦{{ trialTotalCredit | number:'1.2-2' }}</td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  @for (row of trialRows(); track row.account_code) {
+                    <tr>
+                      <td><span class="cx-acc-code">{{ row.account_code }}</span></td>
+                      <td class="cx-acc-name">{{ row.account_name }}</td>
+                      <td class="cx-acc-right tabular-nums">{{ (row.debit || 0) | number:'1.2-2' }}</td>
+                      <td class="cx-acc-right tabular-nums">{{ (row.credit || 0) | number:'1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="cx-acc-total-row">
+                    <td colspan="2">Total</td>
+                    <td class="cx-acc-right tabular-nums">₦{{ trialTotalDebit | number:'1.2-2' }}</td>
+                    <td class="cx-acc-right tabular-nums">₦{{ trialTotalCredit | number:'1.2-2' }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           }
         </div>
       }
 
       <!-- TRANSACTIONS TAB -->
       @if (activeTab === 'txns') {
-        <div class="cx-card !p-4 mb-4">
-          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div class="sm:col-span-2 relative">
-              <lucide-icon name="search" class="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--cx-text-muted)]" [size]="16"></lucide-icon>
-              <input type="text" class="cx-input !pl-8" placeholder="Search transactions..." [(ngModel)]="txnSearch" (input)="onTxnFilter()" />
-            </div>
-            <input type="date" class="cx-input" [(ngModel)]="txnFrom" (change)="onTxnFilter()" />
-            <input type="date" class="cx-input" [(ngModel)]="txnTo" (change)="onTxnFilter()" />
+        <div class="cx-acc-filters cx-acc-filters-txn">
+          <div class="cx-acc-filter-search">
+            <lucide-icon name="search" [size]="14" class="cx-acc-filter-search-icon"></lucide-icon>
+            <input type="text" class="cx-acc-filter-search-input"
+              placeholder="Search transactions..." [(ngModel)]="txnSearch" (input)="onTxnFilter()" />
           </div>
+          <input type="date" class="cx-input" [(ngModel)]="txnFrom" (change)="onTxnFilter()" title="From date" />
+          <input type="date" class="cx-input" [(ngModel)]="txnTo" (change)="onTxnFilter()" title="To date" />
         </div>
-        <div class="cx-card !p-4 overflow-hidden">
+        <div class="cx-acc-table-wrap">
           @if (txnLoading()) {
-            <div class="flex items-center justify-center py-16"><div class="w-8 h-8 border-3 border-[var(--cx-primary)] border-t-transparent rounded-full animate-spin"></div></div>
+            <div class="cx-acc-state"><cx-loading message="Loading transactions..."></cx-loading></div>
           } @else if (txnRows().length === 0) {
-            <div class="flex flex-col items-center justify-center py-16">
-              <lucide-icon name="arrow-left-right" [size]="48" class="text-[var(--cx-text-muted)] opacity-30 mb-3"></lucide-icon>
-              <p class="text-sm text-[var(--cx-text-muted)]">No transactions found</p>
-            </div>
+            <div class="cx-acc-state"><cx-empty-state title="No transactions found" description="Try adjusting your filters or date range." icon="arrow-left-right"></cx-empty-state></div>
           } @else {
-            <table class="w-full">
-              <thead><tr class="border-b border-[var(--cx-border)]">
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Reference</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Description</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Account</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Debit</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-[var(--cx-text-muted)] uppercase tracking-wider">Credit</th>
-              </tr></thead>
-              <tbody>
-                @for (t of txnRows(); track t.id) {
-                  <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)]">
-                    <td class="px-4 py-3 text-xs font-mono text-[var(--cx-text-muted)]">{{ t.created_at | date:'shortDate' }}</td>
-                    <td class="px-4 py-3 text-xs font-mono text-[var(--cx-primary)]">{{ t.reference || t.trans_callback || '—' }}</td>
-                    <td class="px-4 py-3 text-sm text-[var(--cx-text)]">{{ t.description || t.narration || '—' }}</td>
-                    <td class="px-4 py-3 text-xs text-[var(--cx-text-secondary)]">{{ t.account_name || '—' }}</td>
-                    <td class="px-4 py-3 text-right text-sm">@if (t.debit_amount > 0) { ₦{{ t.debit_amount | number:'1.2-2' }} }</td>
-                    <td class="px-4 py-3 text-right text-sm">@if (t.credit_amount > 0) { ₦{{ t.credit_amount | number:'1.2-2' }} }</td>
+            <div class="cx-acc-scroll">
+              <table class="cx-acc-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th>Account</th>
+                    <th class="cx-acc-right">Debit</th>
+                    <th class="cx-acc-right">Credit</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (t of txnRows(); track t.id) {
+                    <tr>
+                      <td class="cx-acc-date">{{ t.created_at | date:'MMM d, y' }}</td>
+                      <td><span class="cx-acc-code">{{ t.reference || t.trans_callback || '—' }}</span></td>
+                      <td class="cx-acc-desc">{{ t.description || t.narration || '—' }}</td>
+                      <td class="cx-acc-ledger">{{ t.account_name || '—' }}</td>
+                      <td class="cx-acc-right tabular-nums cx-acc-debit">
+                        @if (t.debit_amount > 0) { ₦{{ t.debit_amount | number:'1.2-2' }} } @else { — }
+                      </td>
+                      <td class="cx-acc-right tabular-nums cx-acc-credit">
+                        @if (t.credit_amount > 0) { ₦{{ t.credit_amount | number:'1.2-2' }} } @else { — }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           }
         </div>
       }
     </div>
 
     <!-- COA Form Dialog -->
-    <cx-form-dialog [open]="showCoaForm()" [title]="coaEditId ? 'Edit Account' : 'Create GL Account'" [saving]="coaSaving()" (close)="showCoaForm.set(false)" (save)="saveCoa()">
-      <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Account Code *</label><input class="cx-input" [(ngModel)]="coaForm.account_code" /></div>
-          <div><label class="cx-label">Account Name *</label><input class="cx-input" [(ngModel)]="coaForm.account_name" /></div>
+    <cx-form-dialog
+      [open]="showCoaForm()"
+      [title]="coaEditId ? 'Edit Account' : 'Create GL Account'"
+      [subtitle]="coaEditId ? 'Update account details' : 'Add a new account to the chart of accounts'"
+      [saving]="coaSaving()" (close)="showCoaForm.set(false)" (save)="saveCoa()">
+      <div class="cx-form-stack">
+        <div class="cx-form-row cx-form-row-2">
+          <div><label class="cx-label">Account Code *</label><input class="cx-input" [(ngModel)]="coaForm.account_code" placeholder="e.g. 1001" /></div>
+          <div><label class="cx-label">Account Name *</label><input class="cx-input" [(ngModel)]="coaForm.account_name" placeholder="e.g. Cash on Hand" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="cx-label">Account Type *</label>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Account Type *</label>
             <select class="cx-select" [(ngModel)]="coaForm.account_type">
-              <option value="">Select</option><option>Asset</option><option>Liability</option><option>Equity</option><option>Revenue</option><option>Expense</option>
+              <option value="">Select...</option>
+              <option>Asset</option>
+              <option>Liability</option>
+              <option>Equity</option>
+              <option>Revenue</option>
+              <option>Expense</option>
             </select>
           </div>
-          <div><label class="cx-label">Ledger Type</label>
+          <div>
+            <label class="cx-label">Ledger Type</label>
             <select class="cx-select" [(ngModel)]="coaForm.ledger_type">
-              <option value="">Select</option><option>General</option><option>Customer</option><option>Vendor</option>
+              <option value="">Select...</option>
+              <option>General</option>
+              <option>Customer</option>
+              <option>Vendor</option>
             </select>
           </div>
         </div>
-        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="coaForm.description"></textarea></div>
+        <div><label class="cx-label">Description</label><textarea class="cx-input" rows="2" [(ngModel)]="coaForm.description" placeholder="Optional account notes..."></textarea></div>
       </div>
     </cx-form-dialog>
   `,
+  styles: [`
+    .cx-acc-tabs-row { margin-bottom: 1.25rem; }
+
+    /* Filter bar */
+    .cx-acc-filters {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      padding: 0.85rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 768px) {
+      .cx-acc-filters-txn { grid-template-columns: 2fr 1fr 1fr; }
+    }
+    .cx-acc-filter-search { position: relative; }
+    .cx-acc-filter-search-icon {
+      position: absolute; left: 0.75rem; top: 50%;
+      transform: translateY(-50%);
+      color: var(--cx-text-muted);
+      pointer-events: none;
+    }
+    .cx-acc-filter-search-input {
+      width: 100%;
+      padding: 0.55rem 0.85rem 0.55rem 2.15rem;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-acc-filter-search-input:hover { border-color: var(--cx-border); }
+    .cx-acc-filter-search-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-ring-focus);
+    }
+
+    /* Table */
+    .cx-acc-table-wrap {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      overflow: hidden;
+    }
+    .cx-acc-state { padding: 4rem 1rem; text-align: center; }
+    .cx-acc-scroll { overflow-x: auto; }
+    .cx-acc-table { width: 100%; border-collapse: collapse; }
+    .cx-acc-table thead { background: var(--cx-surface-2); }
+    .cx-acc-table thead tr { border-bottom: 1px solid var(--cx-border); }
+    .cx-acc-table th {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-xs); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--cx-text-muted);
+      text-align: left;
+      white-space: nowrap;
+    }
+    .cx-acc-right { text-align: right; }
+    .cx-acc-actions-col { width: 60px; text-align: right; }
+    .cx-acc-table tbody td {
+      padding: 0.75rem 1rem;
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      border-bottom: 1px solid var(--cx-border-subtle);
+      vertical-align: middle;
+    }
+    .cx-acc-table tbody tr { transition: background var(--cx-dur-fast) var(--cx-ease-premium); }
+    .cx-acc-table tbody tr:hover { background: var(--cx-surface-hover); }
+    .cx-acc-table tbody tr:last-child td { border-bottom: none; }
+
+    .cx-acc-code {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px;
+      font-family: var(--cx-font-mono);
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: var(--cx-primary-700);
+      background: var(--cx-primary-50);
+      border-radius: var(--cx-radius-sm);
+      letter-spacing: 0.02em;
+    }
+    .cx-acc-name { font-weight: 500; }
+    .cx-acc-ledger { font-size: var(--cx-text-xs); color: var(--cx-text-secondary); }
+    .cx-acc-date { font-size: var(--cx-text-xs); color: var(--cx-text-muted); white-space: nowrap; }
+    .cx-acc-desc { color: var(--cx-text-secondary); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cx-acc-balance { font-weight: 500; }
+    .cx-acc-debit { color: var(--cx-danger); }
+    .cx-acc-credit { color: var(--cx-primary-700); }
+
+    /* Account type chips */
+    .cx-acc-type-chip {
+      display: inline-flex; align-items: center;
+      padding: 2px 10px;
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-secondary);
+      white-space: nowrap;
+    }
+    .cx-acc-type-chip[data-type="asset"] { background: rgba(30, 92, 168, 0.1); color: var(--cx-info); }
+    .cx-acc-type-chip[data-type="liability"] { background: var(--cx-danger-50); color: var(--cx-danger); }
+    .cx-acc-type-chip[data-type="equity"] { background: rgba(124, 58, 237, 0.1); color: #6d28d9; }
+    .cx-acc-type-chip[data-type="revenue"] { background: var(--cx-success-50); color: var(--cx-primary-700); }
+    .cx-acc-type-chip[data-type="expense"] { background: var(--cx-accent-50); color: var(--cx-accent-700); }
+
+    /* Trial balance total row */
+    .cx-acc-total-row {
+      background: var(--cx-surface-2);
+      font-weight: 600;
+      border-top: 2px solid var(--cx-border);
+    }
+    .cx-acc-total-row td {
+      padding: 0.85rem 1rem !important;
+      color: var(--cx-text);
+      font-size: var(--cx-text-sm);
+    }
+  `],
 })
 export class AccountingComponent implements OnInit {
   tabs = [
@@ -180,6 +343,7 @@ export class AccountingComponent implements OnInit {
     { key: 'trial', label: 'Trial Balance', icon: 'bar-chart-3' },
     { key: 'txns', label: 'Transactions', icon: 'arrow-left-right' },
   ];
+  cxTabs: CxTab[] = this.tabs.map(t => ({ id: t.key, label: t.label }));
   activeTab = 'coa';
 
   // COA
