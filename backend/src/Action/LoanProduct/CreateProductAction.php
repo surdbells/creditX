@@ -62,7 +62,9 @@ final class CreateProductAction
                 $pf = new ProductFee();
                 $pf->setFeeType($feeType);
                 $pf->setCalculationType(FeeCalculationType::from($feeData['calculation_type'] ?? 'flat'));
-                $pf->setValue($feeData['value'] ?? '0');
+                // Cast to string — setter expects decimal string. JSON
+                // numbers would otherwise TypeError.
+                $pf->setValue((string) ($feeData['value'] ?? '0'));
                 $pf->setIsDeductedAtSource(filter_var($feeData['is_deducted_at_source'] ?? true, FILTER_VALIDATE_BOOLEAN));
                 $pf->setAppliesTo(FeeAppliesTo::from($feeData['applies_to'] ?? 'principal'));
                 $p->addFee($pf);

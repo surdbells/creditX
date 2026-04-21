@@ -356,6 +356,12 @@ class User
             'email'         => $this->email,
             'phone'         => $this->phone,
             'avatar_path'   => $this->avatarPath,
+            // Absolute URL — keeps frontends from having to build the URL
+            // themselves (they got it wrong when nginx was serving /storage
+            // as a static directory). Built from APP_URL env + the /api/storage
+            // route alias. Null when there's no avatar, so frontends can fall
+            // back to initials.
+            'avatar_url'    => $this->buildAvatarUrl(),
             'font_scale'    => (float) $this->fontScale,
             'is_agent'      => $this->isAgent,
             'monthly_target'=> $this->monthlyTarget,  // null or decimal string
@@ -377,5 +383,30 @@ class User
         }
 
         return $data;
+    }
+
+    /**
+     * Builds an absolute URL for this user's avatar, or null if no
+     * avatar is set.
+     *
+     * Prepends APP_URL from environment (e.g. https://api.dostsuite.com)
+     * and uses the /api/storage/ route alias — NOT the legacy /storage/
+     * route, which some nginx configs intercept and serve statically,
+     * returning 404 when the public/storage symlink is broken or
+     * missing. /api/storage/ is guaranteed to be routed to PHP.
+     *
+     * If APP_URL is unset (dev without .env), falls back to an empty
+     * string prefix which yields a relative URL — the frontend can
+     * still resolve it against its current origin if both apps share
+     * the same domain.
+     */
+    private function buildAvatarUrl(): ?string
+    {
+        if ($this->avatarPath === null || $this->avatarPath === '') {
+            return null;
+        }
+        $base = rtrim((string) ($_ENV['APP_URL'] ?? ''), '/');
+        $path = ltrim($this->avatarPath, '/');
+        return $base . '/api/storage/' . $path;
     }
 }

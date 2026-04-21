@@ -133,8 +133,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                   <tr>
                     <td class="cx-users-user-cell">
                       <div class="cx-users-user">
-                        @if (row.avatar_path) {
-                          <img [src]="avatarUrl(row.avatar_path)" class="cx-users-avatar-img" alt="" (error)="onAvatarError($event, row)" />
+                        @if (row.avatar_url || row.avatar_path) {
+                          <img [src]="row.avatar_url || avatarUrl(row.avatar_path)" class="cx-users-avatar-img" alt="" (error)="onAvatarError($event, row)" />
                         } @else {
                           <div class="cx-users-avatar-initial" [style.background]="avatarColor(row.id)">
                             {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}

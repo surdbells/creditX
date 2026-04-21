@@ -23,8 +23,11 @@ final class UpdatePenaltyRuleAction
         if (isset($data['name']) && $data['name'] !== '') $rule->setName($data['name']);
         if (isset($data['grace_period_days'])) $rule->setGracePeriodDays((int) $data['grace_period_days']);
         if (isset($data['calculation_type'])) $rule->setCalculationType(PenaltyCalculationType::from($data['calculation_type']));
-        if (isset($data['value'])) $rule->setValue($data['value']);
-        if (isset($data['max_amount'])) $rule->setMaxAmount($data['max_amount']);
+        // Cast decimal-string setters — JSON may send numeric values.
+        if (isset($data['value'])) $rule->setValue((string) $data['value']);
+        if (isset($data['max_amount'])) {
+            $rule->setMaxAmount($data['max_amount'] === null ? null : (string) $data['max_amount']);
+        }
         if (isset($data['is_compounding'])) $rule->setIsCompounding(filter_var($data['is_compounding'], FILTER_VALIDATE_BOOLEAN));
         if (isset($data['is_active'])) $rule->setIsActive(filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN));
 

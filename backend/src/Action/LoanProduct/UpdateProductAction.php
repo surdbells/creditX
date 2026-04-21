@@ -27,12 +27,16 @@ final class UpdateProductAction
 
         if (isset($data['name']) && $data['name'] !== '') $p->setName($data['name']);
         if (isset($data['description'])) $p->setDescription($data['description']);
-        if (isset($data['min_amount'])) $p->setMinAmount($data['min_amount']);
-        if (isset($data['max_amount'])) $p->setMaxAmount($data['max_amount']);
+        // Cast decimal-string fields — JSON payloads may send these as
+        // numbers (5, 500000) which trip PHP's strict string type hint
+        // on the setters. All money/rate columns store as decimal strings
+        // to preserve precision, so cast at the action boundary.
+        if (isset($data['min_amount'])) $p->setMinAmount((string) $data['min_amount']);
+        if (isset($data['max_amount'])) $p->setMaxAmount((string) $data['max_amount']);
         if (isset($data['min_tenure'])) $p->setMinTenure((int) $data['min_tenure']);
         if (isset($data['max_tenure'])) $p->setMaxTenure((int) $data['max_tenure']);
         if (isset($data['interest_calculation_method'])) $p->setInterestCalculationMethod(InterestMethod::from($data['interest_calculation_method']));
-        if (isset($data['interest_rate'])) $p->setInterestRate($data['interest_rate']);
+        if (isset($data['interest_rate'])) $p->setInterestRate((string) $data['interest_rate']);
         if (isset($data['max_customer_age'])) $p->setMaxCustomerAge((int) $data['max_customer_age']);
         if (isset($data['max_service_years'])) $p->setMaxServiceYears((int) $data['max_service_years']);
         if (isset($data['allows_top_up'])) $p->setAllowsTopUp(filter_var($data['allows_top_up'], FILTER_VALIDATE_BOOLEAN));
@@ -47,7 +51,9 @@ final class UpdateProductAction
                 $pf = new ProductFee();
                 $pf->setFeeType($feeType);
                 $pf->setCalculationType(FeeCalculationType::from($feeData['calculation_type'] ?? 'flat'));
-                $pf->setValue($feeData['value'] ?? '0');
+                // Cast to string — setter expects decimal string. JSON
+                // numbers (e.g. "value": 2.5) would otherwise TypeError.
+                $pf->setValue((string) ($feeData['value'] ?? '0'));
                 $pf->setIsDeductedAtSource(filter_var($feeData['is_deducted_at_source'] ?? true, FILTER_VALIDATE_BOOLEAN));
                 $pf->setAppliesTo(FeeAppliesTo::from($feeData['applies_to'] ?? 'principal'));
                 $p->addFee($pf);
