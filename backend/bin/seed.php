@@ -273,7 +273,7 @@ $settingsDef = [
     ['general.currency_symbol', '₦', SettingType::STRING, SettingCategory::GENERAL, 'Currency display symbol'],
     ['general.max_customer_age', '57', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum customer age for eligibility'],
     ['general.max_service_years', '33', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum years of service for eligibility'],
-    ['agent.monthly_target', '20', SettingType::INTEGER, SettingCategory::GENERAL, 'Monthly disbursed loan target per agent'],
+    ['agent.monthly_target', '1000000', SettingType::INTEGER, SettingCategory::GENERAL, 'Default monthly disbursement target (naira) for agents without an individual target set'],
 ];
 
 $settingCount = 0;

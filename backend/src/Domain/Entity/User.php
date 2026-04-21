@@ -46,6 +46,22 @@ class User
     #[ORM\Column(name: 'font_scale', type: 'decimal', precision: 3, scale: 2, options: ['default' => '1.00'])]
     private string $fontScale = '1.00';
 
+    /**
+     * Whether this user is a field agent. Only agents can capture loans
+     * from the mobile app. Non-agents never see a monthly target, even if
+     * one is stored on their record (we just don't look at it).
+     */
+    #[ORM\Column(name: 'is_agent', type: 'boolean', options: ['default' => false])]
+    private bool $isAgent = false;
+
+    /**
+     * Personal monthly disbursement target in naira (decimal, 15,2).
+     * Nullable — when null, the agent's dashboard falls back to the global
+     * setting `agent.monthly_target`. Only meaningful when $isAgent is true.
+     */
+    #[ORM\Column(name: 'monthly_target', type: 'decimal', precision: 15, scale: 2, nullable: true)]
+    private ?string $monthlyTarget = null;
+
     #[ORM\ManyToOne(targetEntity: Department::class)]
     #[ORM\JoinColumn(name: 'department_id', referencedColumnName: 'id', nullable: true)]
     private ?Department $department = null;
@@ -209,6 +225,30 @@ class User
         $this->fontScale = number_format($v, 2, '.', '');
     }
 
+    public function isAgent(): bool { return $this->isAgent; }
+    public function setIsAgent(bool $v): void { $this->isAgent = $v; }
+
+    /** Returns the target as a string (decimal string from DB) or null. */
+    public function getMonthlyTarget(): ?string { return $this->monthlyTarget; }
+
+    /**
+     * Accepts a string|float|null. Negative values are clamped to 0.
+     * Non-numeric input is rejected with an InvalidArgumentException —
+     * the caller (action) is expected to have validated input already.
+     */
+    public function setMonthlyTarget(null|string|float|int $v): void {
+        if ($v === null || $v === '') {
+            $this->monthlyTarget = null;
+            return;
+        }
+        if (!is_numeric($v)) {
+            throw new \InvalidArgumentException('monthly_target must be numeric or null');
+        }
+        $f = (float) $v;
+        if ($f < 0) $f = 0;
+        $this->monthlyTarget = number_format($f, 2, '.', '');
+    }
+
     public function getResetToken(): ?string { return $this->resetToken; }
     public function setResetToken(?string $v): void { $this->resetToken = $v; }
     public function getResetTokenExpiresAt(): ?string { return $this->resetTokenExpiresAt; }
@@ -317,6 +357,8 @@ class User
             'phone'         => $this->phone,
             'avatar_path'   => $this->avatarPath,
             'font_scale'    => (float) $this->fontScale,
+            'is_agent'      => $this->isAgent,
+            'monthly_target'=> $this->monthlyTarget,  // null or decimal string
             'department_id'   => $this->department?->getId(),
             'department_name' => $this->department?->getName(),
             'team_id'         => $this->team?->getId(),

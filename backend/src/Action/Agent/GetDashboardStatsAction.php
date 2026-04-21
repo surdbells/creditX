@@ -12,16 +12,32 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  * GET /api/agent/dashboard-stats
  *
  * Returns for the authenticated agent:
- *   - Monthly disbursed count (current month)
- *   - Monthly target (from system setting `agent.monthly_target`, default 20)
- *   - Progress percentage
- *   - Total loans captured this month (all statuses)
- *   - Pending, approved, disbursed, declined counts
- *   - Current month label (e.g., "April 2026")
+ *   - target (decimal string, naira): either the agent's personal
+ *     monthly_target, or the global fallback from system_settings
+ *     (`agent.monthly_target`, default ₦1,000,000).
+ *   - target_source: 'personal' | 'global_default' — for the UI to show
+ *     an explanation if the agent hasn't been assigned a personal target.
+ *   - disbursed_amount (decimal string, naira): sum of net_disbursed
+ *     (fallback amount_requested) for loans disbursed this calendar month.
+ *   - remaining_amount (decimal string, naira): max(0, target - disbursed).
+ *   - disbursed_count (int): number of DISBURSED loans this month — kept
+ *     as an informational secondary stat. No longer drives progress.
+ *   - progress_pct (int, 0-100): amount-based progress toward the target.
+ *   - captured_this_month (int): total loan applications captured this
+ *     month across all statuses (for the by_status summary tiles).
+ *   - by_status: counts by loan status, for dashboard tiles.
+ *   - month_label: "April 2026" etc.
+ *
+ * Only loans with status = DISBURSED and agent_id = caller count toward
+ * the target. Captured-but-not-disbursed loans show in by_status but not
+ * in target progress.
  */
 final class GetDashboardStatsAction
 {
     use ApiResponse;
+
+    /** Last-resort default target if no row exists in system_settings (₦1M). */
+    private const HARDCODED_DEFAULT_TARGET = '1000000';
 
     public function __construct(private readonly EntityManagerInterface $em) {}
 
@@ -38,21 +54,29 @@ final class GetDashboardStatsAction
 
         $conn = $this->em->getConnection();
 
-        // Disbursed loans count this month (counts against target)
-        $disbursedCount = (int) $conn->fetchOne(
-            "SELECT COUNT(id) FROM loans
-             WHERE agent_id = :agent_id
-               AND status = :status
-               AND disbursed_at BETWEEN :start AND :end",
-            [
-                'agent_id' => $user->getId(),
-                'status' => LoanStatus::DISBURSED->value,
-                'start' => $monthStart->format('Y-m-d H:i:s'),
-                'end' => $monthEnd->format('Y-m-d H:i:s'),
-            ]
-        );
+        // ── Target resolution ──────────────────────────────────────────────
+        // Personal target takes precedence; falls back to the global
+        // `agent.monthly_target` setting (a naira amount after the rework);
+        // falls back further to HARDCODED_DEFAULT_TARGET if the row is
+        // missing or non-numeric.
+        $personal = $user->getMonthlyTarget();
+        $targetSource = 'global_default';
+        if ($personal !== null && is_numeric($personal) && (float) $personal > 0) {
+            $targetStr = (string) $personal;
+            $targetSource = 'personal';
+        } else {
+            $globalRaw = $conn->fetchOne(
+                "SELECT setting_value FROM system_settings WHERE setting_key = 'agent.monthly_target'"
+            );
+            if ($globalRaw !== false && is_numeric($globalRaw) && (float) $globalRaw > 0) {
+                $targetStr = (string) $globalRaw;
+            } else {
+                $targetStr = self::HARDCODED_DEFAULT_TARGET;
+            }
+        }
+        $targetFloat = (float) $targetStr;
 
-        // All loans captured this month (by created_at)
+        // ── Loan counts (by status) for the month, scoped to this agent ──
         $allByStatus = $conn->fetchAllAssociative(
             "SELECT status, COUNT(id) AS cnt FROM loans
              WHERE agent_id = :agent_id
@@ -72,18 +96,23 @@ final class GetDashboardStatsAction
             $totalThisMonth += (int) $row['cnt'];
         }
 
-        // Fetch target from system settings
-        $targetSetting = $conn->fetchOne(
-            "SELECT setting_value FROM system_settings WHERE setting_key = 'agent.monthly_target'"
+        // ── Disbursed count (count of loans with status=disbursed) ────────
+        // Informational only — no longer drives progress.
+        $disbursedCount = (int) $conn->fetchOne(
+            "SELECT COUNT(id) FROM loans
+             WHERE agent_id = :agent_id
+               AND status = :status
+               AND disbursed_at BETWEEN :start AND :end",
+            [
+                'agent_id' => $user->getId(),
+                'status' => LoanStatus::DISBURSED->value,
+                'start' => $monthStart->format('Y-m-d H:i:s'),
+                'end' => $monthEnd->format('Y-m-d H:i:s'),
+            ]
         );
-        $target = $targetSetting !== false && is_numeric($targetSetting) ? (int) $targetSetting : 20;
-        if ($target <= 0) $target = 20;
 
-        $progress = (int) round(($disbursedCount / $target) * 100);
-        if ($progress > 100) $progress = 100;
-
-        // Disbursed amount this month (sum of net_disbursed, fallback to amount_requested)
-        $disbursedAmount = (float) ($conn->fetchOne(
+        // ── Disbursed amount (sum of net_disbursed, fallback amount_requested) ─
+        $disbursedAmountRaw = $conn->fetchOne(
             "SELECT COALESCE(SUM(COALESCE(net_disbursed, amount_requested)), 0) FROM loans
              WHERE agent_id = :agent_id
                AND status = :status
@@ -94,15 +123,27 @@ final class GetDashboardStatsAction
                 'start' => $monthStart->format('Y-m-d H:i:s'),
                 'end' => $monthEnd->format('Y-m-d H:i:s'),
             ]
-        ) ?: 0);
+        );
+        $disbursedAmount = (float) ($disbursedAmountRaw ?: 0);
+
+        // ── Progress (amount-based) ───────────────────────────────────────
+        $progress = $targetFloat > 0
+            ? (int) round(($disbursedAmount / $targetFloat) * 100)
+            : 0;
+        if ($progress > 100) $progress = 100;
+        if ($progress < 0) $progress = 0;
+
+        $remainingAmount = max(0.0, $targetFloat - $disbursedAmount);
 
         return $this->success([
             'month_label' => $now->format('F Y'),
-            'target' => $target,
+            // Decimal strings for financial amounts — matches Loan entity convention
+            'target' => number_format($targetFloat, 2, '.', ''),
+            'target_source' => $targetSource,
+            'disbursed_amount' => number_format($disbursedAmount, 2, '.', ''),
+            'remaining_amount' => number_format($remainingAmount, 2, '.', ''),
             'disbursed_count' => $disbursedCount,
-            'remaining' => max(0, $target - $disbursedCount),
             'progress_pct' => $progress,
-            'disbursed_amount' => $disbursedAmount,
             'captured_this_month' => $totalThisMonth,
             'by_status' => [
                 'submitted' => $byStatus[LoanStatus::SUBMITTED->value] ?? 0,

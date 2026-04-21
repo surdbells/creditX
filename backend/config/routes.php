@@ -89,6 +89,12 @@ return function (App $app): void {
             // Self-service preferences (no RBAC — authenticated user edits own record)
             $group->patch('/me/preferences', User\UpdateMyPreferencesAction::class);
 
+            // Bulk agent targets — registered BEFORE the /{id} routes so
+            // the literal 'bulk-agent-targets' segment doesn't get
+            // swallowed by the id wildcard matcher.
+            $group->patch('/bulk-agent-targets', User\BulkUpdateAgentTargetsAction::class)
+                ->add(new RbacMiddleware('settings.edit'));
+
             $group->get('', User\ListUsersAction::class)
                 ->add(new RbacMiddleware('users.view'));
             $group->post('', User\CreateUserAction::class)
@@ -97,6 +103,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('users.view'));
             $group->put('/{id}', User\UpdateUserAction::class)
                 ->add(new RbacMiddleware('users.edit'));
+            $group->patch('/{id}/agent-target', User\UpdateAgentTargetAction::class)
+                ->add(new RbacMiddleware('settings.edit'));
             $group->post('/{id}/reset-password', User\ResetUserPasswordAction::class)
                 ->add(new RbacMiddleware('users.edit'));
             $group->post('/{id}/avatar', User\UploadAvatarAction::class)

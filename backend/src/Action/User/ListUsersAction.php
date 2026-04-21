@@ -23,6 +23,15 @@ final class ListUsersAction
         $params = $request->getQueryParams();
         $pagination = $this->getPaginationParams($params);
 
+        // is_agent query param: accept 'true'/'false' strings and coerce.
+        // Absence of the param (or any other value) = no filter applied.
+        $isAgent = null;
+        if (array_key_exists('is_agent', $params)) {
+            $raw = strtolower((string) $params['is_agent']);
+            if ($raw === 'true' || $raw === '1') $isAgent = true;
+            elseif ($raw === 'false' || $raw === '0') $isAgent = false;
+        }
+
         $result = $this->userRepo->paginated(
             $pagination['offset'],
             $pagination['per_page'],
@@ -31,6 +40,7 @@ final class ListUsersAction
             $pagination['search'] ?: null,
             $params['status'] ?? null,
             $params['role'] ?? null,
+            $isAgent,
         );
 
         $items = array_map(fn($u) => $u->toArray(true), $result['items']);

@@ -50,6 +50,7 @@ class UserRepository extends BaseRepository
         ?string $search = null,
         ?string $status = null,
         ?string $roleSlug = null,
+        ?bool $isAgent = null,
     ): array {
         $qb = $this->em->createQueryBuilder()
             ->select('u')
@@ -65,6 +66,11 @@ class UserRepository extends BaseRepository
             $qb->innerJoin('u.roles', 'r')
                ->andWhere('r.slug = :roleSlug')
                ->setParameter('roleSlug', $roleSlug);
+        }
+
+        if ($isAgent !== null) {
+            $qb->andWhere('u.isAgent = :isAgent')
+               ->setParameter('isAgent', $isAgent);
         }
 
         return $this->paginatedQuery(
