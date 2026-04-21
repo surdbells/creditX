@@ -6,12 +6,34 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\LoanProduct;
 use App\Domain\Entity\ProductFee;
+use App\Domain\Enum\FeeEffect;
 use App\Domain\Enum\InterestMethod;
 
 final class LoanCalculationService
 {
     /**
      * Calculate full loan breakdown for a product.
+     *
+     * Matches the legacy CreditX math exactly:
+     *
+     *   gross_loan    = app_amount + SUM(fees where effect = ADDS_TO_GROSS)
+     *   net_disbursed = app_amount - SUM(fees where effect = DEDUCTED_FROM_DISBURSEMENT)
+     *                               - old_loan_balance
+     *   mr_interest   = rate × gross_loan          (rate is monthly, not annual)
+     *   mr_principal  = ceil(gross_loan / tenure)
+     *   tr_*          = mr_* × tenure
+     *
+     * The two independent ProductFee properties that drive the math:
+     *
+     *   effect      — ADDS_TO_GROSS vs DEDUCTED_FROM_DISBURSEMENT
+     *                 (what does this fee do to the loan numbers?)
+     *   applies_to  — PRINCIPAL vs GROSS_LOAN
+     *                 (what's the base for percentage calculation?)
+     *
+     * All four combinations are valid. The one that requires care is
+     * ADDS_TO_GROSS with applies_to=GROSS_LOAN: the fee is a percentage of
+     * the gross that it's being added to — circular. We solve with a
+     * single fixed-point pass (legacy never uses this, but we support it).
      *
      * @return array{
      *   gross_loan: string, total_fees: string, fee_details: array,
@@ -31,95 +53,118 @@ final class LoanCalculationService
         $interestRate = (float) $product->getInterestRate();
         $method = $product->getInterestCalculationMethod();
 
-        // ─── 1. Compute fees ───
-        $feeDetails = [];
-        $totalFees = '0.00';
-
+        // Collect active fees that apply to this loan. Filter out the
+        // bank statement fee when the customer provided their own statement
+        // (legacy check: $bs_fee = 500 only if Generated_by_FTI).
+        $applicableFees = [];
         /** @var ProductFee $productFee */
         foreach ($product->getFees() as $productFee) {
-            if (!$productFee->isActive()) {
-                continue;
-            }
+            if (!$productFee->isActive()) continue;
 
-            // Bank statement fee only applies when the company generated the statement.
-            // Matches legacy logic: if ($statement_mode == 'Generated_by_FTI') { $bs_fee = 500; }
             $feeCode = $productFee->getFeeType()->getCode();
-            if ($feeCode === 'BSF' && $bankStatementMode !== 'generated_by_company' && $bankStatementMode !== 'Generated_by_FTI') {
+            if ($feeCode === 'BSF'
+                && $bankStatementMode !== 'generated_by_company'
+                && $bankStatementMode !== 'Generated_by_FTI') {
                 continue;
             }
 
-            // For gross_loan-based fees, we need gross_loan. Initially use appAmount + fees as estimate.
-            // We'll do a two-pass: first pass with principal-based, then compute gross, then recompute gross-based.
-            $feeAmount = $productFee->computeAmount($appAmount, $appAmount);
-
-            $feeDetails[] = [
-                'fee_type_id'      => $productFee->getFeeType()->getId(),
-                'fee_type_code'    => $productFee->getFeeType()->getCode(),
-                'fee_type_name'    => $productFee->getFeeType()->getName(),
-                'calculation_type' => $productFee->getCalculationType()->value,
-                'base_value'       => $productFee->getValue(),
-                'amount'           => $feeAmount,
-                'is_deducted'      => $productFee->isDeductedAtSource(),
-                'applies_to'       => $productFee->getAppliesTo()->value,
-            ];
-
-            $totalFees = bcadd($totalFees, $feeAmount, 2);
+            $applicableFees[] = $productFee;
         }
 
-        // ─── 2. Gross loan = principal + fees deducted at source ───
-        $grossLoan = bcadd($appAmount, $totalFees, 2);
+        // ─── Pass 1: compute each applicable fee against app_amount ───
+        // First estimate every fee using app_amount as the percentage base.
+        // This is exactly correct for fees with applies_to=PRINCIPAL, and
+        // is the first iterate for fees with applies_to=GROSS_LOAN.
+        $feeAmounts = [];
+        foreach ($applicableFees as $i => $pf) {
+            $feeAmounts[$i] = $pf->computeAmount($appAmount, $appAmount);
+        }
 
-        // Recompute any fees that apply to gross_loan (second pass)
-        $recalcNeeded = false;
-        foreach ($feeDetails as &$fd) {
-            if ($fd['applies_to'] === 'gross_loan') {
-                $recalcNeeded = true;
-                // Find the matching ProductFee
-                foreach ($product->getFees() as $pf) {
-                    if ($pf->getFeeType()->getId() === $fd['fee_type_id'] && $pf->isActive()) {
-                        $newAmount = $pf->computeAmount($appAmount, $grossLoan);
-                        $totalFees = bcsub($totalFees, $fd['amount'], 2);
-                        $totalFees = bcadd($totalFees, $newAmount, 2);
-                        $fd['amount'] = $newAmount;
-                        break;
-                    }
+        // Provisional gross: app_amount + fees that ADD_TO_GROSS
+        $provisionalGross = $appAmount;
+        foreach ($applicableFees as $i => $pf) {
+            if ($pf->getEffect() === FeeEffect::ADDS_TO_GROSS) {
+                $provisionalGross = bcadd($provisionalGross, $feeAmounts[$i], 2);
+            }
+        }
+
+        // ─── Pass 2: recompute only ADDS_TO_GROSS fees whose base is GROSS_LOAN ───
+        // For those, amount depends on gross, which depends on them — one
+        // extra pass is enough to get a stable value for linear cases.
+        $needsRecalc = false;
+        foreach ($applicableFees as $i => $pf) {
+            if ($pf->getEffect() === FeeEffect::ADDS_TO_GROSS
+                && $pf->getAppliesTo()->value === 'gross_loan') {
+                $feeAmounts[$i] = $pf->computeAmount($appAmount, $provisionalGross);
+                $needsRecalc = true;
+            }
+        }
+        // If any fee was recomputed, rebuild the gross with new amounts
+        if ($needsRecalc) {
+            $provisionalGross = $appAmount;
+            foreach ($applicableFees as $i => $pf) {
+                if ($pf->getEffect() === FeeEffect::ADDS_TO_GROSS) {
+                    $provisionalGross = bcadd($provisionalGross, $feeAmounts[$i], 2);
                 }
             }
         }
-        unset($fd);
 
-        if ($recalcNeeded) {
-            $grossLoan = bcadd($appAmount, $totalFees, 2);
+        // Also recompute DEDUCTED fees with applies_to=GROSS_LOAN against the
+        // now-final gross. Doesn't affect gross itself, only net.
+        foreach ($applicableFees as $i => $pf) {
+            if ($pf->getEffect() === FeeEffect::DEDUCTED_FROM_DISBURSEMENT
+                && $pf->getAppliesTo()->value === 'gross_loan') {
+                $feeAmounts[$i] = $pf->computeAmount($appAmount, $provisionalGross);
+            }
         }
 
-        // ─── 3. Calculate repayment based on method ───
-        $schedule = [];
+        $grossLoan = $provisionalGross;
 
+        // ─── Assemble fee_details for the response ───
+        $feeDetails = [];
+        $totalFees = '0.00';
+        $deductedFees = '0.00';
+        foreach ($applicableFees as $i => $pf) {
+            $amount = $feeAmounts[$i];
+            $feeDetails[] = [
+                'fee_type_id'      => $pf->getFeeType()->getId(),
+                'fee_type_code'    => $pf->getFeeType()->getCode(),
+                'fee_type_name'    => $pf->getFeeType()->getName(),
+                'calculation_type' => $pf->getCalculationType()->value,
+                'base_value'       => $pf->getValue(),
+                'amount'           => $amount,
+                'effect'           => $pf->getEffect()->value,
+                'applies_to'       => $pf->getAppliesTo()->value,
+                // Kept for backward-compat with any consumer that reads it;
+                // effect is the canonical field going forward.
+                'is_deducted'      => $pf->getEffect() === FeeEffect::DEDUCTED_FROM_DISBURSEMENT,
+            ];
+            $totalFees = bcadd($totalFees, $amount, 2);
+            if ($pf->getEffect() === FeeEffect::DEDUCTED_FROM_DISBURSEMENT) {
+                $deductedFees = bcadd($deductedFees, $amount, 2);
+            }
+        }
+
+        // ─── Interest + principal schedule ───
         switch ($method) {
             case InterestMethod::FLAT_RATE:
                 $result = $this->calculateFlatRate($grossLoan, $interestRate, $tenure);
                 break;
-
             case InterestMethod::REDUCING_BALANCE:
                 $result = $this->calculateReducingBalance($grossLoan, $interestRate, $tenure);
                 break;
-
             case InterestMethod::AMORTIZED:
                 $result = $this->calculateAmortized($grossLoan, $interestRate, $tenure);
                 break;
-
             default:
                 $result = $this->calculateFlatRate($grossLoan, $interestRate, $tenure);
         }
 
-        // ─── 4. Net disbursed ───
-        $deductedFees = '0.00';
-        foreach ($feeDetails as $fd) {
-            if ($fd['is_deducted']) {
-                $deductedFees = bcadd($deductedFees, $fd['amount'], 2);
-            }
-        }
-
+        // ─── Net disbursed ───
+        // Legacy: $net_disbursed = $app_amount - $mgt_fee - $bs_fee - $old_loan_balance
+        // Equivalent: start at app_amount, subtract all DEDUCTED_FROM_DISBURSEMENT
+        // fees, subtract old loan balance. Note that ADDS_TO_GROSS fees do NOT
+        // appear here — they're paid by the customer over the schedule.
         $netDisbursed = bcsub($appAmount, $deductedFees, 2);
         $netDisbursed = bcsub($netDisbursed, $oldLoanBalance, 2);
 
@@ -145,7 +190,19 @@ final class LoanCalculationService
 
     /**
      * Flat rate: principal and interest split evenly across tenure.
-     * Matches existing CreditX behavior exactly.
+     * Matches legacy CreditX exactly:
+     *
+     *   mr_principal          = ceil(gross_loan / tenure)
+     *   mr_interest           = ceil(rate × gross_loan)         (rate is monthly)
+     *   tr_principal          = ceil(mr_principal × tenure)     (small ceiling drift OK)
+     *   tr_interest           = ceil(mr_interest × tenure)
+     *   mr_principal_interest = ceil(mr_principal + mr_interest)
+     *   tr_principal_interest = ceil(mr_principal_interest × tenure)
+     *
+     * The last line matters — legacy computes tr_pi from mr_pi × tenure, not
+     * tr_principal + tr_interest. These coincide in normal cases but can differ
+     * by ₦0–2 due to ceiling rounding; keep the legacy formula for byte-level
+     * parity with the old system.
      */
     private function calculateFlatRate(string $grossLoan, float $rate, int $tenure): array
     {
@@ -155,8 +212,9 @@ final class LoanCalculationService
         $trPrincipal = (string) ceil((float) bcmul($mrPrincipal, (string) $tenure, 2));
         $trInterest = (string) ceil((float) bcmul($mrInterest, (string) $tenure, 2));
 
-        $mrTotal = bcadd($mrPrincipal, $mrInterest, 2);
-        $trTotal = bcadd($trPrincipal, $trInterest, 2);
+        $mrTotal = (string) ceil((float) bcadd($mrPrincipal, $mrInterest, 2));
+        // Legacy formula — keep as mr_total × tenure rather than tr_principal + tr_interest
+        $trTotal = (string) ceil((float) bcmul($mrTotal, (string) $tenure, 2));
 
         $schedule = [];
         for ($i = 1; $i <= $tenure; $i++) {
