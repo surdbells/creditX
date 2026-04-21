@@ -89,20 +89,20 @@ import { AuthService } from '../../core/services/auth.service';
                 <div class="cxm-db-target-row">
                   <span class="cxm-db-target-label">Disbursed</span>
                   <span class="cxm-db-target-value tabular-nums">
-                    {{ targetStats()?.disbursed_count }}
-                    <span class="cxm-db-target-of">of {{ targetStats()?.target }}</span>
+                    {{ formatNaira(targetStats()?.disbursed_amount) }}
+                    <span class="cxm-db-target-of">of {{ formatNaira(targetStats()?.target) }}</span>
                   </span>
                 </div>
                 <div class="cxm-db-target-row">
                   <span class="cxm-db-target-label">Remaining</span>
                   <span class="cxm-db-target-value cxm-db-target-gold tabular-nums">
-                    {{ targetStats()?.remaining }} loans
+                    {{ formatNaira(targetStats()?.remaining_amount) }} to go
                   </span>
                 </div>
                 <div class="cxm-db-target-row">
-                  <span class="cxm-db-target-label">Value</span>
+                  <span class="cxm-db-target-label">Loans</span>
                   <span class="cxm-db-target-value tabular-nums">
-                    ₦{{ targetStats()?.disbursed_amount | number:'1.0-0' }}
+                    {{ targetStats()?.disbursed_count || 0 }} disbursed
                   </span>
                 </div>
               </div>
@@ -257,25 +257,35 @@ import { AuthService } from '../../core/services/auth.service';
       font-weight: 700;
       letter-spacing: -0.01em;
     }
-    .cxm-db-target-stats { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .cxm-db-target-stats { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
     .cxm-db-target-row {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 12px;
+      min-width: 0;
     }
     .cxm-db-target-label {
       font-size: var(--cx-text-xs);
       color: rgba(255, 255, 255, 0.7);
+      flex-shrink: 0;
     }
     .cxm-db-target-value {
       font-size: var(--cx-text-sm);
       font-weight: 700;
+      text-align: right;
+      min-width: 0;
+      /* Naira amounts can be long on narrow screens — let them shrink
+         gracefully rather than stretching the card layout. */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .cxm-db-target-of {
       font-size: 11px;
       font-weight: 500;
       color: rgba(255, 255, 255, 0.6);
+      margin-left: 2px;
     }
     .cxm-db-target-gold { color: var(--cx-accent-400); }
 
@@ -376,5 +386,18 @@ export class DashboardPage implements OnInit {
     if (['submitted', 'under_review', 'captured', 'draft'].includes(s)) return 'warning';
     if (['rejected', 'overdue'].includes(s)) return 'danger';
     return 'neutral';
+  }
+
+  /**
+   * Formats a naira amount (decimal string or number) as ₦1,234,567.
+   * Rounds to whole naira — kobo precision would make the ring card
+   * too noisy for a progress-at-a-glance surface. Matches the admin
+   * Agent Targets page formatter for UI consistency.
+   */
+  formatNaira(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '₦0';
+    const n = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(n)) return '₦0';
+    return '₦' + Math.round(n).toLocaleString('en-NG');
   }
 }
