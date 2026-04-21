@@ -242,6 +242,67 @@ Check recent commits before deploying to see if any are required.
 
 ---
 
+## Data migrations (bin/migrate.php)
+
+For data corrections that need inspection-before-commit semantics or
+that touch many rows across multiple tables, the project includes a
+PHP migration runner at `backend/bin/migrate.php`. This replaces
+hand-written SQL for complex one-off migrations.
+
+### Usage
+
+```bash
+cd /www/wwwroot/creditx/backend
+
+# Dry-run — shows what would change, does NOT modify anything
+php bin/migrate.php
+
+# Apply with confirmation prompt
+php bin/migrate.php --apply
+
+# Apply non-interactively (for scripts / unattended runs)
+php bin/migrate.php --apply --yes
+```
+
+### Current migration scope
+
+`bin/migrate.php` as of commit `<this commit hash>` handles ONE migration:
+
+  **Percentage-fee / penalty-rule value correction**
+
+  Historic bad data: admins entered `2` into percentage-fee value fields
+  meaning "2%", but the backend stores and calculates fees as fractions
+  (0.02 = 2%). The result was catastrophically wrong loan calculations
+  (200% fees).
+
+  The migration divides `product_fees.value` and `penalty_rules.value`
+  by 100 for any row where:
+    - `calculation_type = 'percentage'`
+    - `value >= 1`
+
+  The `>= 1` threshold is critical: it skips rows already in correct
+  fractional form (0.02, 0.05, etc.) so re-running the script is safe.
+  It also means a legitimate 1% fee expressed as "1" won't be corrected
+  unless you update it — use the admin UI for that edge case.
+
+### Idempotency
+
+After a successful first run, all percentage rows are < 1. A second
+run reports "Nothing to migrate" and exits cleanly. Safe to re-run
+at any point.
+
+### Adding future migrations
+
+Extend `bin/migrate.php` with additional migration functions as the
+need arises. Each migration should:
+  - Have a clear precondition (what data shape does it expect?)
+  - Be idempotent (running twice should be harmless)
+  - Print a dry-run plan
+  - Apply inside a transaction
+  - Print post-apply verification
+
+---
+
 ## Environment variables
 
 All configuration lives in `backend/.env`. See `backend/.env.example`
