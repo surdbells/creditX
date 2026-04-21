@@ -156,37 +156,48 @@ if [[ $FRONTEND_ONLY -eq 0 ]]; then
     warn "3/5 Schema update SKIPPED (--skip-schema)"
   fi
 
-  # ─── Cache clear + warmup ────────────────────────────────────────────
-  step "4/5 Cache clear + warmup"
-  rm -rf var/cache/* var/proxies/* 2>/dev/null || true
-  ok "Cache cleared"
+  # ─── Cache + opcache lifecycle ────────────────────────────────────────
+  # Order matters here. The previous ordering (clear → warmup → opcache)
+  # could leave stale Doctrine metadata on disk:
+  #
+  #   1. We wipe var/cache (fine).
+  #   2. Warmup runs as a CLI process. If opcache.enable_cli=1 (surprisingly
+  #      common on managed hosts like aaPanel / cPanel), the CLI process
+  #      reuses opcache from the previous CLI invocation — which may have
+  #      loaded the OLD Entity/User.php bytecode before the deploy pulled
+  #      the new version.
+  #   3. Warmup writes serialized metadata based on that stale bytecode.
+  #   4. We reload php-fpm; now HTTP serves from fresh bytecode but reads
+  #      the stale metadata file warmup just wrote. Semantical errors
+  #      like 'Class ... has no field named isAgent' appear despite the
+  #      entity code on disk having the field.
+  #
+  # New ordering: clear → reload php-fpm (resets BOTH web + CLI opcache
+  # for systems that share the pool) → warmup. This guarantees warmup
+  # loads fresh source and writes correct metadata.
+  step "4/5 Cache clear + opcache reset + warmup"
 
-  if [[ -f bin/cache-warmup.php ]]; then
-    $PHP -d memory_limit=512M bin/cache-warmup.php
-    ok "Cache warmed"
-  else
-    warn "bin/cache-warmup.php not found — skipping warmup"
+  # Hardened clear: -rf with hidden files, and re-create the directories
+  # with correct perms so the warmup doesn't fail on missing parents.
+  rm -rf var/cache var/proxies 2>/dev/null || true
+  mkdir -p var/cache/doctrine var/proxies 2>/dev/null || true
+  # If running as root, make sure the webserver user can write
+  if [[ $EUID -eq 0 ]]; then
+    chown -R www:www var/cache var/proxies 2>/dev/null || \
+    chown -R www-data:www-data var/cache var/proxies 2>/dev/null || \
+    chown -R nginx:nginx var/cache var/proxies 2>/dev/null || true
   fi
+  ok "Cache dirs reset"
 
-  # ─── PHP opcache reset ───────────────────────────────────────────────
-  # Without this, PHP serves cached bytecode from before the deploy and
-  # new/changed routes or action files won't be picked up until opcache
-  # naturally invalidates. Route additions are the most affected because
-  # the routing table is built from the cached routes.php bytecode, so a
-  # new endpoint looks like a 404 until opcache resets.
-  #
-  # We try php-fpm reload first (the clean, graceful option that also
-  # restarts workers). If that fails we fall back to reloading common
-  # named services. Last resort: print a warning — operator can run
-  # 'sudo systemctl reload php-fpm' manually.
-  #
-  # Detection: systemd 'list-units' is cheap and tells us what's actually
-  # running rather than guessing by version numbers.
+  # Opcache reset — see detailed rationale below. Done BEFORE warmup now
+  # so the warmup script executes against fresh PHP source. Also done
+  # AGAIN after warmup (further down) to make sure HTTP workers pick up
+  # the freshly written metadata cache files rather than serving older
+  # bytecode of cache files that existed before the deploy.
   reload_opcache() {
     if ! command -v systemctl >/dev/null 2>&1; then
       return 1
     fi
-    # Find any unit matching php*-fpm.service or php-fpm.service
     local unit
     unit=$(systemctl list-units --no-legend --state=active --type=service 2>/dev/null \
       | awk '/^php[0-9.]*-?fpm\.service/ { print $1; exit }')
@@ -199,10 +210,28 @@ if [[ $FRONTEND_ONLY -eq 0 ]]; then
   }
 
   if RELOADED=$(reload_opcache); then
-    ok "Opcache reset via reload of $RELOADED"
+    ok "Opcache reset (pre-warmup) via $RELOADED"
+  else
+    warn "Could not reset PHP opcache automatically (pre-warmup)."
+  fi
+
+  if [[ -f bin/cache-warmup.php ]]; then
+    $PHP -d memory_limit=512M bin/cache-warmup.php
+    ok "Cache warmed"
+  else
+    warn "bin/cache-warmup.php not found — skipping warmup"
+  fi
+
+  # Second opcache reset — ensures HTTP workers load the freshly written
+  # metadata cache files (which are PHP files that themselves get cached
+  # in opcache on first read). Without this, Doctrine Semantical errors
+  # can appear after adding new entity fields.
+  if RELOADED=$(reload_opcache); then
+    ok "Opcache reset (post-warmup) via $RELOADED"
   else
     warn "Could not reset PHP opcache automatically."
-    warn "  If new routes/actions return 404 after deploy, run one of:"
+    warn "  If new routes/actions return 404 or Doctrine Semantical errors"
+    warn "  appear after deploy, run one of:"
     warn "    sudo systemctl reload php-fpm"
     warn "    sudo systemctl reload php8.2-fpm      # or your PHP version"
     warn "    sudo service php-fpm reload"
