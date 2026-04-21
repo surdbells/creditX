@@ -127,6 +127,29 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
                       <div class="cx-field-hint">0.02 = 2%</div>
                     }
                   </div>
+                  <div class="cx-lp-fee-field cx-lp-fee-field-grow">
+                    <label class="cx-label">Effect</label>
+                    <select class="cx-select" [(ngModel)]="fee.effect">
+                      <option value="adds_to_gross">Adds to Gross Loan</option>
+                      <option value="deducted_from_disbursement">Deducted from Disbursement</option>
+                    </select>
+                    <div class="cx-field-hint">
+                      @if (fee.effect === 'adds_to_gross') {
+                        Increases gross; customer repays over term
+                      } @else {
+                        Reduces what customer receives; not repaid
+                      }
+                    </div>
+                  </div>
+                  @if (fee.calculation_type === 'percentage') {
+                    <div class="cx-lp-fee-field cx-lp-fee-field-sm">
+                      <label class="cx-label">Base</label>
+                      <select class="cx-select" [(ngModel)]="fee.applies_to">
+                        <option value="principal">Principal</option>
+                        <option value="gross_loan">Gross Loan</option>
+                      </select>
+                    </div>
+                  }
                   <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-lp-fee-remove" (click)="fees.splice(i,1)" title="Remove">
                     <lucide-icon name="trash-2" [size]="14"></lucide-icon>
                   </button>
@@ -183,10 +206,10 @@ export class LoanProductsComponent implements OnInit {
   load(p?:any) { this.loading.set(true); this.api.get('/loan-products',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
   onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }
   openForm(row?:any) {
-    if(row){this.editId=row.id;this.form={name:row.name,code:row.code,description:row.description,interest_calculation_method:row.interest_calculation_method,interest_rate:row.interest_rate,min_amount:row.min_amount,max_amount:row.max_amount,min_tenure:row.min_tenure,max_tenure:row.max_tenure,max_age:row.max_age,max_years_of_service:row.max_years_of_service,allows_top_up:row.allows_top_up};this.fees=(row.fees||[]).map((f:any)=>({fee_type_id:f.fee_type_id,calculation_type:f.calculation_type,value:f.value}));}
+    if(row){this.editId=row.id;this.form={name:row.name,code:row.code,description:row.description,interest_calculation_method:row.interest_calculation_method,interest_rate:row.interest_rate,min_amount:row.min_amount,max_amount:row.max_amount,min_tenure:row.min_tenure,max_tenure:row.max_tenure,max_age:row.max_age,max_years_of_service:row.max_years_of_service,allows_top_up:row.allows_top_up};this.fees=(row.fees||[]).map((f:any)=>({fee_type_id:f.fee_type_id,calculation_type:f.calculation_type,value:f.value,effect:f.effect||'deducted_from_disbursement',applies_to:f.applies_to||'principal'}));}
     else{this.editId=null;this.form={name:'',code:'',description:'',interest_calculation_method:'flat_rate',interest_rate:'',min_amount:'',max_amount:'',min_tenure:1,max_tenure:24,max_age:60,max_years_of_service:35,allows_top_up:false};this.fees=[];}
     this.showForm.set(true);
   }
-  addFee() { this.fees.push({fee_type_id:'',calculation_type:'flat',value:''}); }
+  addFee() { this.fees.push({fee_type_id:'',calculation_type:'flat',value:'',effect:'deducted_from_disbursement',applies_to:'principal'}); }
   saveForm() { this.saving.set(true); const p={...this.form,fees:this.fees.filter(f=>f.fee_type_id)}; (this.editId?this.api.put('/loan-products/'+this.editId,p):this.api.post('/loan-products',p)).subscribe({next:r=>{this.saving.set(false);this.toast.success(r.message||'Saved');this.showForm.set(false);this.load(this.q);},error:e=>{this.saving.set(false);this.toast.error(e.error?.message||'Failed');}}); }
 }
