@@ -83,6 +83,50 @@ class Loan
     #[ORM\Column(type: 'string', length: 36, nullable: true)]
     private ?string $previousLoanId = null;
 
+    // ─── Application-capture fields — populated by the agent during
+    //     the loan wizard. Not directly used by the calculation engine;
+    //     persisted for audit, statement generation, and disbursement. ───
+
+    /**
+     * Loan amount in words — free-text field matching the legacy
+     * "Amount in word" input, e.g. "Five hundred thousand naira only".
+     * Used in printed loan agreements.
+     */
+    #[ORM\Column(type: 'string', length: 500, nullable: true)]
+    private ?string $loanAmountWords = null;
+
+    /**
+     * Purpose of the loan — legacy default was "Public Sector".
+     * Free text; not an enum so products can define their own
+     * typical purposes without schema changes.
+     */
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    private ?string $loanPurpose = null;
+
+    /**
+     * Repayment method. Legacy values are "Direct Debit", "Cheques",
+     * "Payroll Deduction". Left as free-text rather than enum for the
+     * same flexibility as loanPurpose.
+     */
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $repaymentMethod = null;
+
+    /**
+     * Account statement identifier. Applies when the customer provided
+     * their own statement — an identifier for the uploaded document.
+     */
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $accountStatementId = null;
+
+    /**
+     * Password for opening the account statement PDF. Stored as-is for
+     * now; the statement-consumer service needs the plaintext to
+     * open the PDF. A future hardening could encrypt this with a
+     * per-tenant key so it's not readable from raw DB access.
+     */
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $accountStatementPassword = null;
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $disbursedAt = null;
 
@@ -127,6 +171,11 @@ class Loan
     public function getTopUpBalance(): ?string { return $this->topUpBalance; }
     public function getPreviousLoanId(): ?string { return $this->previousLoanId; }
     public function getDisbursedAt(): ?\DateTimeImmutable { return $this->disbursedAt; }
+    public function getLoanAmountWords(): ?string { return $this->loanAmountWords; }
+    public function getLoanPurpose(): ?string { return $this->loanPurpose; }
+    public function getRepaymentMethod(): ?string { return $this->repaymentMethod; }
+    public function getAccountStatementId(): ?string { return $this->accountStatementId; }
+    public function getAccountStatementPassword(): ?string { return $this->accountStatementPassword; }
     public function getClosedAt(): ?\DateTimeImmutable { return $this->closedAt; }
     public function getTransaction(): ?LoanTransaction { return $this->transaction; }
     /** @return Collection<int, LoanFeeBreakdown> */
@@ -151,6 +200,11 @@ class Loan
     public function setTopUpBalance(?string $v): void { $this->topUpBalance = $v; }
     public function setPreviousLoanId(?string $v): void { $this->previousLoanId = $v; }
     public function setDisbursedAt(?\DateTimeImmutable $v): void { $this->disbursedAt = $v; }
+    public function setLoanAmountWords(?string $v): void { $this->loanAmountWords = $v; }
+    public function setLoanPurpose(?string $v): void { $this->loanPurpose = $v; }
+    public function setRepaymentMethod(?string $v): void { $this->repaymentMethod = $v; }
+    public function setAccountStatementId(?string $v): void { $this->accountStatementId = $v; }
+    public function setAccountStatementPassword(?string $v): void { $this->accountStatementPassword = $v; }
     public function setClosedAt(?\DateTimeImmutable $v): void { $this->closedAt = $v; }
     public function setTransaction(?LoanTransaction $v): void { $this->transaction = $v; }
 
@@ -231,6 +285,12 @@ class Loan
             'top_up_balance'     => $this->topUpBalance,
             'previous_loan_id'   => $this->previousLoanId,
             'disbursed_at'       => $this->disbursedAt?->format('Y-m-d H:i:s'),
+            'loan_amount_words'  => $this->loanAmountWords,
+            'loan_purpose'       => $this->loanPurpose,
+            'repayment_method'   => $this->repaymentMethod,
+            'account_statement_id' => $this->accountStatementId,
+            // Intentionally NOT included: account_statement_password.
+            // Never returned in API responses. Readable via getter only.
             'closed_at'          => $this->closedAt?->format('Y-m-d H:i:s'),
             'created_at'         => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'         => $this->updatedAt->format('Y-m-d H:i:s'),

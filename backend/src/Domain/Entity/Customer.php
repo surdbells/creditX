@@ -89,6 +89,61 @@ class Customer
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $altAccountNumber = null;
 
+    /**
+     * Resolved alternate account holder name. Populated by bank-account
+     * validation (Paystack resolve endpoint) when the agent clicks the
+     * VALIDATE ACCOUNT button during loan capture. Not edited directly.
+     */
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    private ?string $altAccountName = null;
+
+    // ─── Employment (populated from the Employment Information step of
+    //     the loan capture wizard. All nullable — existing customer rows
+    //     predate these columns). ───
+
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $jobTitle = null;
+
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    private ?string $employer = null;
+
+    /** Sub-organization, ministry, agency, parastatal, etc. */
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    private ?string $organization = null;
+
+    /** For armed forces / police — e.g. "3 Division". Nullable for civilians. */
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $command = null;
+
+    #[ORM\Column(type: 'date', nullable: true)]
+    private ?\DateTimeInterface $employmentDate = null;
+
+    /**
+     * Type of ID presented: WorkID, NIN, DriversLicense, VotersCard,
+     * NigerianIntPassport, BirthCertificate, etc. Free text (50 chars)
+     * rather than an enum so legacy data and new ID types can be added
+     * without schema changes.
+     */
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $idType = null;
+
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    private ?string $workIdNumber = null;
+
+    #[ORM\Column(type: 'date', nullable: true)]
+    private ?\DateTimeInterface $workIdIssuedDate = null;
+
+    #[ORM\Column(type: 'date', nullable: true)]
+    private ?\DateTimeInterface $workIdExpiryDate = null;
+
+    /**
+     * Legacy calls this "Net Pay" in the form label but stores it in a
+     * column named gross_pay. Kept as grossPay here to match the legacy
+     * DB column name for compatibility with any reporting that reads it.
+     */
+    #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
+    private ?string $grossPay = null;
+
     // ─── Relations ───
 
     /** @var Collection<int, NextOfKin> */
@@ -130,6 +185,17 @@ class Customer
     public function getAccountNumber(): ?string { return $this->accountNumber; }
     public function getAltBankName(): ?string { return $this->altBankName; }
     public function getAltAccountNumber(): ?string { return $this->altAccountNumber; }
+    public function getAltAccountName(): ?string { return $this->altAccountName; }
+    public function getJobTitle(): ?string { return $this->jobTitle; }
+    public function getEmployer(): ?string { return $this->employer; }
+    public function getOrganization(): ?string { return $this->organization; }
+    public function getCommand(): ?string { return $this->command; }
+    public function getEmploymentDate(): ?\DateTimeInterface { return $this->employmentDate; }
+    public function getIdType(): ?string { return $this->idType; }
+    public function getWorkIdNumber(): ?string { return $this->workIdNumber; }
+    public function getWorkIdIssuedDate(): ?\DateTimeInterface { return $this->workIdIssuedDate; }
+    public function getWorkIdExpiryDate(): ?\DateTimeInterface { return $this->workIdExpiryDate; }
+    public function getGrossPay(): ?string { return $this->grossPay; }
     /** @return Collection<int, NextOfKin> */
     public function getNextOfKins(): Collection { return $this->nextOfKins; }
     /** @return Collection<int, Document> */
@@ -158,6 +224,17 @@ class Customer
     public function setAccountNumber(?string $v): void { $this->accountNumber = $v; }
     public function setAltBankName(?string $v): void { $this->altBankName = $v; }
     public function setAltAccountNumber(?string $v): void { $this->altAccountNumber = $v; }
+    public function setAltAccountName(?string $v): void { $this->altAccountName = $v; }
+    public function setJobTitle(?string $v): void { $this->jobTitle = $v; }
+    public function setEmployer(?string $v): void { $this->employer = $v; }
+    public function setOrganization(?string $v): void { $this->organization = $v; }
+    public function setCommand(?string $v): void { $this->command = $v; }
+    public function setEmploymentDate(?\DateTimeInterface $v): void { $this->employmentDate = $v; }
+    public function setIdType(?string $v): void { $this->idType = $v; }
+    public function setWorkIdNumber(?string $v): void { $this->workIdNumber = $v; }
+    public function setWorkIdIssuedDate(?\DateTimeInterface $v): void { $this->workIdIssuedDate = $v; }
+    public function setWorkIdExpiryDate(?\DateTimeInterface $v): void { $this->workIdExpiryDate = $v; }
+    public function setGrossPay(?string $v): void { $this->grossPay = $v; }
 
     // ─── NextOfKin management ───
 
@@ -216,8 +293,35 @@ class Customer
         if (isset($data['account_number'])) $this->setAccountNumber($data['account_number']);
         if (isset($data['alt_bank_name'])) $this->setAltBankName($data['alt_bank_name']);
         if (isset($data['alt_account_number'])) $this->setAltAccountNumber($data['alt_account_number']);
+        if (isset($data['alt_account_name'])) $this->setAltAccountName($data['alt_account_name']);
+
+        // Employment fields
+        if (isset($data['job_title'])) $this->setJobTitle($data['job_title']);
+        if (isset($data['employer'])) $this->setEmployer($data['employer']);
+        if (isset($data['organization'])) $this->setOrganization($data['organization']);
+        if (isset($data['command'])) $this->setCommand($data['command']);
+        if (isset($data['id_type'])) $this->setIdType($data['id_type']);
+        if (isset($data['work_id_number'])) $this->setWorkIdNumber($data['work_id_number']);
+        if (isset($data['gross_pay'])) $this->setGrossPay((string) $data['gross_pay']);
+
+        // Date fields — all use the same safe-parse pattern. Silently
+        // ignore unparseable strings rather than throwing; validator
+        // should catch malformed input at the action layer.
+        foreach ([
+            'employment_date' => 'setEmploymentDate',
+            'work_id_issued_date' => 'setWorkIdIssuedDate',
+            'work_id_expiry_date' => 'setWorkIdExpiryDate',
+        ] as $key => $setter) {
+            if (!empty($data[$key])) {
+                try { $this->$setter(new \DateTime($data[$key])); } catch (\Exception) {}
+            }
+        }
+
         if (isset($data['dob']) && $data['dob']) {
             try { $this->setDateOfBirth(new \DateTime($data['dob'])); } catch (\Exception) {}
+        }
+        if (isset($data['date_of_birth']) && $data['date_of_birth']) {
+            try { $this->setDateOfBirth(new \DateTime($data['date_of_birth'])); } catch (\Exception) {}
         }
     }
 
@@ -246,6 +350,17 @@ class Customer
             'account_number'     => $this->accountNumber,
             'alt_bank_name'      => $this->altBankName,
             'alt_account_number' => $this->altAccountNumber,
+            'alt_account_name'   => $this->altAccountName,
+            'job_title'          => $this->jobTitle,
+            'employer'           => $this->employer,
+            'organization'       => $this->organization,
+            'command'            => $this->command,
+            'employment_date'    => $this->employmentDate?->format('Y-m-d'),
+            'id_type'            => $this->idType,
+            'work_id_number'     => $this->workIdNumber,
+            'work_id_issued_date' => $this->workIdIssuedDate?->format('Y-m-d'),
+            'work_id_expiry_date' => $this->workIdExpiryDate?->format('Y-m-d'),
+            'gross_pay'          => $this->grossPay,
             'created_at'         => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'         => $this->updatedAt->format('Y-m-d H:i:s'),
         ];

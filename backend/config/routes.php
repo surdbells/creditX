@@ -212,6 +212,11 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('customers.view'));
             $group->post('', Customer\CreateCustomerAction::class)
                 ->add(new RbacMiddleware('customers.create'));
+            // Look up a customer by IPPIS (staff_id) — used by the agent
+            // loan-capture wizard to prefill the form. Route is placed
+            // before /{id} so Slim doesn't treat "by-ippis" as an ID.
+            $group->get('/by-ippis/{ippis}', Customer\FindByIppisAction::class)
+                ->add(new RbacMiddleware('customers.view'));
             $group->get('/{id}', Customer\GetCustomerAction::class)
                 ->add(new RbacMiddleware('customers.view'));
             $group->put('/{id}', Customer\UpdateCustomerAction::class)
