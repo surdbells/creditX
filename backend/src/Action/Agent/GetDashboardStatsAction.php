@@ -27,7 +27,9 @@ final class GetDashboardStatsAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $user = $request->getAttribute('user');
+        $userId = $request->getAttribute('user_id');
+        if (!$userId) return $this->unauthorized();
+        $user = $this->em->find(User::class, $userId);
         if (!$user instanceof User) return $this->unauthorized();
 
         $now = new \DateTimeImmutable('now', new \DateTimeZone('Africa/Lagos'));
