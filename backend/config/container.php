@@ -289,6 +289,7 @@ return [
     \App\Infrastructure\Service\PushNotificationService::class => function (ContainerInterface $c): \App\Infrastructure\Service\PushNotificationService {
         return new \App\Infrastructure\Service\PushNotificationService(
             $c->get(EntityManagerInterface::class),
+            $c->get(\Psr\Log\LoggerInterface::class),
         );
     },
     ReportingService::class => function (ContainerInterface $c): ReportingService {
