@@ -282,7 +282,13 @@ return [
             $c->get(NotificationTemplateRepository::class),
             $c->get(NotificationRepository::class),
             $c->get(SettingsCacheService::class),
-            $c->get(\Psr\Log\LoggerInterface::class)
+            $c->get(\Psr\Log\LoggerInterface::class),
+            $c->get(\App\Infrastructure\Service\PushNotificationService::class),
+        );
+    },
+    \App\Infrastructure\Service\PushNotificationService::class => function (ContainerInterface $c): \App\Infrastructure\Service\PushNotificationService {
+        return new \App\Infrastructure\Service\PushNotificationService(
+            $c->get(EntityManagerInterface::class),
         );
     },
     ReportingService::class => function (ContainerInterface $c): ReportingService {

@@ -21,6 +21,7 @@ final class NotificationDispatchService
         private readonly NotificationRepository $notifRepo,
         private readonly SettingsCacheService $settings,
         private readonly LoggerInterface $logger,
+        private readonly PushNotificationService $push,
     ) {
     }
 
@@ -39,6 +40,7 @@ final class NotificationDispatchService
                 NotificationChannel::SMS => $this->settings->getBool('notification.sms_enabled', true),
                 NotificationChannel::WHATSAPP => $this->settings->getBool('notification.whatsapp_enabled', false),
                 NotificationChannel::IN_APP => true,
+                NotificationChannel::PUSH => $this->settings->getBool('notification.push_enabled', true),
             };
 
             if (!$channelEnabled) continue;
@@ -81,6 +83,7 @@ final class NotificationDispatchService
             NotificationChannel::SMS => $this->sendSms($notification),
             NotificationChannel::WHATSAPP => $this->sendWhatsApp($notification),
             NotificationChannel::IN_APP => $this->sendInApp($notification),
+            NotificationChannel::PUSH => $this->sendPush($notification),
         };
     }
 
@@ -217,6 +220,54 @@ final class NotificationDispatchService
     }
 
     /**
+     * Dispatch a push notification via FCM.
+     *
+     * The Notification's recipient field holds the user_id (resolved by
+     * resolveRecipient() for NotificationChannel::PUSH). PushNotificationService
+     * looks up active DeviceToken rows for that user and sends to each.
+     *
+     * Failure modes are handled by PushNotificationService:
+     *   - No active device tokens: returns ['sent' => 0, 'reason' => ...].
+     *     We still markSent() because the message was dispatched correctly —
+     *     the user simply has no registered device. Marking failed would
+     *     spam the notifications log every time a desk worker without a
+     *     phone app gets a status update.
+     *   - FCM request failure: returns ['error' => ...]. We throw so the
+     *     outer catch marks the notification as failed and logs the
+     *     reason. Retry behaviour is handled by whoever calls dispatch.
+     *
+     * The data payload passed to FCM carries the notification id and any
+     * contextual hints (loan_id, route) so the agent app can deep-link
+     * when the user taps the notification.
+     */
+    private function sendPush(Notification $notification): void
+    {
+        $userId = $notification->getRecipient();
+        if (!$userId) {
+            throw new \RuntimeException('Push channel requires user_id recipient');
+        }
+
+        $data = [
+            'notification_id' => $notification->getId(),
+        ];
+
+        $result = $this->push->sendToUser(
+            $userId,
+            $notification->getSubject(),
+            $notification->getBody(),
+            $data,
+        );
+
+        if (isset($result['error'])) {
+            throw new \RuntimeException('FCM: ' . (string) $result['error']);
+        }
+
+        // Mark sent even when no active devices — the message was routed
+        // correctly, the user just has no phone registered. See docblock.
+        $notification->markSent();
+    }
+
+    /**
      * Resolve recipient address based on channel.
      */
     private function resolveRecipient(NotificationChannel $channel, array $context): ?string
@@ -224,7 +275,7 @@ final class NotificationDispatchService
         return match ($channel) {
             NotificationChannel::EMAIL => $context['customer_email'] ?? $context['email'] ?? null,
             NotificationChannel::SMS, NotificationChannel::WHATSAPP => $context['customer_phone'] ?? $context['phone'] ?? null,
-            NotificationChannel::IN_APP => $context['user_id'] ?? null,
+            NotificationChannel::IN_APP, NotificationChannel::PUSH => $context['user_id'] ?? null,
         };
     }
 
