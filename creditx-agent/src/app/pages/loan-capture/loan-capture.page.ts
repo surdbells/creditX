@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline } from 'ionicons/icons';
+import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
@@ -15,283 +15,969 @@ import { ApiService } from '../../core/services/api.service';
     <ion-header class="ion-no-border">
       <ion-toolbar>
         <ion-buttons slot="start"><ion-back-button defaultHref="/loans"></ion-back-button></ion-buttons>
-        <ion-title>New Loan Application</ion-title>
+        <ion-title>New Application</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content [fullscreen]="true">
-      <div class="p-4">
-        @if (agentBlocked()) {
-          <div class="flex flex-col items-center justify-center py-16">
-            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
-              <ion-icon name="close-circle-outline" class="text-3xl text-red-500"></ion-icon>
-            </div>
-            <h3 class="text-base font-bold text-gray-800 mb-1">Loan Applications Paused</h3>
-            <p class="text-xs text-gray-500 text-center max-w-xs">The admin has temporarily stopped accepting new loan applications. Please check back later or contact your supervisor.</p>
-            <button class="mt-4 px-4 py-2 rounded-xl bg-gray-100 text-sm font-medium text-gray-600" (click)="router.navigate(['/dashboard'])">Back to Dashboard</button>
+      @if (agentBlocked()) {
+        <div class="cxm-empty cxm-lc-blocked">
+          <div class="cxm-empty-icon" style="background: var(--cx-danger-50); color: var(--cx-danger)">
+            <ion-icon name="close-circle-outline" style="font-size: 28px"></ion-icon>
           </div>
-        } @else {
-        <!-- Step Indicator -->
-        <div class="flex items-center justify-between mb-6">
-          @for (s of stepLabels; track s; let i = $index) {
-            <div class="flex items-center gap-1" [class.flex-1]="i < stepLabels.length - 1">
-              <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
-                   [class]="step() > i ? 'bg-[#0A4F2A] text-white' : step() === i ? 'bg-[#C9A227] text-white' : 'bg-gray-200 text-gray-500'">
-                @if (step() > i) { <ion-icon name="checkmark-circle-outline" class="text-sm"></ion-icon> }
-                @else { {{ i + 1 }} }
-              </div>
-              <span class="text-[10px] text-gray-500 hidden sm:inline">{{ s }}</span>
-              @if (i < stepLabels.length - 1) { <div class="flex-1 h-0.5 mx-1" [class]="step() > i ? 'bg-[#0A4F2A]' : 'bg-gray-200'"></div> }
-            </div>
-          }
+          <div class="cxm-empty-title">Applications Paused</div>
+          <div class="cxm-empty-desc">The admin has temporarily stopped accepting new loan applications. Please check back later or contact your supervisor.</div>
+          <button class="cxm-lc-back-btn" (click)="router.navigate(['/dashboard'])">Back to Dashboard</button>
+        </div>
+      } @else {
+        <!-- Page header -->
+        <div class="cxm-page-header cx-animate-in" style="padding-bottom: 12px">
+          <div class="cxm-eyebrow cxm-eyebrow-primary">Step {{ step() + 1 }} of {{ stepLabels.length }}</div>
+          <h1 class="cxm-title">{{ stepLabels[step()] }}</h1>
+          <p class="cxm-subtitle">{{ stepHints[step()] }}</p>
         </div>
 
-        <!-- Step 1: Product Select -->
-        @if (step() === 0) {
-          <div class="space-y-3">
-            <h3 class="text-base font-semibold text-gray-800">Select Loan Product</h3>
-            @if (productsLoading()) {
-              <div class="flex justify-center py-8"><ion-spinner name="crescent"></ion-spinner></div>
-            } @else {
-              @for (product of products(); track product.id) {
-                <div class="p-4 rounded-xl border-2 cursor-pointer transition-colors"
-                     [class]="form['product_id'] === product.id ? 'border-[#0A4F2A] bg-[#0A4F2A]/5' : 'border-gray-100 bg-white'"
-                     (click)="selectProduct(product)">
-                  <div class="font-semibold text-sm text-gray-800">{{ product.name }}</div>
-                  <div class="text-xs text-gray-500 mt-1">{{ product.interest_calculation_method }} &bull; {{ product.interest_rate }}% &bull; {{ product.min_tenure }}-{{ product.max_tenure }} months</div>
-                  <div class="text-xs text-gray-400 mt-0.5">₦{{ product.min_amount | number:'1.0-0' }} — ₦{{ product.max_amount | number:'1.0-0' }}</div>
+        <!-- Step indicator pill rail -->
+        <div class="cxm-lc-rail-wrap">
+          <div class="cxm-lc-rail">
+            @for (s of stepLabels; track s; let i = $index; let last = $last) {
+              <div class="cxm-lc-step-wrap" [class.is-last]="last">
+                <div class="cxm-lc-step"
+                     [class.is-active]="step() === i"
+                     [class.is-done]="step() > i">
+                  @if (step() > i) {
+                    <ion-icon name="checkmark" style="font-size: 12px"></ion-icon>
+                  } @else {
+                    <span class="tabular-nums">{{ i + 1 }}</span>
+                  }
                 </div>
-              }
-            }
-          </div>
-        }
-
-        <!-- Step 2: Staff ID Validation -->
-        @if (step() === 1) {
-          <div class="space-y-4">
-            <h3 class="text-base font-semibold text-gray-800">Staff Record Lookup</h3>
-            <div class="flex gap-2">
-              <input type="text" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm" [(ngModel)]="form['staff_id']" placeholder="Enter Staff ID" />
-              <button class="px-4 py-3 rounded-xl bg-[#0A4F2A] text-white disabled:opacity-50" [disabled]="staffLoading() || !form['staff_id']" (click)="lookupStaff()">
-                @if (staffLoading()) { <ion-spinner name="crescent" class="w-4 h-4"></ion-spinner> }
-                @else { <ion-icon name="search-outline"></ion-icon> }
-              </button>
-            </div>
-            @if (staffRecord()) {
-              <div class="p-4 rounded-xl bg-green-50 border border-green-100">
-                <div class="font-semibold text-sm text-gray-800">{{ staffRecord()?.employee_name }}</div>
-                <div class="text-xs text-gray-500 mt-1">{{ staffRecord()?.organization }} &bull; {{ staffRecord()?.job_title }}</div>
-                <div class="text-xs text-gray-500">Gross: ₦{{ staffRecord()?.gross_pay | number:'1.0-0' }} &bull; Net: ₦{{ staffRecord()?.net_pay | number:'1.0-0' }}</div>
-              </div>
-            }
-            @if (staffError()) {
-              <div class="p-3 rounded-xl bg-red-50 text-red-600 text-sm">{{ staffError() }}</div>
-            }
-            @if (existingCustomer() && staffRecord()) {
-              <div class="p-3 rounded-xl bg-[#C9A227]/10 border border-[#C9A227]/20 text-xs text-[#8a6f1a] flex items-start gap-2">
-                <ion-icon name="information-circle-outline" class="text-base flex-shrink-0 mt-0.5"></ion-icon>
-                <div>Existing customer found. Contact details have been pre-filled — you can edit them as needed.</div>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- Step 3: Loan Details -->
-        @if (step() === 2) {
-          <div class="space-y-4">
-            <h3 class="text-base font-semibold text-gray-800">Loan Details</h3>
-            <div>
-              <label class="text-xs font-medium text-gray-500 mb-1 block">Loan Amount (₦)</label>
-              <input type="number" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm" [(ngModel)]="form['amount']" placeholder="Enter amount" />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500 mb-1 block">Tenure (months)</label>
-              <input type="number" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm" [(ngModel)]="form['tenure']" placeholder="Enter tenure" />
-            </div>
-            <button class="w-full py-3 rounded-xl bg-[#C9A227]/10 text-[#C9A227] font-medium text-sm flex items-center justify-center gap-2 border border-[#C9A227]/20"
-                    [disabled]="calcLoading()" (click)="calculate()">
-              <ion-icon name="calculator-outline"></ion-icon> Calculate Breakdown
-            </button>
-            @if (calcResult()) {
-              <div class="p-4 rounded-xl bg-[#0A4F2A]/5 border border-[#0A4F2A]/10 space-y-1 text-sm">
-                <div class="flex justify-between"><span class="text-gray-500">Gross Loan</span><span class="font-semibold">₦{{ calcResult()?.gross_loan | number:'1.2-2' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">Total Fees</span><span class="font-semibold">₦{{ calcResult()?.total_fees | number:'1.2-2' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">Net Disbursed</span><span class="font-semibold text-[#0A4F2A]">₦{{ calcResult()?.net_disbursed | number:'1.2-2' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">Monthly Repayment</span><span class="font-semibold text-[#C9A227]">₦{{ calcResult()?.mr_principal_interest | number:'1.2-2' }}</span></div>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- Step 4: Personal & Banking -->
-        @if (step() === 3) {
-          <div class="space-y-4">
-            <h3 class="text-base font-semibold text-gray-800">Personal & Banking</h3>
-            @for (field of personalFields; track field.key) {
-              <div>
-                <label class="text-xs font-medium text-gray-500 mb-1 block">{{ field.label }}</label>
-                @if (field.key === 'bank_name') {
-                  <input type="text" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"
-                         [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''"
-                         list="banks-list" autocomplete="off" />
-                  <datalist id="banks-list">
-                    @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
-                  </datalist>
-                } @else {
-                  <input [type]="field.type || 'text'" class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm"
-                         [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''" />
+                @if (!last) {
+                  <div class="cxm-lc-rail-line" [class.is-done]="step() > i"></div>
                 }
               </div>
             }
           </div>
-        }
+        </div>
 
-        <!-- Step 5: Review & Submit -->
-        <!-- Step 5: Document Upload -->
-        @if (step() === 4) {
-          <div class="space-y-4">
-            <h3 class="text-base font-semibold text-gray-800">Upload Documents</h3>
-            <p class="text-xs text-gray-500">Upload required documents (passport, ID, payslip, bank statement)</p>
-
-            @for (docType of docTypes; track docType.key) {
-              <div class="p-4 rounded-xl border border-gray-100 bg-white">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm font-medium text-gray-800">{{ docType.label }}</span>
-                  @if (getUploadedDoc(docType.key)) {
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1">
-                      <ion-icon name="checkmark-circle" class="text-xs"></ion-icon>
-                      Ready
-                    </span>
-                  }
+        <div class="px-4 pb-6">
+          <!-- Step 1: Product Select -->
+          @if (step() === 0) {
+            <div class="flex flex-col gap-2">
+              @if (productsLoading()) {
+                <div class="cxm-loading">
+                  <div class="cxm-loading-dots"><span></span><span></span><span></span></div>
+                  <span class="cxm-loading-text">Loading products...</span>
                 </div>
-                @if (getUploadedDoc(docType.key); as docFile) {
-                  <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                      <ion-icon name="document-outline" class="text-base text-gray-400 flex-shrink-0"></ion-icon>
-                      <div class="min-w-0">
-                        <div class="text-xs text-gray-700 truncate">{{ docFile.name }}</div>
-                        <div class="text-[10px] text-gray-400">{{ formatFileSize(docFile.file.size) }}</div>
+              } @else {
+                @for (product of products(); track product.id) {
+                  <button type="button" class="cxm-lc-product"
+                          [class.is-selected]="form['product_id'] === product.id"
+                          (click)="selectProduct(product)">
+                    <div class="cxm-lc-product-main">
+                      <div class="cxm-lc-product-name">{{ product.name }}</div>
+                      <div class="cxm-lc-product-meta">
+                        <span>{{ product.interest_calculation_method }}</span>
+                        <span class="cxm-lc-dot">·</span>
+                        <span class="cxm-lc-product-rate">{{ product.interest_rate }}%</span>
+                        <span class="cxm-lc-dot">·</span>
+                        <span>{{ product.min_tenure }}–{{ product.max_tenure }} mo</span>
+                      </div>
+                      <div class="cxm-lc-product-range tabular-nums">
+                        ₦{{ product.min_amount | number:'1.0-0' }} – ₦{{ product.max_amount | number:'1.0-0' }}
                       </div>
                     </div>
-                    <button type="button" class="text-red-500 p-1" (click)="removeUpload(docType.key)" aria-label="Remove">
-                      <ion-icon name="close-circle" class="text-lg"></ion-icon>
-                    </button>
-                  </div>
-                } @else {
-                  <div class="flex gap-2">
-                    <label class="flex-1 py-3 rounded-xl border-2 border-dashed border-gray-200 text-center cursor-pointer hover:border-[#0A4F2A]/30 transition-colors">
-                      <input type="file" class="hidden" [accept]="docType.accept" (change)="onFileSelected($event, docType.key)" />
-                      <ion-icon name="cloud-upload-outline" class="text-xl text-gray-400 block mx-auto"></ion-icon>
-                      <span class="text-xs text-gray-500 mt-1 block">Tap to select file</span>
-                      <span class="text-[10px] text-gray-400 block">Max 10MB</span>
-                    </label>
-                  </div>
-                }
-              </div>
-            }
-
-            @if (uploadError()) {
-              <div class="p-3 rounded-xl bg-red-50 text-red-600 text-sm">{{ uploadError() }}</div>
-            }
-          </div>
-        }
-
-        <!-- Step 6: Review & Submit -->
-        @if (step() === 5) {
-          <div class="space-y-4">
-            <h3 class="text-base font-semibold text-gray-800">Review & Submit</h3>
-            <div class="p-4 rounded-xl bg-white border border-gray-100 space-y-2 text-sm">
-              <div class="flex justify-between"><span class="text-gray-500">Product</span><span class="font-medium">{{ selectedProductName() }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Staff ID</span><span class="font-medium">{{ form['staff_id'] }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Customer</span><span class="font-medium">{{ staffRecord()?.employee_name }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Amount</span><span class="font-semibold">₦{{ form['amount'] | number:'1.2-2' }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">Tenure</span><span class="font-medium">{{ form['tenure'] }} months</span></div>
-              @if (calcResult()) {
-                <div class="flex justify-between border-t pt-2 mt-2"><span class="text-gray-500">Net Disbursed</span><span class="font-semibold text-[#0A4F2A]">₦{{ calcResult()?.net_disbursed | number:'1.2-2' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">Monthly Payment</span><span class="font-semibold text-[#C9A227]">₦{{ calcResult()?.mr_principal_interest | number:'1.2-2' }}</span></div>
-              }
-            </div>
-
-            <!-- Upload Progress (visible after loan is submitted) -->
-            @if (submittedLoanId() && uploadedDocs.size > 0) {
-              <div class="p-4 rounded-xl bg-white border border-gray-100 space-y-3">
-                <div class="flex items-center justify-between">
-                  <h4 class="text-sm font-semibold text-gray-800">Uploading Documents</h4>
-                  @if (uploadsComplete()) {
-                    <ion-icon name="checkmark-circle" class="text-green-600 text-lg"></ion-icon>
-                  } @else {
-                    <ion-spinner name="crescent" class="w-4 h-4"></ion-spinner>
-                  }
-                </div>
-                @for (docType of docTypes; track docType.key) {
-                  @if (getUploadedDoc(docType.key); as doc) {
-                    <div class="space-y-1">
-                      <div class="flex justify-between items-center text-xs">
-                        <span class="text-gray-700 truncate pr-2">{{ docType.label }}</span>
-                        @if (getUploadState(docType.key); as state) {
-                          @if (state.status === 'done') {
-                            <span class="text-green-600 font-medium flex items-center gap-1 flex-shrink-0">
-                              <ion-icon name="checkmark-circle"></ion-icon> Done
-                            </span>
-                          } @else if (state.status === 'error') {
-                            <button class="text-red-600 font-medium flex items-center gap-1 flex-shrink-0" (click)="retryUpload(docType.key, submittedLoanId()!)">
-                              <ion-icon name="refresh-outline"></ion-icon> Retry
-                            </button>
-                          } @else {
-                            <span class="text-[#0A4F2A] font-medium flex-shrink-0">{{ state.progress }}%</span>
-                          }
-                        }
-                      </div>
-                      <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        @if (getUploadState(docType.key); as state) {
-                          <div class="h-full transition-all duration-300 rounded-full"
-                               [class]="state.status === 'error' ? 'bg-red-500' : state.status === 'done' ? 'bg-green-500' : 'bg-[#0A4F2A]'"
-                               [style.width.%]="state.progress"></div>
-                        }
-                      </div>
-                      @if (getUploadState(docType.key)?.status === 'error') {
-                        <div class="text-[10px] text-red-600">{{ getUploadState(docType.key)?.error }}</div>
+                    <div class="cxm-lc-product-check">
+                      @if (form['product_id'] === product.id) {
+                        <ion-icon name="checkmark" style="font-size: 14px"></ion-icon>
                       }
                     </div>
-                  }
-                }
-                @if (uploadsComplete()) {
-                  <button class="w-full py-2 rounded-lg bg-[#0A4F2A] text-white text-sm font-medium mt-2" (click)="proceedAfterUploads()">
-                    Continue to Loan
                   </button>
                 }
+              }
+            </div>
+          }
+
+          <!-- Step 2: Staff Lookup -->
+          @if (step() === 1) {
+            <div class="flex flex-col gap-3">
+              <div class="cxm-lc-card">
+                <label class="cxm-lc-label">Staff ID / IPPIS Number</label>
+                <div class="cxm-lc-search-row">
+                  <input type="text" class="cxm-lc-input"
+                         [(ngModel)]="form['staff_id']"
+                         placeholder="Enter staff ID"
+                         (keyup.enter)="lookupStaff()" />
+                  <button class="cxm-lc-search-btn"
+                          [disabled]="staffLoading() || !form['staff_id']"
+                          (click)="lookupStaff()">
+                    @if (staffLoading()) {
+                      <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+                    } @else {
+                      <ion-icon name="search-outline" style="font-size: 18px"></ion-icon>
+                    }
+                  </button>
+                </div>
               </div>
+
+              @if (staffRecord()) {
+                <div class="cxm-lc-result cx-animate-in">
+                  <div class="cxm-lc-result-head">
+                    <div class="cxm-avatar cxm-avatar-lg">
+                      {{ staffRecord()?.employee_name?.charAt(0) }}
+                    </div>
+                    <div class="cxm-lc-result-meta">
+                      <div class="cxm-lc-result-name">{{ staffRecord()?.employee_name }}</div>
+                      <div class="cxm-lc-result-job">{{ staffRecord()?.job_title || '—' }} · {{ staffRecord()?.organization || '—' }}</div>
+                    </div>
+                    <div class="cxm-lc-result-check">
+                      <ion-icon name="checkmark-circle" style="font-size: 20px"></ion-icon>
+                    </div>
+                  </div>
+                  <div class="cxm-lc-result-stats">
+                    <div class="cxm-lc-result-stat">
+                      <div class="cxm-eyebrow">Gross Pay</div>
+                      <div class="cxm-lc-result-stat-value tabular-nums">₦{{ staffRecord()?.gross_pay | number:'1.0-0' }}</div>
+                    </div>
+                    <div class="cxm-lc-result-stat">
+                      <div class="cxm-eyebrow">Net Pay</div>
+                      <div class="cxm-lc-result-stat-value tabular-nums">₦{{ staffRecord()?.net_pay | number:'1.0-0' }}</div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @if (staffError()) {
+                <div class="cxm-lc-error">
+                  <ion-icon name="alert-circle-outline" style="font-size: 16px"></ion-icon>
+                  <span>{{ staffError() }}</span>
+                </div>
+              }
+
+              @if (existingCustomer() && staffRecord()) {
+                <div class="cxm-lc-info">
+                  <ion-icon name="information-circle-outline" style="font-size: 16px"></ion-icon>
+                  <div>Existing customer found. Contact details have been pre-filled — you can still edit them.</div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Step 3: Loan Details -->
+          @if (step() === 2) {
+            <div class="flex flex-col gap-3">
+              <div class="cxm-lc-card">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="cxm-lc-label">Amount (₦)</label>
+                    <input type="number" class="cxm-lc-input tabular-nums" [(ngModel)]="form['amount']" placeholder="500,000" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Tenure (months)</label>
+                    <input type="number" class="cxm-lc-input tabular-nums" [(ngModel)]="form['tenure']" placeholder="12" />
+                  </div>
+                </div>
+                <button class="cxm-lc-calc-btn" [disabled]="calcLoading() || !form['amount'] || !form['tenure']" (click)="calculate()">
+                  @if (calcLoading()) {
+                    <ion-spinner name="crescent" style="width: 14px; height: 14px"></ion-spinner>
+                    <span>Calculating...</span>
+                  } @else {
+                    <ion-icon name="calculator-outline" style="font-size: 14px"></ion-icon>
+                    <span>Calculate Breakdown</span>
+                  }
+                </button>
+              </div>
+
+              @if (calcResult()) {
+                <div class="grid grid-cols-2 gap-3 cx-animate-in">
+                  <div class="cxm-lc-calc-hero cxm-lc-calc-hero-primary">
+                    <div class="cxm-eyebrow">Net Disbursed</div>
+                    <div class="cxm-lc-calc-value tabular-nums">₦{{ calcResult()?.net_disbursed | number:'1.0-0' }}</div>
+                  </div>
+                  <div class="cxm-lc-calc-hero cxm-lc-calc-hero-gold">
+                    <div class="cxm-eyebrow cxm-eyebrow-gold">Monthly</div>
+                    <div class="cxm-lc-calc-value cxm-lc-calc-value-gold tabular-nums">₦{{ calcResult()?.mr_principal_interest | number:'1.0-0' }}</div>
+                  </div>
+                </div>
+                <div class="cxm-lc-card">
+                  <div class="cxm-lc-calc-field">
+                    <span class="cxm-lc-calc-field-label">Gross Loan</span>
+                    <span class="cxm-lc-calc-field-value tabular-nums">₦{{ calcResult()?.gross_loan | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="cxm-lc-calc-field">
+                    <span class="cxm-lc-calc-field-label">Total Fees</span>
+                    <span class="cxm-lc-calc-field-value tabular-nums">₦{{ calcResult()?.total_fees | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Step 4: Personal & Banking -->
+          @if (step() === 3) {
+            <div class="cxm-lc-card">
+              <div class="flex flex-col gap-3">
+                @for (field of personalFields; track field.key) {
+                  <div>
+                    <label class="cxm-lc-label">{{ field.label }}</label>
+                    @if (field.key === 'bank_name') {
+                      <input type="text" class="cxm-lc-input"
+                             [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''"
+                             list="banks-list" autocomplete="off" />
+                      <datalist id="banks-list">
+                        @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
+                      </datalist>
+                    } @else {
+                      <input [type]="field.type || 'text'" class="cxm-lc-input"
+                             [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''" />
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Step 5: Document Upload -->
+          @if (step() === 4) {
+            <div class="flex flex-col gap-3">
+              <p class="cxm-lc-doc-hint">Upload required documents (passport, ID, payslip, bank statement). Max 10MB each.</p>
+
+              @for (docType of docTypes; track docType.key) {
+                <div class="cxm-lc-doc">
+                  <div class="cxm-lc-doc-head">
+                    <span class="cxm-lc-doc-name">{{ docType.label }}</span>
+                    @if (getUploadedDoc(docType.key)) {
+                      <span class="cxm-status" data-tone="success">
+                        <span class="cxm-status-dot"></span>
+                        <span>Ready</span>
+                      </span>
+                    }
+                  </div>
+                  @if (getUploadedDoc(docType.key); as docFile) {
+                    <div class="cxm-lc-doc-selected">
+                      <div class="cxm-lc-doc-selected-icon">
+                        <ion-icon name="document-outline" style="font-size: 16px"></ion-icon>
+                      </div>
+                      <div class="cxm-lc-doc-selected-meta">
+                        <div class="cxm-lc-doc-selected-name">{{ docFile.name }}</div>
+                        <div class="cxm-lc-doc-selected-size tabular-nums">{{ formatFileSize(docFile.file.size) }}</div>
+                      </div>
+                      <button type="button" class="cxm-lc-doc-remove" (click)="removeUpload(docType.key)" aria-label="Remove">
+                        <ion-icon name="close" style="font-size: 16px"></ion-icon>
+                      </button>
+                    </div>
+                  } @else {
+                    <label class="cxm-lc-doc-drop">
+                      <input type="file" class="hidden" [accept]="docType.accept" (change)="onFileSelected($event, docType.key)" />
+                      <ion-icon name="cloud-upload-outline" style="font-size: 22px; color: var(--cx-text-muted)"></ion-icon>
+                      <span class="cxm-lc-doc-drop-label">Tap to select file</span>
+                    </label>
+                  }
+                </div>
+              }
+
+              @if (uploadError()) {
+                <div class="cxm-lc-error">
+                  <ion-icon name="alert-circle-outline" style="font-size: 16px"></ion-icon>
+                  <span>{{ uploadError() }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Step 6: Review & Submit -->
+          @if (step() === 5) {
+            <div class="flex flex-col gap-3">
+              <div class="cxm-lc-card">
+                <h3 class="cxm-lc-review-title">Application Summary</h3>
+                <div class="cxm-lc-review-fields">
+                  <div class="cxm-lc-field">
+                    <span class="cxm-lc-field-label">Product</span>
+                    <span class="cxm-lc-field-value">{{ selectedProductName() }}</span>
+                  </div>
+                  <div class="cxm-lc-field">
+                    <span class="cxm-lc-field-label">Staff ID</span>
+                    <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['staff_id'] }}</span>
+                  </div>
+                  <div class="cxm-lc-field">
+                    <span class="cxm-lc-field-label">Customer</span>
+                    <span class="cxm-lc-field-value">{{ staffRecord()?.employee_name }}</span>
+                  </div>
+                  <div class="cxm-lc-field">
+                    <span class="cxm-lc-field-label">Amount</span>
+                    <span class="cxm-lc-field-value tabular-nums">₦{{ form['amount'] | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="cxm-lc-field">
+                    <span class="cxm-lc-field-label">Tenure</span>
+                    <span class="cxm-lc-field-value tabular-nums">{{ form['tenure'] }} months</span>
+                  </div>
+                  @if (calcResult()) {
+                    <div class="cxm-lc-review-divider"></div>
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Net Disbursed</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-primary tabular-nums">₦{{ calcResult()?.net_disbursed | number:'1.2-2' }}</span>
+                    </div>
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Monthly Payment</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-gold tabular-nums">₦{{ calcResult()?.mr_principal_interest | number:'1.2-2' }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Upload Progress -->
+              @if (submittedLoanId() && uploadedDocs.size > 0) {
+                <div class="cxm-lc-card">
+                  <div class="cxm-lc-upload-head">
+                    <h4 class="cxm-lc-review-title" style="margin: 0">Uploading Documents</h4>
+                    @if (uploadsComplete()) {
+                      <ion-icon name="checkmark-circle" style="font-size: 20px; color: var(--cx-primary-600)"></ion-icon>
+                    } @else {
+                      <ion-spinner name="crescent" style="width: 18px; height: 18px"></ion-spinner>
+                    }
+                  </div>
+                  <div class="cxm-lc-upload-list">
+                    @for (docType of docTypes; track docType.key) {
+                      @if (getUploadedDoc(docType.key); as doc) {
+                        <div class="cxm-lc-upload-item">
+                          <div class="cxm-lc-upload-row">
+                            <span class="cxm-lc-upload-name">{{ docType.label }}</span>
+                            @if (getUploadState(docType.key); as state) {
+                              @if (state.status === 'done') {
+                                <span class="cxm-status" data-tone="success">
+                                  <span class="cxm-status-dot"></span>
+                                  <span>Done</span>
+                                </span>
+                              } @else if (state.status === 'error') {
+                                <button class="cxm-lc-retry-btn" (click)="retryUpload(docType.key, submittedLoanId()!)">
+                                  <ion-icon name="refresh-outline" style="font-size: 12px"></ion-icon>
+                                  <span>Retry</span>
+                                </button>
+                              } @else {
+                                <span class="cxm-lc-upload-pct tabular-nums">{{ state.progress }}%</span>
+                              }
+                            }
+                          </div>
+                          <div class="cxm-lc-progress-track">
+                            @if (getUploadState(docType.key); as state) {
+                              <div class="cxm-lc-progress-bar"
+                                   [class.is-error]="state.status === 'error'"
+                                   [class.is-done]="state.status === 'done'"
+                                   [style.width.%]="state.progress"></div>
+                            }
+                          </div>
+                          @if (getUploadState(docType.key)?.status === 'error') {
+                            <div class="cxm-lc-upload-err">{{ getUploadState(docType.key)?.error }}</div>
+                          }
+                        </div>
+                      }
+                    }
+                  </div>
+                  @if (uploadsComplete()) {
+                    <button class="cxm-lc-continue-btn" (click)="proceedAfterUploads()">Continue to Loan</button>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Navigation Buttons -->
+          <div class="cxm-lc-nav">
+            @if (step() > 0) {
+              <button class="cxm-lc-back" (click)="step.set(step() - 1)">
+                <ion-icon name="chevron-back-outline" style="font-size: 14px"></ion-icon>
+                <span>Back</span>
+              </button>
+            }
+            @if (step() < 5) {
+              <button class="cxm-lc-next"
+                      [disabled]="!canProceed()" (click)="step.set(step() + 1)">
+                <span>Next</span>
+                <ion-icon name="chevron-forward-outline" style="font-size: 14px"></ion-icon>
+              </button>
+            } @else {
+              <button class="cxm-lc-submit"
+                      [disabled]="submitting()" (click)="submit()">
+                @if (submitting()) {
+                  <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+                  <span>Submitting...</span>
+                } @else {
+                  <ion-icon name="checkmark-circle-outline" style="font-size: 16px"></ion-icon>
+                  <span>Submit Application</span>
+                }
+              </button>
             }
           </div>
-        }
-
-        <!-- Navigation Buttons -->
-        <div class="flex gap-3 mt-6">
-          @if (step() > 0) {
-            <button class="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm" (click)="step.set(step() - 1)">
-              <ion-icon name="chevron-back-outline"></ion-icon> Back
-            </button>
-          }
-          @if (step() < 5) {
-            <button class="flex-1 py-3 rounded-xl bg-[#0A4F2A] text-white font-medium text-sm disabled:opacity-50"
-                    [disabled]="!canProceed()" (click)="step.set(step() + 1)">
-              Next <ion-icon name="chevron-forward-outline"></ion-icon>
-            </button>
-          } @else {
-            <button class="flex-1 py-3 rounded-xl bg-[#0A4F2A] text-white font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                    [disabled]="submitting()" (click)="submit()">
-              @if (submitting()) { <ion-spinner name="crescent" class="w-4 h-4"></ion-spinner> Submitting... }
-              @else { <ion-icon name="checkmark-circle-outline"></ion-icon> Submit Application }
-            </button>
-          }
         </div>
-        } <!-- end else agentBlocked -->
-      </div>
+      }
     </ion-content>
   `,
+  styles: [`
+    :host { display: block; }
+
+    /* ─── Agent blocked screen ─── */
+    .cxm-lc-blocked { padding: 48px 24px; }
+    .cxm-lc-back-btn {
+      margin-top: 16px;
+      padding: 10px 18px;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-secondary);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+    }
+
+    /* ─── Step rail ─── */
+    .cxm-lc-rail-wrap {
+      padding: 0 16px 16px;
+    }
+    .cxm-lc-rail {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+    }
+    .cxm-lc-step-wrap {
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+    .cxm-lc-step-wrap.is-last { flex: 0 0 auto; }
+    .cxm-lc-step {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--cx-text-xs);
+      font-weight: 600;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-muted);
+      border: 2px solid transparent;
+      flex-shrink: 0;
+      transition: all var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cxm-lc-step.is-active {
+      background: var(--cx-accent-500);
+      color: #fff;
+      box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.15);
+    }
+    .cxm-lc-step.is-done {
+      background: var(--cx-primary-600);
+      color: #fff;
+    }
+    .cxm-lc-rail-line {
+      flex: 1;
+      height: 2px;
+      background: var(--cx-stone-200);
+      margin: 0 6px;
+      transition: background var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cxm-lc-rail-line.is-done { background: var(--cx-primary-600); }
+
+    /* ─── Shared card ─── */
+    .cxm-lc-card {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .cxm-lc-label {
+      display: block;
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: var(--cx-text-secondary);
+      margin-bottom: 5px;
+    }
+    .cxm-lc-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+    }
+
+    /* ─── Product cards (step 1) ─── */
+    .cxm-lc-product {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--cx-surface);
+      border: 2px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-product:active { transform: scale(0.99); }
+    .cxm-lc-product.is-selected {
+      border-color: var(--cx-primary-600);
+      background: var(--cx-primary-50);
+    }
+    .cxm-lc-product-main { flex: 1; min-width: 0; }
+    .cxm-lc-product-name {
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cxm-lc-product-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+    .cxm-lc-dot { color: var(--cx-stone-400); }
+    .cxm-lc-product-rate {
+      color: var(--cx-primary-700);
+      font-weight: 500;
+    }
+    .cxm-lc-product-range {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+    .cxm-lc-product-check {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid var(--cx-stone-300);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: transparent;
+      flex-shrink: 0;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-product.is-selected .cxm-lc-product-check {
+      background: var(--cx-primary-600);
+      border-color: var(--cx-primary-600);
+      color: #fff;
+    }
+
+    /* ─── Staff lookup (step 2) ─── */
+    .cxm-lc-search-row { display: flex; gap: 8px; }
+    .cxm-lc-search-btn {
+      width: 44px;
+      background: var(--cx-primary-600);
+      color: #fff;
+      border: none;
+      border-radius: var(--cx-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--cx-shadow-sm);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-search-btn:disabled { opacity: 0.5; box-shadow: none; }
+    .cxm-lc-search-btn:not(:disabled):active { transform: scale(0.92); background: var(--cx-primary-700); }
+
+    .cxm-lc-result {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-primary-200);
+      border-radius: var(--cx-radius-xl);
+      overflow: hidden;
+    }
+    .cxm-lc-result-head {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, var(--cx-primary-50) 0%, var(--cx-surface) 100%);
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-lc-result-meta { min-width: 0; flex: 1; }
+    .cxm-lc-result-name {
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cxm-lc-result-job {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+    .cxm-lc-result-check {
+      color: var(--cx-primary-600);
+      flex-shrink: 0;
+    }
+    .cxm-lc-result-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--cx-border-subtle);
+    }
+    .cxm-lc-result-stat {
+      padding: 12px 14px;
+      background: var(--cx-surface);
+    }
+    .cxm-lc-result-stat-value {
+      font-size: var(--cx-text-md);
+      font-weight: 600;
+      color: var(--cx-text);
+      margin-top: 3px;
+    }
+
+    .cxm-lc-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--cx-danger-50);
+      border: 1px solid rgba(193, 48, 48, 0.15);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-danger);
+    }
+    .cxm-lc-info {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--cx-accent-50);
+      border: 1px solid rgba(201, 162, 39, 0.2);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-xs);
+      color: var(--cx-accent-700);
+      line-height: 1.5;
+    }
+    .cxm-lc-info ion-icon { flex-shrink: 0; margin-top: 2px; }
+
+    /* ─── Loan details (step 3) ─── */
+    .cxm-lc-calc-btn {
+      margin-top: 4px;
+      padding: 11px;
+      background: var(--cx-accent-50);
+      color: var(--cx-accent-700);
+      border: 1px solid rgba(201, 162, 39, 0.25);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-calc-btn:disabled { opacity: 0.5; }
+    .cxm-lc-calc-btn:not(:disabled):active {
+      background: var(--cx-accent-100);
+      transform: scale(0.99);
+    }
+
+    .cxm-lc-calc-hero {
+      padding: 14px;
+      border-radius: var(--cx-radius-xl);
+      border: 1px solid transparent;
+    }
+    .cxm-lc-calc-hero-primary {
+      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
+      color: #fff;
+      border-color: var(--cx-primary-600);
+      box-shadow: var(--cx-shadow-md);
+    }
+    .cxm-lc-calc-hero-primary .cxm-eyebrow { color: rgba(255, 255, 255, 0.75); }
+    .cxm-lc-calc-hero-gold {
+      background: var(--cx-accent-50);
+      border-color: rgba(201, 162, 39, 0.2);
+    }
+    .cxm-lc-calc-value {
+      font-size: var(--cx-text-lg);
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin-top: 5px;
+      line-height: 1.1;
+    }
+    .cxm-lc-calc-value-gold { color: var(--cx-accent-700); }
+
+    .cxm-lc-calc-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-lc-calc-field:last-child { border-bottom: none; }
+    .cxm-lc-calc-field-label {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-muted);
+    }
+    .cxm-lc-calc-field-value {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+    }
+
+    /* ─── Documents (step 5) ─── */
+    .cxm-lc-doc-hint {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin: 0;
+      line-height: 1.5;
+      padding: 0 2px;
+    }
+    .cxm-lc-doc {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      padding: 12px;
+    }
+    .cxm-lc-doc-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .cxm-lc-doc-name {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+    }
+    .cxm-lc-doc-selected {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+    }
+    .cxm-lc-doc-selected-icon {
+      width: 28px; height: 28px;
+      border-radius: var(--cx-radius-sm);
+      background: var(--cx-primary-50);
+      color: var(--cx-primary-600);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .cxm-lc-doc-selected-meta { flex: 1; min-width: 0; }
+    .cxm-lc-doc-selected-name {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cxm-lc-doc-selected-size {
+      font-size: 10px;
+      color: var(--cx-text-muted);
+      margin-top: 1px;
+    }
+    .cxm-lc-doc-remove {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--cx-danger);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-doc-remove:active { background: var(--cx-danger-50); }
+    .cxm-lc-doc-drop {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 18px 12px;
+      background: var(--cx-surface-2);
+      border: 2px dashed var(--cx-border-strong);
+      border-radius: var(--cx-radius-md);
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-doc-drop:active {
+      border-color: var(--cx-primary-600);
+      background: var(--cx-primary-50);
+    }
+    .cxm-lc-doc-drop-label {
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: var(--cx-text-secondary);
+    }
+
+    /* ─── Review (step 6) ─── */
+    .cxm-lc-review-title {
+      margin: 0 0 10px;
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cxm-lc-review-fields { display: flex; flex-direction: column; }
+    .cxm-lc-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-lc-field:last-child { border-bottom: none; }
+    .cxm-lc-field-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+    }
+    .cxm-lc-field-value {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+      text-align: right;
+    }
+    .cxm-lc-field-mono {
+      font-family: var(--cx-font-mono, monospace);
+      color: var(--cx-primary-700);
+    }
+    .cxm-lc-field-primary { color: var(--cx-primary-700); font-weight: 600; }
+    .cxm-lc-field-gold { color: var(--cx-accent-700); font-weight: 600; }
+    .cxm-lc-review-divider {
+      height: 1px;
+      background: var(--cx-border);
+      margin: 6px -14px;
+    }
+
+    /* ─── Upload progress ─── */
+    .cxm-lc-upload-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cxm-lc-upload-list { display: flex; flex-direction: column; gap: 10px; }
+    .cxm-lc-upload-item { display: flex; flex-direction: column; gap: 5px; }
+    .cxm-lc-upload-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: var(--cx-text-xs);
+    }
+    .cxm-lc-upload-name { color: var(--cx-text); font-weight: 500; }
+    .cxm-lc-upload-pct { color: var(--cx-primary-700); font-weight: 600; }
+    .cxm-lc-retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: var(--cx-danger-50);
+      color: var(--cx-danger);
+      border: none;
+      border-radius: var(--cx-radius-pill);
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .cxm-lc-progress-track {
+      width: 100%;
+      height: 5px;
+      background: var(--cx-stone-100);
+      border-radius: var(--cx-radius-pill);
+      overflow: hidden;
+    }
+    .cxm-lc-progress-bar {
+      height: 100%;
+      background: var(--cx-primary-600);
+      border-radius: var(--cx-radius-pill);
+      transition: width var(--cx-dur-base) var(--cx-ease-premium);
+    }
+    .cxm-lc-progress-bar.is-done { background: var(--cx-primary-600); }
+    .cxm-lc-progress-bar.is-error { background: var(--cx-danger); }
+    .cxm-lc-upload-err {
+      font-size: 10px;
+      color: var(--cx-danger);
+      line-height: 1.4;
+    }
+    .cxm-lc-continue-btn {
+      margin-top: 4px;
+      padding: 10px;
+      background: var(--cx-primary-600);
+      color: #fff;
+      border: none;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      box-shadow: var(--cx-shadow-sm);
+    }
+
+    /* ─── Navigation ─── */
+    .cxm-lc-nav {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .cxm-lc-back {
+      flex: 1;
+      padding: 12px;
+      background: var(--cx-surface);
+      color: var(--cx-text-secondary);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-back:active { background: var(--cx-surface-hover); }
+    .cxm-lc-next, .cxm-lc-submit {
+      flex: 1;
+      padding: 12px;
+      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
+      color: #fff;
+      border: none;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(10, 79, 42, 0.2);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-next:disabled, .cxm-lc-submit:disabled { opacity: 0.5; box-shadow: none; }
+    .cxm-lc-next:not(:disabled):active, .cxm-lc-submit:not(:disabled):active {
+      transform: scale(0.99);
+      box-shadow: 0 1px 4px rgba(10, 79, 42, 0.2);
+    }
+    .cxm-lc-submit {
+      background: linear-gradient(135deg, var(--cx-primary-700), var(--cx-primary-600));
+    }
+  `],
 })
 export class LoanCapturePage implements OnInit {
   step = signal(0);
   stepLabels = ['Product', 'Staff', 'Details', 'Info', 'Docs', 'Review'];
+  stepHints = [
+    'Choose the loan product that fits the customer',
+    'Look up the staff record to verify eligibility',
+    'Enter amount and tenure, then calculate',
+    'Provide personal and banking details',
+    'Upload required supporting documents',
+    'Review everything and submit the application',
+  ];
 
   products = signal<any[]>([]);
   productsLoading = signal(true);
@@ -331,7 +1017,7 @@ export class LoanCapturePage implements OnInit {
   banks = signal<{code: string; name: string}[]>([]);
 
   constructor(private api: ApiService, public router: Router) {
-    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline });
+    addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close });
   }
 
   ngOnInit(): void {
