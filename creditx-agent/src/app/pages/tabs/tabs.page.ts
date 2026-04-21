@@ -9,7 +9,7 @@ import { homeOutline, documentTextOutline, calculatorOutline, chatbubbleEllipses
   imports: [IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel],
   template: `
     <ion-tabs>
-      <ion-tab-bar slot="bottom" color="light">
+      <ion-tab-bar slot="bottom">
         <ion-tab-button tab="dashboard">
           <ion-icon name="home-outline"></ion-icon>
           <ion-label>Home</ion-label>

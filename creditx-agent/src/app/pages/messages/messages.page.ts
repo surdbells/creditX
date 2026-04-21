@@ -16,34 +16,47 @@ import { ApiService } from '../../core/services/api.service';
     </ion-header>
     <ion-content [fullscreen]="true">
       <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
-      <div class="p-4">
+
+      <div class="cxm-page-header cx-animate-in">
+        <div class="cxm-eyebrow cxm-eyebrow-primary">Inbox</div>
+        <h1 class="cxm-title">Messages</h1>
+        <p class="cxm-subtitle">Conversations with your team and admin</p>
+      </div>
+
+      <div class="px-4 pb-6">
         @if (loading() && conversations().length === 0) {
-          <div class="flex justify-center py-12"><div class="w-6 h-6 border-2 border-[#0A4F2A] border-t-transparent rounded-full animate-spin"></div></div>
+          <div class="cxm-loading">
+            <div class="cxm-loading-dots"><span></span><span></span><span></span></div>
+            <span class="cxm-loading-text">Loading conversations...</span>
+          </div>
         } @else if (conversations().length === 0) {
-          <div class="py-12 text-center">
-            <ion-icon name="chatbubble-ellipses-outline" class="text-4xl text-gray-300"></ion-icon>
-            <p class="text-sm text-gray-400 mt-2">No conversations yet</p>
+          <div class="cxm-empty">
+            <div class="cxm-empty-icon">
+              <ion-icon name="chatbubble-ellipses-outline" style="font-size: 24px"></ion-icon>
+            </div>
+            <div class="cxm-empty-title">No conversations yet</div>
+            <div class="cxm-empty-desc">When you start a conversation, it'll show up here.</div>
           </div>
         } @else {
-          <div class="space-y-2">
+          <div class="flex flex-col gap-2 cxm-stagger">
             @for (conv of conversations(); track conv.id) {
-              <a [routerLink]="['/messages', conv.id]" class="flex items-center gap-3 p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
-                <div class="w-10 h-10 rounded-full bg-[#0A4F2A]/10 flex items-center justify-center flex-shrink-0">
-                  <ion-icon name="chatbubble-ellipses-outline" class="text-[#0A4F2A]"></ion-icon>
+              <a [routerLink]="['/messages', conv.id]" class="cxm-row">
+                <div class="cxm-avatar cxm-avatar-gold">
+                  <ion-icon name="chatbubble-ellipses-outline" style="font-size: 16px"></ion-icon>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-sm font-semibold text-gray-800 truncate">{{ conv.subject }}</span>
+                <div class="cxm-row-main">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="cxm-row-primary">{{ conv.subject }}</span>
                     @if (conv.unread_count > 0) {
-                      <ion-badge color="danger" class="text-[10px]">{{ conv.unread_count }}</ion-badge>
+                      <span class="cxm-unread-dot tabular-nums">{{ conv.unread_count }}</span>
                     }
                   </div>
-                  <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                          [class]="conv.status === 'open' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'">
-                      {{ conv.status | titlecase }}
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="cxm-status" [attr.data-tone]="conv.status === 'open' ? 'success' : 'neutral'">
+                      <span class="cxm-status-dot"></span>
+                      <span>{{ conv.status | titlecase }}</span>
                     </span>
-                    <span>&bull; {{ conv.message_count }} messages</span>
+                    <span class="cxm-row-secondary" style="margin: 0">{{ conv.message_count }} {{ conv.message_count === 1 ? 'message' : 'messages' }}</span>
                   </div>
                 </div>
               </a>
@@ -53,6 +66,22 @@ import { ApiService } from '../../core/services/api.service';
       </div>
     </ion-content>
   `,
+  styles: [`
+    .cxm-unread-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      background: var(--cx-danger);
+      color: #fff;
+      border-radius: var(--cx-radius-pill);
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+  `],
 })
 export class MessagesPage implements OnInit {
   conversations = signal<any[]>([]);

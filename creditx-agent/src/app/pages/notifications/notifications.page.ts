@@ -15,36 +15,49 @@ import { ApiService } from '../../core/services/api.service';
         <ion-buttons slot="start"><ion-back-button defaultHref="/dashboard"></ion-back-button></ion-buttons>
         <ion-title>Notifications</ion-title>
         <div slot="end" class="pr-4">
-          <button class="text-xs text-[#0A4F2A] font-medium" (click)="markAllRead()">Mark All Read</button>
+          <button class="cxm-mark-read-btn" (click)="markAllRead()">
+            <ion-icon name="checkmark-done-outline" style="font-size: 14px"></ion-icon>
+            <span>Mark all read</span>
+          </button>
         </div>
       </ion-toolbar>
     </ion-header>
     <ion-content [fullscreen]="true">
       <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
-      <div class="p-4">
+
+      <div class="cxm-page-header cx-animate-in">
+        <div class="cxm-eyebrow cxm-eyebrow-primary">Activity</div>
+        <h1 class="cxm-title">Notifications</h1>
+        <p class="cxm-subtitle">Updates from approvals, disbursements, and announcements</p>
+      </div>
+
+      <div class="px-4 pb-6">
         @if (loading()) {
-          <div class="flex justify-center py-12"><div class="w-6 h-6 border-2 border-[#0A4F2A] border-t-transparent rounded-full animate-spin"></div></div>
+          <div class="cxm-loading">
+            <div class="cxm-loading-dots"><span></span><span></span><span></span></div>
+            <span class="cxm-loading-text">Loading notifications...</span>
+          </div>
         } @else if (notifications().length === 0) {
-          <div class="py-12 text-center">
-            <ion-icon name="notifications-outline" class="text-4xl text-gray-300"></ion-icon>
-            <p class="text-sm text-gray-400 mt-2">No notifications</p>
+          <div class="cxm-empty">
+            <div class="cxm-empty-icon">
+              <ion-icon name="notifications-outline" style="font-size: 24px"></ion-icon>
+            </div>
+            <div class="cxm-empty-title">You're all caught up</div>
+            <div class="cxm-empty-desc">New notifications will appear here.</div>
           </div>
         } @else {
-          <div class="space-y-2">
+          <div class="flex flex-col gap-2 cxm-stagger">
             @for (n of notifications(); track n.id) {
-              <div class="p-4 rounded-xl border shadow-sm" [class]="n.is_read ? 'bg-white border-gray-100' : 'bg-[#0A4F2A]/5 border-[#0A4F2A]/10'">
-                <div class="flex items-start gap-3">
-                  <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                       [class]="n.is_read ? 'bg-gray-100' : 'bg-[#0A4F2A]/20'">
-                    <ion-icon [name]="n.is_read ? 'mail-open-outline' : 'notifications-outline'"
-                              [class]="n.is_read ? 'text-gray-400 text-sm' : 'text-[#0A4F2A] text-sm'"></ion-icon>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    @if (n.subject) { <div class="text-sm font-semibold text-gray-800">{{ n.subject }}</div> }
-                    <div class="text-sm text-gray-600">{{ n.body }}</div>
-                    <div class="text-xs text-gray-400 mt-1">{{ n.created_at }}</div>
-                  </div>
+              <div class="cxm-notif" [class.is-unread]="!n.is_read">
+                <div class="cxm-notif-icon" [class.is-unread]="!n.is_read">
+                  <ion-icon [name]="n.is_read ? 'mail-open-outline' : 'notifications-outline'" style="font-size: 15px"></ion-icon>
                 </div>
+                <div class="cxm-notif-body">
+                  @if (n.subject) { <div class="cxm-notif-subject">{{ n.subject }}</div> }
+                  <div class="cxm-notif-text">{{ n.body }}</div>
+                  <div class="cxm-notif-time tabular-nums">{{ n.created_at }}</div>
+                </div>
+                @if (!n.is_read) { <span class="cxm-notif-marker"></span> }
               </div>
             }
           </div>
@@ -52,6 +65,78 @@ import { ApiService } from '../../core/services/api.service';
       </div>
     </ion-content>
   `,
+  styles: [`
+    .cxm-mark-read-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      background: var(--cx-primary-50);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: var(--cx-primary-700);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-mark-read-btn:active { background: var(--cx-primary-100); }
+
+    .cxm-notif {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-notif.is-unread {
+      background: var(--cx-primary-50);
+      border-color: rgba(10, 79, 42, 0.12);
+    }
+    .cxm-notif-icon {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .cxm-notif-icon.is-unread {
+      background: var(--cx-primary-600);
+      color: #fff;
+    }
+    .cxm-notif-body { flex: 1; min-width: 0; }
+    .cxm-notif-subject {
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+      margin-bottom: 2px;
+    }
+    .cxm-notif-text {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text-secondary);
+      line-height: 1.5;
+    }
+    .cxm-notif-time {
+      font-size: 10px;
+      color: var(--cx-text-muted);
+      margin-top: 4px;
+    }
+    .cxm-notif-marker {
+      position: absolute;
+      top: 14px; right: 14px;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--cx-accent-500);
+      box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.25);
+    }
+  `],
 })
 export class NotificationsPage implements OnInit {
   notifications = signal<any[]>([]);

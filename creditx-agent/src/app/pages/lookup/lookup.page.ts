@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { searchOutline, checkmarkCircleOutline, closeCircleOutline, personOutline, briefcaseOutline } from 'ionicons/icons';
+import { searchOutline, checkmarkCircleOutline, closeCircleOutline, personOutline, briefcaseOutline, checkmarkCircle, closeCircle } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
@@ -17,18 +17,27 @@ import { ApiService } from '../../core/services/api.service';
         <ion-title>Staff Lookup</ion-title>
       </ion-toolbar>
     </ion-header>
-    <ion-content [fullscreen]="true" class="ion-padding">
-      <div class="space-y-4">
-        <!-- Search -->
-        <div>
-          <label class="text-xs font-medium text-gray-500 mb-1 block">Staff ID / IPPIS Number</label>
-          <div class="flex gap-2">
-            <input type="text" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-[#0A4F2A] focus:outline-none"
-                   [(ngModel)]="staffId" placeholder="Enter Staff ID" (keyup.enter)="search()" />
-            <button class="px-4 py-3 rounded-xl bg-[#0A4F2A] text-white flex items-center gap-2 disabled:opacity-50"
+    <ion-content [fullscreen]="true">
+      <div class="cxm-page-header cx-animate-in">
+        <div class="cxm-eyebrow cxm-eyebrow-primary">Eligibility Check</div>
+        <h1 class="cxm-title">Staff Lookup</h1>
+        <p class="cxm-subtitle">Find a government employee record and check loan eligibility</p>
+      </div>
+
+      <div class="px-4 pb-6 flex flex-col gap-4">
+        <!-- Search Card -->
+        <div class="cxm-lookup-search">
+          <label class="cxm-lookup-label">Staff ID / IPPIS Number</label>
+          <div class="cxm-lookup-input-row">
+            <input type="text" class="cxm-lookup-input"
+                   [(ngModel)]="staffId" placeholder="Enter staff ID" (keyup.enter)="search()" />
+            <button class="cxm-lookup-search-btn"
                     [disabled]="loading() || !staffId.trim()" (click)="search()">
-              @if (loading()) { <ion-spinner name="crescent" class="w-4 h-4"></ion-spinner> }
-              @else { <ion-icon name="search-outline"></ion-icon> }
+              @if (loading()) {
+                <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+              } @else {
+                <ion-icon name="search-outline" style="font-size: 18px"></ion-icon>
+              }
             </button>
           </div>
         </div>
@@ -36,40 +45,54 @@ import { ApiService } from '../../core/services/api.service';
         <!-- Results -->
         @if (searched() && !loading()) {
           @if (record()) {
-            <div class="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-              <div class="p-4 bg-[#0A4F2A]/5 flex items-center gap-3">
-                <div class="w-12 h-12 rounded-full bg-[#0A4F2A] flex items-center justify-center text-white text-lg font-bold">
+            <div class="cxm-lookup-result cx-animate-in">
+              <!-- Header with avatar -->
+              <div class="cxm-lookup-header">
+                <div class="cxm-avatar cxm-avatar-lg">
                   {{ record()?.employee_name?.charAt(0) }}
                 </div>
-                <div>
-                  <div class="text-base font-semibold text-gray-800">{{ record()?.employee_name }}</div>
-                  <div class="text-xs text-gray-500">{{ record()?.staff_id }} &bull; {{ record()?.record_type_name }}</div>
+                <div class="cxm-lookup-header-meta">
+                  <div class="cxm-lookup-name">{{ record()?.employee_name }}</div>
+                  <div class="cxm-lookup-id">
+                    <span class="cxm-lookup-staff-id">{{ record()?.staff_id }}</span>
+                    <span class="cxm-lookup-dot">·</span>
+                    <span>{{ record()?.record_type_name }}</span>
+                  </div>
                 </div>
               </div>
-              <div class="p-4 space-y-2">
+
+              <!-- Details grid -->
+              <div class="cxm-lookup-details">
                 @for (field of recordFields(); track field.label) {
-                  <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0">
-                    <span class="text-xs text-gray-500">{{ field.label }}</span>
-                    <span class="text-sm font-medium text-gray-800 text-right">{{ field.value || '—' }}</span>
+                  <div class="cxm-lookup-field">
+                    <span class="cxm-lookup-field-label">{{ field.label }}</span>
+                    <span class="cxm-lookup-field-value">{{ field.value || '—' }}</span>
                   </div>
                 }
               </div>
 
-              <!-- Eligibility -->
+              <!-- Eligibility banner -->
               @if (eligibility()) {
-                <div class="p-4 border-t border-gray-100">
-                  <div class="flex items-center gap-2 mb-2">
-                    <ion-icon [name]="eligibility()?.eligible ? 'checkmark-circle-outline' : 'close-circle-outline'"
-                              [class]="eligibility()?.eligible ? 'text-green-500 text-xl' : 'text-red-500 text-xl'"></ion-icon>
-                    <span class="text-sm font-semibold" [class]="eligibility()?.eligible ? 'text-green-700' : 'text-red-700'">
-                      {{ eligibility()?.eligible ? 'Eligible for Loan' : 'Not Eligible' }}
-                    </span>
+                <div class="cxm-elig" [class.is-eligible]="eligibility()?.eligible">
+                  <div class="cxm-elig-head">
+                    <div class="cxm-elig-icon">
+                      <ion-icon [name]="eligibility()?.eligible ? 'checkmark-circle' : 'close-circle'" style="font-size: 18px"></ion-icon>
+                    </div>
+                    <div>
+                      <div class="cxm-elig-title">
+                        {{ eligibility()?.eligible ? 'Eligible for Loan' : 'Not Eligible' }}
+                      </div>
+                      @if (!eligibility()?.eligible && eligibility()?.reasons?.length) {
+                        <div class="cxm-elig-sub">{{ eligibility()?.reasons?.length }} reason{{ eligibility()?.reasons?.length === 1 ? '' : 's' }}</div>
+                      }
+                    </div>
                   </div>
                   @if (eligibility()?.reasons?.length) {
-                    <div class="space-y-1">
+                    <div class="cxm-elig-reasons">
                       @for (reason of eligibility()?.reasons; track reason) {
-                        <div class="text-xs text-gray-500 flex items-start gap-1">
-                          <span class="text-red-400 mt-0.5">•</span> {{ reason }}
+                        <div class="cxm-elig-reason">
+                          <span class="cxm-elig-bullet">•</span>
+                          <span>{{ reason }}</span>
                         </div>
                       }
                     </div>
@@ -78,15 +101,186 @@ import { ApiService } from '../../core/services/api.service';
               }
             </div>
           } @else {
-            <div class="p-8 rounded-2xl bg-gray-50 text-center">
-              <ion-icon name="close-circle-outline" class="text-4xl text-gray-300"></ion-icon>
-              <p class="text-sm text-gray-500 mt-2">No record found for "{{ staffId }}"</p>
+            <div class="cxm-empty">
+              <div class="cxm-empty-icon">
+                <ion-icon name="close-circle-outline" style="font-size: 24px"></ion-icon>
+              </div>
+              <div class="cxm-empty-title">No record found</div>
+              <div class="cxm-empty-desc">We couldn't find a record for "{{ staffId }}".</div>
             </div>
           }
         }
       </div>
     </ion-content>
   `,
+  styles: [`
+    .cxm-lookup-search {
+      padding: 14px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+    }
+    .cxm-lookup-label {
+      display: block;
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: var(--cx-text-secondary);
+      margin-bottom: 6px;
+    }
+    .cxm-lookup-input-row { display: flex; gap: 8px; }
+    .cxm-lookup-input {
+      flex: 1;
+      padding: 10px 14px;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lookup-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+    }
+    .cxm-lookup-search-btn {
+      width: 44px;
+      background: var(--cx-primary-600);
+      color: #fff;
+      border: none;
+      border-radius: var(--cx-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--cx-shadow-sm);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lookup-search-btn:disabled { opacity: 0.5; box-shadow: none; }
+    .cxm-lookup-search-btn:not(:disabled):active {
+      transform: scale(0.93);
+      background: var(--cx-primary-700);
+    }
+
+    .cxm-lookup-result {
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-2xl);
+      overflow: hidden;
+    }
+    .cxm-lookup-header {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, var(--cx-primary-50) 0%, var(--cx-surface) 100%);
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-lookup-header-meta { min-width: 0; flex: 1; }
+    .cxm-lookup-name {
+      font-size: var(--cx-text-md);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.005em;
+    }
+    .cxm-lookup-id {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+    .cxm-lookup-staff-id {
+      font-family: var(--cx-font-mono, monospace);
+      color: var(--cx-primary-700);
+      font-weight: 500;
+    }
+    .cxm-lookup-dot { color: var(--cx-stone-400); }
+
+    .cxm-lookup-details {
+      padding: 6px 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .cxm-lookup-field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-lookup-field:last-child { border-bottom: none; }
+    .cxm-lookup-field-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      flex-shrink: 0;
+    }
+    .cxm-lookup-field-value {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+      text-align: right;
+    }
+
+    .cxm-elig {
+      margin: 0 16px 16px;
+      padding: 14px;
+      background: var(--cx-danger-50);
+      border: 1px solid rgba(193, 48, 48, 0.15);
+      border-radius: var(--cx-radius-lg);
+    }
+    .cxm-elig.is-eligible {
+      background: var(--cx-success-50);
+      border-color: rgba(26, 122, 69, 0.2);
+    }
+    .cxm-elig-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .cxm-elig-icon {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--cx-danger);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .cxm-elig.is-eligible .cxm-elig-icon { background: var(--cx-primary-600); }
+    .cxm-elig-title {
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      color: var(--cx-danger);
+      letter-spacing: -0.005em;
+    }
+    .cxm-elig.is-eligible .cxm-elig-title { color: var(--cx-primary-700); }
+    .cxm-elig-sub {
+      font-size: 10px;
+      color: var(--cx-text-muted);
+      margin-top: 1px;
+    }
+    .cxm-elig-reasons {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cxm-elig-reason {
+      display: flex;
+      gap: 6px;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-secondary);
+      line-height: 1.5;
+    }
+    .cxm-elig-bullet {
+      color: var(--cx-danger);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+  `],
 })
 export class LookupPage {
   staffId = '';
