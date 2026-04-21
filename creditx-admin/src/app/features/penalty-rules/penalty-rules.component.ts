@@ -52,7 +52,20 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
               <option value="percentage">Percentage</option>
             </select>
           </div>
-          <div><label class="cx-label">Value *</label><input class="cx-input" type="number" [(ngModel)]="form.value" /></div>
+          <div>
+            <label class="cx-label">
+              {{ form.calculation_type === 'percentage' ? 'Fraction *' : 'Amount (₦) *' }}
+            </label>
+            <input class="cx-input" type="number"
+                   [attr.step]="form.calculation_type === 'percentage' ? '0.0001' : '1'"
+                   [attr.min]="0"
+                   [attr.max]="form.calculation_type === 'percentage' ? 1 : null"
+                   [(ngModel)]="form.value"
+                   [placeholder]="form.calculation_type === 'percentage' ? 'e.g. 0.02' : 'e.g. 5000'" />
+            @if (form.calculation_type === 'percentage') {
+              <div class="cx-field-hint">0.02 = 2%</div>
+            }
+          </div>
         </div>
         <div class="cx-form-row cx-form-row-2">
           <div><label class="cx-label">Grace Period (days)</label><input class="cx-input" type="number" [(ngModel)]="form.grace_period_days" placeholder="0" /></div>

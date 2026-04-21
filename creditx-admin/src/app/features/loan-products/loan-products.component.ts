@@ -54,7 +54,12 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
               <option value="amortized">Amortized (EMI)</option>
             </select>
           </div>
-          <div><label class="cx-label">Rate (% p.a.)</label><input class="cx-input" type="number" [(ngModel)]="form.interest_rate" placeholder="e.g. 3.5" /></div>
+          <div>
+            <label class="cx-label">Interest Rate (fraction)</label>
+            <input class="cx-input" type="number" step="0.0001" min="0" max="1"
+                   [(ngModel)]="form.interest_rate" placeholder="e.g. 0.05" />
+            <div class="cx-field-hint">Enter as a fraction: 0.05 = 5%, 0.035 = 3.5%</div>
+          </div>
           <div>
             <label class="cx-label">Allows Top-up</label>
             <select class="cx-select" [(ngModel)]="form.allows_top_up">
@@ -109,8 +114,18 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
                     </select>
                   </div>
                   <div class="cx-lp-fee-field cx-lp-fee-field-sm">
-                    <label class="cx-label">Value</label>
-                    <input class="cx-input" type="number" [(ngModel)]="fee.value" />
+                    <label class="cx-label">
+                      {{ fee.calculation_type === 'percentage' ? 'Fraction' : 'Amount (₦)' }}
+                    </label>
+                    <input class="cx-input" type="number"
+                           [attr.step]="fee.calculation_type === 'percentage' ? '0.0001' : '1'"
+                           [attr.min]="0"
+                           [attr.max]="fee.calculation_type === 'percentage' ? 1 : null"
+                           [(ngModel)]="fee.value"
+                           [placeholder]="fee.calculation_type === 'percentage' ? 'e.g. 0.02' : 'e.g. 2000'" />
+                    @if (fee.calculation_type === 'percentage') {
+                      <div class="cx-field-hint">0.02 = 2%</div>
+                    }
                   </div>
                   <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-lp-fee-remove" (click)="fees.splice(i,1)" title="Remove">
                     <lucide-icon name="trash-2" [size]="14"></lucide-icon>
