@@ -256,8 +256,14 @@ import { ApiService } from '../../core/services/api.service';
                   </div>
                   <div>
                     <label class="cxm-lc-label">BVN <span class="cxm-lc-req">*</span></label>
-                    <input type="text" maxlength="11" pattern="\d*" class="cxm-lc-input"
-                           [(ngModel)]="form['bvn']" placeholder="22200000000" />
+                    <input type="text" inputmode="numeric" maxlength="11" pattern="\d*" class="cxm-lc-input"
+                           [class.is-invalid]="bvnError()"
+                           [(ngModel)]="form['bvn']"
+                           (ngModelChange)="onBvnChange($event)"
+                           placeholder="22200000000" />
+                    @if (bvnError(); as err) {
+                      <div class="cxm-lc-field-err">{{ err }}</div>
+                    }
                   </div>
                   <div>
                     <label class="cxm-lc-label">Mother's Maiden Name</label>
@@ -668,7 +674,7 @@ import { ApiService } from '../../core/services/api.service';
               </button>
             } @else {
               <button class="cxm-lc-submit"
-                      [disabled]="submitting()" (click)="submit()">
+                      [disabled]="submitting() || !canSubmit()" (click)="submit()">
                 @if (submitting()) {
                   <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
                   <span>Submitting...</span>
@@ -780,6 +786,27 @@ import { ApiService } from '../../core/services/api.service';
     .cxm-lc-input:focus {
       background: var(--cx-surface);
       border-color: var(--cx-primary-600);
+    }
+
+    /* Invalid input state — red border + subtle background tint.
+       Applied via [class.is-invalid] binding when field validation fails. */
+    .cxm-lc-input.is-invalid,
+    .cxm-lc-select.is-invalid {
+      border-color: var(--cx-danger);
+      background: rgba(220, 38, 38, 0.04);
+    }
+    .cxm-lc-input.is-invalid:focus,
+    .cxm-lc-select.is-invalid:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-danger);
+    }
+
+    /* Inline error message under a field. Small, red, left-aligned with input. */
+    .cxm-lc-field-err {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--cx-danger);
+      line-height: 1.35;
     }
 
     /* Select boxes inherit input styling plus chevron glyph */
@@ -1339,6 +1366,35 @@ export class LoanCapturePage implements OnInit {
   agentBlocked = signal(false);
   banks = signal<{code: string; name: string}[]>([]);
 
+  /**
+   * BVN validation — Nigerian BVN is exactly 11 digits, all numeric.
+   * Signal tracks the current error message (or null if valid/empty).
+   * Empty is treated as 'not-yet-filled' so the error only appears
+   * after the agent has typed something.
+   *
+   * Per user decision: BVN blocks submit. submit() reads this signal
+   * and refuses to POST if bvnError() is non-null OR if BVN is empty.
+   */
+  bvnError = signal<string | null>(null);
+
+  onBvnChange(v: string): void {
+    const trimmed = (v ?? '').trim();
+    if (trimmed === '') {
+      // Empty — no error shown, but submit will still block on emptiness.
+      this.bvnError.set(null);
+      return;
+    }
+    if (!/^\d+$/.test(trimmed)) {
+      this.bvnError.set('BVN must contain only digits');
+      return;
+    }
+    if (trimmed.length !== 11) {
+      this.bvnError.set(`BVN must be exactly 11 digits (${trimmed.length} entered)`);
+      return;
+    }
+    this.bvnError.set(null);
+  }
+
   constructor(private api: ApiService, public router: Router) {
     addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close });
   }
@@ -1496,6 +1552,11 @@ export class LoanCapturePage implements OnInit {
       if (this.form[key]) continue; // don't overwrite existing value
       this.form[key] = typeof rawVal === 'string' ? rawVal : String(rawVal);
     }
+    // Re-validate BVN if it was prefilled. Existing customer records
+    // may have been seeded with malformed BVNs from legacy data import;
+    // trigger validation so the agent sees the error immediately rather
+    // than on submit.
+    if (src['bvn']) this.onBvnChange(this.form['bvn']);
   }
 
   calculate(): void {
@@ -1515,10 +1576,32 @@ export class LoanCapturePage implements OnInit {
       case 0: return !!this.form['product_id'];
       case 1: return !!this.staffRecord();
       case 2: return !!this.form['amount'] && !!this.form['tenure'];
-      case 3: return !!this.form['phone'];
+      // Step 3: must have full_name, phone, and a VALID BVN. BVN is
+      // required per user decision — wizard can't submit without it.
+      case 3: return !!this.form['full_name']
+                  && !!this.form['phone']
+                  && !!this.form['bvn']
+                  && this.bvnError() === null;
       case 4: return true; // docs are optional
       default: return true;
     }
+  }
+
+  /**
+   * Additional check for the final submit button. Identical to the
+   * Step 3 gate — we don't let the agent submit without a valid
+   * BVN even if they somehow reached Step 5. Belt + suspenders vs
+   * edge cases where step state and data state drift.
+   */
+  canSubmit(): boolean {
+    return !!this.form['product_id']
+        && !!this.staffRecord()
+        && !!this.form['amount']
+        && !!this.form['tenure']
+        && !!this.form['full_name']
+        && !!this.form['phone']
+        && !!this.form['bvn']
+        && this.bvnError() === null;
   }
 
   getUploadedDoc(key: string): {name: string; file: File} | undefined {
@@ -1634,6 +1717,10 @@ export class LoanCapturePage implements OnInit {
    *     repayment_method, account_statement_id/password) goes at the top.
    */
   submit(): void {
+    // Defensive — the submit button's [disabled] already gates on this,
+    // but if an agent somehow invokes submit() via another path (stale
+    // ref, keyboard enter on a hidden button) we still refuse.
+    if (!this.canSubmit()) return;
     this.submitting.set(true);
 
     // Customer payload — every field we captured. Backend's fillFromArray
