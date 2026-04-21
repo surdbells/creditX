@@ -328,3 +328,90 @@ for the full list. Critical ones:
 | `PAYSTACK_SECRET_KEY` | Payment webhook verification |
 | `STORAGE_PATH` | Absolute path to storage root (default: `backend/storage`) |
 | `FRONTEND_URL` | Used in password-reset email links |
+| `FCM_SERVICE_ACCOUNT_PATH` | Absolute path to the Firebase service account JSON. Required for push notifications. See [Push notifications](#push-notifications) below. |
+
+---
+
+## Push notifications
+
+The agent mobile app receives push notifications via Firebase Cloud
+Messaging (FCM). Delivery uses the FCM HTTP v1 API, authenticated with
+an OAuth2 service account. The legacy server-key HTTP API is NOT used
+(it was deprecated in 2024 and stops working on new Firebase projects).
+
+### One-time setup
+
+1. **Create or open the Firebase project** at
+   <https://console.firebase.google.com>.
+
+2. **Enable Cloud Messaging** if it isn't already.
+
+3. **Generate a service account key:**
+   Project Settings → Service accounts → "Generate new private key".
+   This downloads a JSON file. Treat it like a password — it grants
+   full send access on your Firebase project.
+
+4. **Place the JSON on the server** outside the repo:
+
+   ```bash
+   mkdir -p /www/wwwroot/creditx/backend/storage/firebase
+   # upload the JSON via SFTP, name it service-account.json
+   chmod 600 /www/wwwroot/creditx/backend/storage/firebase/service-account.json
+   chown www:www /www/wwwroot/creditx/backend/storage/firebase/service-account.json
+   ```
+
+5. **Set the env var** in `backend/.env`:
+
+   ```
+   FCM_SERVICE_ACCOUNT_PATH=/www/wwwroot/creditx/backend/storage/firebase/service-account.json
+   ```
+
+6. **Seed push templates** (first deploy after Commit 5.2):
+
+   ```bash
+   cd /www/wwwroot/creditx/backend
+   php bin/seed-push-templates.php               # dry-run preview
+   php bin/seed-push-templates.php --apply --yes # apply
+   ```
+
+   This is idempotent — re-running after success is a no-op.
+
+7. **Reload php-fpm** so workers pick up the env change:
+
+   ```bash
+   sudo systemctl reload php-fpm
+   ```
+
+### What the 5 seeded templates cover
+
+| Event trigger | Fires when | Template code |
+|---|---|---|
+| `loan_approval_step` | Intermediate approval step completes | `LOAN_APPROVAL_STEP_PUSH` |
+| `loan_approved` | Loan is fully approved | `LOAN_APPROVED_PUSH` |
+| `loan_rejected` | Loan is rejected | `LOAN_REJECTED_PUSH` |
+| `loan_disbursed` | Loan is disbursed | `LOAN_DISBURSED_PUSH` |
+| `overdue_reminder` | Overdue sweep finds a past-due loan | `OVERDUE_REMINDER_PUSH` |
+
+Agents receive push notifications on their registered devices. Each
+notification carries the `notification_id` in its data payload; the
+agent app's push handler deep-links to the notifications list on tap.
+
+### When push fails
+
+If `FCM_SERVICE_ACCOUNT_PATH` is unset or the file isn't readable,
+push sends return an error and the notification is marked `failed`
+in the `notifications` table. Email, SMS, WhatsApp, and in-app
+channels are unaffected — they run on separate templates and
+separate transports.
+
+The global kill-switch is the `notification.push_enabled` setting
+(default `true`). Flip it to `false` via the admin settings UI to
+silence all push delivery without deleting templates. EMAIL, SMS,
+WHATSAPP, and IN_APP settings work the same way.
+
+### Debugging a missing push
+
+1. Is the template seeded? `SELECT code, channel, event_trigger, is_active FROM notification_templates WHERE channel='push';`
+2. Is the user's device registered? `SELECT * FROM device_tokens WHERE user_id='...' AND is_active=true;`
+3. Did the event dispatch attempt to send? `SELECT * FROM notifications WHERE user_id='...' AND channel='push' ORDER BY created_at DESC LIMIT 5;` — look at the `status` and `error_message` columns.
+4. If notifications show `failed` with no error message: check `var/log/app.log` for FCM errors around that timestamp.
