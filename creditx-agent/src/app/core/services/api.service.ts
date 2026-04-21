@@ -23,6 +23,14 @@ export class ApiService {
     return this.http.put<ApiResponse<T>>(`${this.base}${path}`, body);
   }
 
+  patch<T = any>(path: string, body?: any): Observable<ApiResponse<T>> {
+    return this.http.patch<ApiResponse<T>>(`${this.base}${path}`, body);
+  }
+
+  delete<T = any>(path: string): Observable<ApiResponse<T>> {
+    return this.http.delete<ApiResponse<T>>(`${this.base}${path}`);
+  }
+
   upload<T = any>(path: string, formData: FormData): Observable<ApiResponse<T>> {
     return this.http.post<ApiResponse<T>>(`${this.base}${path}`, formData);
   }

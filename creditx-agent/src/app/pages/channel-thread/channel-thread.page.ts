@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, IonFooter } from '@ionic/angular/standalone';
@@ -426,7 +426,7 @@ import { AuthService } from '../../core/services/auth.service';
     }
   `],
 })
-export class ChannelThreadPage implements OnInit {
+export class ChannelThreadPage implements OnInit, OnDestroy {
   @Input() id = '';
 
   channel = signal<any>(null);
@@ -446,6 +446,16 @@ export class ChannelThreadPage implements OnInit {
   // refresh (or tap in and back out) if someone new joined.
   private membersLoaded = false;
 
+  /**
+   * Polling interval for new messages. Real-time delivery (WebSocket /
+   * SSE) would be fancier but costs infra; a 10s poll while the thread
+   * is open is cheap and Good Enough for typical channel chat cadence.
+   * Interval cleared in ngOnDestroy so we don't leak timers across
+   * route changes.
+   */
+  private pollTimer: any = null;
+  private readonly POLL_INTERVAL_MS = 10000;
+
   constructor(private api: ApiService, private auth: AuthService) {
     addIcons({ sendOutline, peopleOutline, closeOutline, megaphoneOutline, informationCircleOutline });
     this.userId = this.auth.user()?.id || '';
@@ -458,6 +468,12 @@ export class ChannelThreadPage implements OnInit {
     }
     this.loadChannel();
     this.loadMessages();
+    this.markRead();
+    this.startPolling();
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
   }
 
   /**
@@ -484,6 +500,61 @@ export class ChannelThreadPage implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /**
+   * Quiet refetch for the polling loop. Doesn't flip the loading flag
+   * (that would make the UI flicker a loading indicator every 10s) and
+   * doesn't swallow errors loudly — a transient network failure during
+   * polling shouldn't blow up the UI.
+   *
+   * If the server returns a different set of messages than we have
+   * in-memory (new arrivals), the signal update re-renders the thread.
+   * Angular's change detection + @for's track-by-id keeps existing
+   * bubbles stable; only the new ones animate in.
+   */
+  private pollMessages(): void {
+    this.api.get(`/channels/${this.id}/messages`).subscribe({
+      next: res => {
+        const incoming = res.data || [];
+        // Only update if the count changed or last-id differs — avoids
+        // needless re-renders when nothing's new.
+        const cur = this.messages();
+        if (incoming.length !== cur.length ||
+            (incoming.length && cur.length && incoming[incoming.length - 1].id !== cur[cur.length - 1].id)) {
+          this.messages.set(incoming);
+          // New messages arrived — mark them read since the user is looking
+          // at the thread right now.
+          this.markRead();
+        }
+      },
+      error: () => { /* swallow — next tick will retry */ },
+    });
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
+    this.pollTimer = setInterval(() => this.pollMessages(), this.POLL_INTERVAL_MS);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  /**
+   * Mark this channel as read. Fires on thread open and whenever new
+   * messages arrive via polling while the thread is in view. Best-effort
+   * — failures are silent since mark-read is idempotent (next success
+   * just moves the timestamp forward).
+   */
+  markRead(): void {
+    this.api.post(`/channels/${this.id}/mark-read`, {}).subscribe({
+      next: () => {},
+      error: () => {},
     });
   }
 
