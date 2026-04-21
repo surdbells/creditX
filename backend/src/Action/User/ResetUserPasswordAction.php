@@ -111,7 +111,7 @@ final class ResetUserPasswordAction
             CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: Zoho-enczapikey ' . $apiKey,
+                'Authorization: ' . $apiKey,
             ],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,

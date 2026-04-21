@@ -43,7 +43,7 @@ final class ForgotPasswordAction
                 'htmlbody' => '<html><body><p>Hi ' . htmlspecialchars($user->getFirstName()) . ',</p><p>You requested a password reset. Click the link below to reset your password (valid for 1 hour):</p><p><a href="' . $resetUrl . '">' . $resetUrl . '</a></p><p>If you did not request this, please ignore this email.</p></body></html>',
             ];
             $ch = curl_init('https://api.zeptomail.com/v1.1/email');
-            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Zoho-enczapikey ' . $apiKey], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: ' . $apiKey], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
             curl_exec($ch); curl_close($ch);
         }
 
