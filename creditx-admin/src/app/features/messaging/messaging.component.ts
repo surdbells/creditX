@@ -104,7 +104,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                 <h3 class="cx-msg-thread-title">{{ activeName }}</h3>
               </div>
               @if (activeType === 'channel') {
-                <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openAddMembers()">
+                <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openManageMembers()">
                   <lucide-icon name="users" [size]="14"></lucide-icon>
                   <span>Members</span>
                 </button>
@@ -215,13 +215,60 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       </div>
     </cx-form-dialog>
 
-    <!-- Add Members Dialog -->
+    <!-- Manage Members Dialog -->
     <cx-form-dialog
-      [open]="showAddMembers()"
-      title="Add Members"
-      subtitle="Invite more people to this channel"
-      [saving]="addMembersSaving()" (close)="showAddMembers.set(false)" (save)="saveAddMembers()">
+      [open]="showManageMembers()"
+      title="Manage Members"
+      subtitle="View, add, or remove members in this channel"
+      [saving]="manageSaving()" (close)="closeManageMembers()" (save)="saveAddMembers()"
+      saveLabel="Add selected">
       <div class="cx-form-stack">
+
+        <!-- Current members -->
+        <div>
+          <div class="cx-msg-members-head">
+            <label class="cx-label" style="margin: 0">Current members</label>
+            <span class="cx-msg-members-count">{{ currentMembers().length }}</span>
+          </div>
+          @if (membersLoading()) {
+            <div class="cx-msg-members-loading">Loading...</div>
+          } @else if (currentMembers().length === 0) {
+            <div class="cx-msg-members-empty">No members yet</div>
+          } @else {
+            <div class="cx-msg-member-list">
+              @for (m of currentMembers(); track m.id) {
+                <div class="cx-msg-member-row">
+                  <div class="cx-msg-member-avatar">
+                    {{ (m.user_name || '?').charAt(0).toUpperCase() }}
+                  </div>
+                  <div class="cx-msg-member-meta">
+                    <div class="cx-msg-member-name">{{ m.user_name }}</div>
+                    <div class="cx-msg-member-sub">{{ m.email }}</div>
+                  </div>
+                  @if (m.role === 'admin') {
+                    <span class="cx-msg-member-role">Admin</span>
+                  }
+                  <button type="button" class="cx-msg-member-remove"
+                          [disabled]="removingUserId() === m.user_id"
+                          (click)="removeMember(m)" aria-label="Remove">
+                    @if (removingUserId() === m.user_id) {
+                      <span>…</span>
+                    } @else {
+                      <lucide-icon name="x" [size]="14"></lucide-icon>
+                    }
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Add new -->
+        <div style="border-top: 1px solid var(--cx-border); padding-top: 16px; margin-top: 4px">
+          <label class="cx-label">Add new members</label>
+          <div class="cx-msg-members-subtle">Pick departments, teams, or individual users to add</div>
+        </div>
+
         <div>
           <label class="cx-label">By Department</label>
           <div class="cx-msg-chips">
@@ -620,6 +667,118 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       transition: all var(--cx-dur-fast) var(--cx-ease-premium);
     }
     .cx-msg-user-tag button:hover { background: var(--cx-primary-100); }
+
+    /* ═══ Manage Members dialog — current members list ═══ */
+    .cx-msg-members-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .cx-msg-members-count {
+      padding: 2px 8px;
+      background: var(--cx-surface-2);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-pill);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cx-text-secondary);
+    }
+    .cx-msg-members-subtle {
+      font-size: 12px;
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+      margin-bottom: 8px;
+    }
+    .cx-msg-members-loading,
+    .cx-msg-members-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--cx-text-muted);
+      font-size: 13px;
+      background: var(--cx-surface-2);
+      border: 1px dashed var(--cx-border);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-msg-member-list {
+      display: flex;
+      flex-direction: column;
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-msg-member-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cx-msg-member-row:last-child { border-bottom: none; }
+    .cx-msg-member-row:hover { background: var(--cx-surface-2); }
+
+    .cx-msg-member-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cx-accent-600), var(--cx-accent-500));
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 13px;
+      flex-shrink: 0;
+    }
+    .cx-msg-member-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .cx-msg-member-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--cx-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-msg-member-sub {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-msg-member-role {
+      padding: 2px 8px;
+      background: rgba(201, 162, 39, 0.12);
+      border: 1px solid rgba(201, 162, 39, 0.35);
+      color: var(--cx-gold-700, #8a6f1a);
+      border-radius: var(--cx-radius-pill);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    .cx-msg-member-remove {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      border: 1px solid var(--cx-border);
+      border-radius: 50%;
+      color: var(--cx-danger);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-msg-member-remove:hover:not(:disabled) {
+      background: var(--cx-danger);
+      color: #fff;
+      border-color: var(--cx-danger);
+    }
+    .cx-msg-member-remove:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
   `],
 })
 export class MessagingComponent implements OnInit, OnDestroy {
@@ -637,6 +796,12 @@ export class MessagingComponent implements OnInit, OnDestroy {
 
   // Add members
   showAddMembers = signal(false); addMembersSaving = signal(false);
+  // Manage members dialog state (replaces / wraps add-members)
+  showManageMembers = signal(false);
+  currentMembers = signal<any[]>([]);
+  membersLoading = signal(false);
+  manageSaving = signal(false);
+  removingUserId = signal<string | null>(null);
   addDepts: string[] = []; addTeams: string[] = []; addUserIds: string[] = [];
 
   private pollInterval: any;
@@ -701,14 +866,89 @@ export class MessagingComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Add members to existing channel
-  openAddMembers() { this.addDepts = []; this.addTeams = []; this.addUserIds = []; this.showAddMembers.set(true); }
+  /**
+   * Open the Manage Members dialog for the currently-active channel.
+   * Loads the member list from the server; the add-members picker
+   * state (addDepts/addTeams/addUserIds) resets so it starts clean.
+   *
+   * Members are re-fetched every open because admin churn (somebody
+   * joins/leaves another session) is real and stale data creates
+   * confusing 'why is X still here' UX.
+   */
+  openManageMembers() {
+    if (!this.activeId || this.activeType !== 'channel') return;
+    this.addDepts = []; this.addTeams = []; this.addUserIds = [];
+    this.showManageMembers.set(true);
+    this.loadCurrentMembers();
+  }
+
+  closeManageMembers() {
+    this.showManageMembers.set(false);
+    this.currentMembers.set([]);
+  }
+
+  loadCurrentMembers() {
+    if (!this.activeId) return;
+    this.membersLoading.set(true);
+    this.api.get(`/channels/${this.activeId}/members`).subscribe({
+      next: r => { this.currentMembers.set(r.data || []); this.membersLoading.set(false); },
+      error: () => this.membersLoading.set(false),
+    });
+  }
+
+  /**
+   * Remove a single member from the active channel.
+   *
+   * Optimistic-ish: we disable the row's X button via removingUserId
+   * (spinner-like ellipsis) while the DELETE is in flight, then on
+   * success we remove the row client-side. On error we clear the
+   * spinner and surface the server's message (e.g. 'cannot remove
+   * the last admin').
+   */
+  removeMember(m: any) {
+    if (!this.activeId || !m?.user_id) return;
+    if (!confirm(`Remove ${m.user_name} from this channel?`)) return;
+    this.removingUserId.set(m.user_id);
+    this.api.delete(`/channels/${this.activeId}/members/${m.user_id}`).subscribe({
+      next: r => {
+        this.removingUserId.set(null);
+        this.toast.success(r.message || 'Member removed');
+        // Local list update
+        this.currentMembers.update(list => list.filter(x => x.user_id !== m.user_id));
+      },
+      error: e => {
+        this.removingUserId.set(null);
+        this.toast.error(e.error?.message || 'Failed to remove');
+      },
+    });
+  }
+
+  /**
+   * Kept as a thin alias so legacy callsites (if any) still work.
+   * The UI now only exposes openManageMembers via the thread header.
+   */
+  openAddMembers() { this.openManageMembers(); }
 
   saveAddMembers() {
-    this.addMembersSaving.set(true);
+    if (!this.activeId) return;
+    // If nothing is selected, close the dialog gracefully — the user
+    // may have opened Manage just to view/remove members and is clicking
+    // the dialog's primary button to dismiss.
+    if (this.addDepts.length === 0 && this.addTeams.length === 0 && this.addUserIds.length === 0) {
+      this.closeManageMembers();
+      return;
+    }
+    this.manageSaving.set(true);
     this.api.post(`/channels/${this.activeId}/members`, { department_ids: this.addDepts, team_ids: this.addTeams, user_ids: this.addUserIds }).subscribe({
-      next: r => { this.addMembersSaving.set(false); this.toast.success(r.message || 'Members added'); this.showAddMembers.set(false); },
-      error: e => { this.addMembersSaving.set(false); this.toast.error(e.error?.message || 'Failed'); },
+      next: r => {
+        this.manageSaving.set(false);
+        this.toast.success(r.message || 'Members added');
+        // Refresh the member list so the newly-added show up
+        this.loadCurrentMembers();
+        // Reset the add pickers so subsequent opens don't show stale selections
+        this.addDepts = []; this.addTeams = []; this.addUserIds = [];
+      },
+      error: e => { this.manageSaving.set(false); this.toast.error(e.error?.message || 'Failed'); },
     });
   }
 
