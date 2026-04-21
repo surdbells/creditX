@@ -66,7 +66,20 @@ return function (App $app): void {
     $app->post('/api/payments/webhook/paystack', Payment\PaystackWebhookAction::class);
 
     // ─── Public Storage (avatars, uploads) ───
+    // Two paths serve the same action:
+    //   /storage/{path}      — legacy, public (outside /api prefix). Some
+    //                          deploys have nginx rewriting or static-file
+    //                          serving configured here, which can break
+    //                          after a deploy that rebuilds public/.
+    //   /api/storage/{path}  — robust alias. Lives under /api so it's
+    //                          guaranteed to be routed to PHP regardless
+    //                          of nginx location block shenanigans.
+    // Both are public (not inside the authenticated /api group further
+    // down) since avatars need to be embeddable from the frontend without
+    // sending the Authorization header. If you need auth-gated storage,
+    // register a separate route inside the authenticated group.
     $app->get('/storage/{path:.*}', Storage\ServeFileAction::class);
+    $app->get('/api/storage/{path:.*}', Storage\ServeFileAction::class);
 
     // ─── Public utility endpoints ───
     $app->get('/api/banks', ListBanksAction::class);

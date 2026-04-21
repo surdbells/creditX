@@ -134,7 +134,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                     <td class="cx-users-user-cell">
                       <div class="cx-users-user">
                         @if (row.avatar_path) {
-                          <img [src]="apiUrl + '/storage/' + row.avatar_path" class="cx-users-avatar-img" alt="" />
+                          <img [src]="avatarUrl(row.avatar_path)" class="cx-users-avatar-img" alt="" (error)="onAvatarError($event, row)" />
                         } @else {
                           <div class="cx-users-avatar-initial" [style.background]="avatarColor(row.id)">
                             {{ row.first_name?.[0] }}{{ row.last_name?.[0] }}
@@ -762,6 +762,34 @@ export class UsersComponent implements OnInit {
     const colors = ['#0A4F2A','#C9A227','#2563eb','#7c3aed','#dc2626','#059669','#d97706','#0891b2'];
     let hash = 0; for (const c of id) hash = c.charCodeAt(0) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
+  }
+
+  /**
+   * Builds the URL for a user avatar. Uses the /api/storage alias which
+   * is routed to PHP unconditionally — unlike the legacy /storage path
+   * which can be intercepted by nginx's static-file location handling
+   * and return 404 before PHP ever sees the request.
+   *
+   * environment.apiUrl already includes '/api' so the resulting URL is
+   * e.g. https://api.dostsuite.com/api/storage/avatars/uuid.jpg
+   */
+  avatarUrl(avatarPath: string): string {
+    if (!avatarPath) return '';
+    // Strip any accidental leading slash so we don't get //
+    const clean = avatarPath.startsWith('/') ? avatarPath.slice(1) : avatarPath;
+    return `${environment.apiUrl}/storage/${clean}`;
+  }
+
+  /**
+   * If an avatar fails to load (file was deleted, storage offline, etc.)
+   * we null the row's avatar_path client-side so Angular falls back to
+   * the initials tile. Avoids a broken-image icon.
+   */
+  onAvatarError(ev: Event, row: any): void {
+    row.avatar_path = null;
+    // Hide the broken img element immediately
+    const img = ev.target as HTMLImageElement;
+    if (img) img.style.display = 'none';
   }
 
   deptOptions(): SelectOption[] { return this.departments().map((d: any) => ({ value: d.id, label: d.name, sublabel: d.code })); }
