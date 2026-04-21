@@ -42,11 +42,33 @@ export class FontScaleService {
   private persistSubject = new Subject<number>();
 
   constructor(private http: HttpClient, private auth: AuthService) {
-    // Apply initial scale immediately
+    // Hydrate from auth.user() synchronously if it's already loaded.
+    // auth.user() is backed by localStorage on service init, so this will
+    // pick up the last-known server value on page reload. Only applies
+    // when the user hasn't yet saved a local preference — user's most
+    // recent interaction always wins over stale remote state.
+    const hasLocal = this.readLocalStorage() !== null;
+    if (!hasLocal) {
+      const user = this.auth.user();
+      const remote = user ? (user as any).font_scale : undefined;
+      if (typeof remote === 'number' && !isNaN(remote)) {
+        this.scale.set(this.clamp(remote));
+      }
+    }
+
+    // Apply initial scale immediately from resolved signal value
     this.applyToDOM(this.scale());
     this.currentStep.set(this.stepForValue(this.scale()));
 
-    // When scale changes, apply to DOM + localStorage immediately
+    // Effect: whenever scale changes, reflect to DOM + step signal + localStorage.
+    // This is a read-only effect for scale outputs (applyToDOM, currentStep,
+    // localStorage are not signals), so no feedback loop risk.
+    //
+    // PREVIOUS BUG: a second effect also lived here that wrote to the scale
+    // signal from inside an effect body whenever auth.user() emitted. That
+    // created a feedback loop where any user click got instantly snapped back
+    // to the cached auth.user().font_scale value. Fixed by moving hydration
+    // to a one-shot synchronous read above, before any effect is set up.
     effect(() => {
       const val = this.scale();
       this.applyToDOM(val);
@@ -54,18 +76,7 @@ export class FontScaleService {
       try { localStorage.setItem(FontScaleService.STORAGE_KEY, String(val)); } catch {}
     });
 
-    // Sync to backend after auth loads — user.font_scale is source of truth
-    effect(() => {
-      const user = this.auth.user();
-      if (user && typeof (user as any).font_scale === 'number') {
-        const remoteScale = (user as any).font_scale as number;
-        if (Math.abs(remoteScale - this.scale()) > 0.001) {
-          this.scale.set(this.clamp(remoteScale));
-        }
-      }
-    });
-
-    // Debounced persistence to backend
+    // Debounced persistence to backend — fires on every scale change.
     this.persistSubject.pipe(debounceTime(600)).subscribe(value => {
       if (!this.auth.isAuthenticated()) return;
       this.http.patch(`${environment.apiUrl}/users/me/preferences`, { font_scale: value }).subscribe({
@@ -92,15 +103,22 @@ export class FontScaleService {
 
   // ─── Internals ───
 
-  private resolveInitial(): number {
-    // Check localStorage first (fast path on reload before user loads)
+  /** Raw localStorage read. Returns null if absent or unparseable. */
+  private readLocalStorage(): number | null {
     try {
       const stored = localStorage.getItem(FontScaleService.STORAGE_KEY);
-      if (stored) {
-        const parsed = parseFloat(stored);
-        if (!isNaN(parsed)) return this.clamp(parsed);
-      }
-    } catch {}
+      if (!stored) return null;
+      const parsed = parseFloat(stored);
+      return isNaN(parsed) ? null : this.clamp(parsed);
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveInitial(): number {
+    // Check localStorage first (fast path on reload before user loads)
+    const fromStorage = this.readLocalStorage();
+    if (fromStorage !== null) return fromStorage;
     return FontScaleService.DEFAULT;
   }
 

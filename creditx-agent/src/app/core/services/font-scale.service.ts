@@ -42,24 +42,33 @@ export class FontScaleService {
   private persistSubject = new Subject<number>();
 
   constructor(private http: HttpClient, private auth: AuthService) {
+    // Hydrate from auth.user() synchronously if it's already loaded.
+    // auth.user() is backed by localStorage on service init, so this will
+    // pick up the last-known server value on page reload. Only applies
+    // when the user hasn't yet saved a local preference — user's most
+    // recent interaction always wins over stale remote state.
+    const hasLocal = this.readLocalStorage() !== null;
+    if (!hasLocal) {
+      const user = this.auth.user();
+      const remote = user ? (user as any).font_scale : undefined;
+      if (typeof remote === 'number' && !isNaN(remote)) {
+        this.scale.set(this.clamp(remote));
+      }
+    }
+
     this.applyToDOM(this.scale());
     this.currentStep.set(this.stepForValue(this.scale()));
 
+    // Effect: whenever scale changes, reflect to DOM + step signal + localStorage.
+    // PREVIOUS BUG: a second effect used to write to the scale signal from
+    // inside an effect body whenever auth.user() emitted, creating a
+    // feedback loop that snapped user clicks back to the cached remote
+    // value. Fixed by moving hydration to a one-shot synchronous read above.
     effect(() => {
       const val = this.scale();
       this.applyToDOM(val);
       this.currentStep.set(this.stepForValue(val));
       try { localStorage.setItem(FontScaleService.STORAGE_KEY, String(val)); } catch {}
-    });
-
-    effect(() => {
-      const user = this.auth.user();
-      if (user && typeof (user as any).font_scale === 'number') {
-        const remoteScale = (user as any).font_scale as number;
-        if (Math.abs(remoteScale - this.scale()) > 0.001) {
-          this.scale.set(this.clamp(remoteScale));
-        }
-      }
     });
 
     this.persistSubject.pipe(debounceTime(600)).subscribe(value => {
@@ -86,14 +95,21 @@ export class FontScaleService {
     this.setValue(FontScaleService.DEFAULT);
   }
 
-  private resolveInitial(): number {
+  /** Raw localStorage read. Returns null if absent or unparseable. */
+  private readLocalStorage(): number | null {
     try {
       const stored = localStorage.getItem(FontScaleService.STORAGE_KEY);
-      if (stored) {
-        const parsed = parseFloat(stored);
-        if (!isNaN(parsed)) return this.clamp(parsed);
-      }
-    } catch {}
+      if (!stored) return null;
+      const parsed = parseFloat(stored);
+      return isNaN(parsed) ? null : this.clamp(parsed);
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveInitial(): number {
+    const fromStorage = this.readLocalStorage();
+    if (fromStorage !== null) return fromStorage;
     return FontScaleService.DEFAULT;
   }
 
