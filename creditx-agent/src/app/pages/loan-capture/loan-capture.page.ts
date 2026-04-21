@@ -213,25 +213,297 @@ import { ApiService } from '../../core/services/api.service';
 
           <!-- Step 4: Personal & Banking -->
           @if (step() === 3) {
-            <div class="cxm-lc-card">
-              <div class="flex flex-col gap-3">
-                @for (field of personalFields; track field.key) {
+            <div class="flex flex-col gap-3">
+
+              <!-- Personal section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Personal Information</div>
+                <div class="flex flex-col gap-3">
                   <div>
-                    <label class="cxm-lc-label">{{ field.label }}</label>
-                    @if (field.key === 'bank_name') {
-                      <input type="text" class="cxm-lc-input"
-                             [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''"
-                             list="banks-list" autocomplete="off" />
-                      <datalist id="banks-list">
-                        @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
-                      </datalist>
-                    } @else {
-                      <input [type]="field.type || 'text'" class="cxm-lc-input"
-                             [(ngModel)]="form[field.key]" [placeholder]="field.placeholder || ''" />
-                    }
+                    <label class="cxm-lc-label">Full Name <span class="cxm-lc-req">*</span></label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['full_name']" placeholder="As shown on ID" />
                   </div>
-                }
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Date of Birth</label>
+                      <input type="date" class="cxm-lc-input" [(ngModel)]="form['date_of_birth']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Gender</label>
+                      <select class="cxm-lc-select" [(ngModel)]="form['gender']">
+                        <option value="">Select...</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Marital Status</label>
+                      <select class="cxm-lc-select" [(ngModel)]="form['marital_status']">
+                        <option value="">Select...</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Divorced">Divorced</option>
+                        <option value="Widowed">Widowed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Children</label>
+                      <input type="number" min="0" max="20" class="cxm-lc-input" [(ngModel)]="form['number_of_children']" placeholder="0" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">BVN <span class="cxm-lc-req">*</span></label>
+                    <input type="text" maxlength="11" pattern="\d*" class="cxm-lc-input"
+                           [(ngModel)]="form['bvn']" placeholder="22200000000" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Mother's Maiden Name</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['mothers_maiden_name']" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Religion</label>
+                    <select class="cxm-lc-select" [(ngModel)]="form['religion']">
+                      <option value="">Select...</option>
+                      <option value="Christian">Christian</option>
+                      <option value="Muslim">Muslim</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                </div>
               </div>
+
+              <!-- Contact section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Contact Information</div>
+                <div class="flex flex-col gap-3">
+                  <div>
+                    <label class="cxm-lc-label">Phone <span class="cxm-lc-req">*</span></label>
+                    <input type="tel" maxlength="11" class="cxm-lc-input"
+                           [(ngModel)]="form['phone']" placeholder="08012345678" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Alternative Phone</label>
+                    <input type="tel" maxlength="11" class="cxm-lc-input" [(ngModel)]="form['alt_phone']" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Email</label>
+                    <input type="email" class="cxm-lc-input" [(ngModel)]="form['email']" placeholder="customer@email.com" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Home Address (nearest bus stop)</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['home_address']" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Permanent Home Address</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['permanent_address']" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">State of Origin</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['state_of_origin']" placeholder="e.g. Lagos" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">LGA</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['lga']" placeholder="Local government" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Home Town</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['hometown']" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Employment section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Employment Information</div>
+                <div class="flex flex-col gap-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Employee ID</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['employee_id']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Net Pay (₦)</label>
+                      <input type="number" class="cxm-lc-input tabular-nums" [(ngModel)]="form['gross_pay']" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Job Title</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['job_title']" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Employer</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['employer']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Sub-Organization</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['organization']" />
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Command</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['command']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Employment Date</label>
+                      <input type="date" class="cxm-lc-input" [(ngModel)]="form['employment_date']" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">ID Type</label>
+                    <select class="cxm-lc-select" [(ngModel)]="form['id_type']">
+                      <option value="">Select...</option>
+                      <option value="WorkID">Work ID</option>
+                      <option value="OldNationalID">National ID</option>
+                      <option value="DriversLicense">Driver's License</option>
+                      <option value="VotersCard">Voter's Card</option>
+                      <option value="NigerianIntPassport">Int'l Passport</option>
+                      <option value="NHISCard">NHIS Card</option>
+                      <option value="GovStaffID">Gov Staff ID</option>
+                      <option value="BirthCertificate">Birth Certificate</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Work ID Number</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['work_id_number']" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">ID Issued</label>
+                      <input type="date" class="cxm-lc-input" [(ngModel)]="form['work_id_issued_date']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">ID Expires</label>
+                      <input type="date" class="cxm-lc-input" [(ngModel)]="form['work_id_expiry_date']" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Loan extras section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Loan Details</div>
+                <div class="flex flex-col gap-3">
+                  <div>
+                    <label class="cxm-lc-label">Amount in Words</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['loan_amount_words']" placeholder="e.g. Five hundred thousand naira only" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Loan Purpose</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['loan_purpose']" placeholder="Public Sector" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Repayment Method</label>
+                    <select class="cxm-lc-select" [(ngModel)]="form['repayment_method']">
+                      <option value="">Select...</option>
+                      <option value="Direct Debit">Direct Debit</option>
+                      <option value="Cheques">Cheques</option>
+                      <option value="Payroll Deduction">Payroll Deduction</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Bank Statement Mode</label>
+                    <select class="cxm-lc-select" [(ngModel)]="form['bank_statement_mode']">
+                      <option value="">No statement fee</option>
+                      <option value="generated_by_company">Generated by company (₦500 fee)</option>
+                      <option value="not_generated_by_company">Not generated by company</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Statement ID</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['account_statement_id']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Statement Password</label>
+                      <input type="text" class="cxm-lc-input" [(ngModel)]="form['account_statement_password']" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bank section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Disbursement Bank</div>
+                <div class="flex flex-col gap-3">
+                  <div>
+                    <label class="cxm-lc-label">Account Number <span class="cxm-lc-req">*</span></label>
+                    <input type="text" maxlength="10" class="cxm-lc-input"
+                           [(ngModel)]="form['account_number']" placeholder="0123456789" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Account Name</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['account_name']" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Bank Name <span class="cxm-lc-req">*</span></label>
+                    <input type="text" class="cxm-lc-input"
+                           [(ngModel)]="form['bank_name']" placeholder="e.g. Access Bank"
+                           list="banks-list" autocomplete="off" />
+                    <datalist id="banks-list">
+                      @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
+                    </datalist>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Alternate Bank</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['alt_bank_name']"
+                           list="banks-list" autocomplete="off" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Alt Account #</label>
+                      <input type="text" maxlength="10" class="cxm-lc-input" [(ngModel)]="form['alt_account_number']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Alt Account Name</label>
+                      <input class="cxm-lc-input" [(ngModel)]="form['alt_account_name']" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Next of Kin section -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-section-title">Next of Kin</div>
+                <div class="flex flex-col gap-3">
+                  <div>
+                    <label class="cxm-lc-label">Full Name</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['nok_full_name']" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="cxm-lc-label">Phone</label>
+                      <input type="tel" maxlength="11" class="cxm-lc-input" [(ngModel)]="form['nok_phone']" />
+                    </div>
+                    <div>
+                      <label class="cxm-lc-label">Relationship</label>
+                      <select class="cxm-lc-select" [(ngModel)]="form['nok_relationship']">
+                        <option value="">Select...</option>
+                        <option value="Father">Father</option>
+                        <option value="Mother">Mother</option>
+                        <option value="Brother">Brother</option>
+                        <option value="Sister">Sister</option>
+                        <option value="Wife">Wife</option>
+                        <option value="Husband">Husband</option>
+                        <option value="Son">Son</option>
+                        <option value="Daughter">Daughter</option>
+                        <option value="Friend">Friend</option>
+                        <option value="Others">Others</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Address</label>
+                    <input class="cxm-lc-input" [(ngModel)]="form['nok_address']" />
+                  </div>
+                </div>
+              </div>
+
             </div>
           }
 
@@ -507,6 +779,46 @@ import { ApiService } from '../../core/services/api.service';
     .cxm-lc-input:focus {
       background: var(--cx-surface);
       border-color: var(--cx-primary-600);
+    }
+
+    /* Select boxes inherit input styling plus chevron glyph */
+    .cxm-lc-select {
+      width: 100%;
+      padding: 10px 36px 10px 14px;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6965' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-select:focus {
+      background-color: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+    }
+
+    /* Section headings within multi-section cards on step 3 */
+    .cxm-lc-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cx-primary-700);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--cx-border-subtle);
+      margin-bottom: 4px;
+    }
+
+    /* Required-field marker — red asterisk in labels */
+    .cxm-lc-req {
+      color: var(--cx-danger);
+      font-weight: 600;
+      margin-left: 2px;
     }
 
     /* ─── Product cards (step 1) ─── */
@@ -990,9 +1302,28 @@ export class LoanCapturePage implements OnInit {
   submitting = signal(false);
 
   form: any = {
+    // Core loan
     product_id: '', staff_id: '', amount: '', tenure: '',
-    phone: '', email: '', bank_name: '', account_number: '',
-    home_address: '', bvn: '',
+    // Personal
+    full_name: '', date_of_birth: '', gender: '', marital_status: '',
+    number_of_children: '', bvn: '', mothers_maiden_name: '', religion: '',
+    // Contact
+    phone: '', alt_phone: '', email: '',
+    home_address: '', permanent_address: '',
+    state_of_origin: '', lga: '', hometown: '',
+    // Employment
+    employee_id: '', gross_pay: '', job_title: '', employer: '',
+    organization: '', command: '', employment_date: '',
+    id_type: '', work_id_number: '',
+    work_id_issued_date: '', work_id_expiry_date: '',
+    // Loan extras
+    loan_amount_words: '', loan_purpose: '', repayment_method: '',
+    bank_statement_mode: '', account_statement_id: '', account_statement_password: '',
+    // Bank
+    bank_name: '', account_number: '', account_name: '',
+    alt_bank_name: '', alt_account_number: '', alt_account_name: '',
+    // Next of Kin (single NOK captured here; server wraps it in an array)
+    nok_full_name: '', nok_phone: '', nok_address: '', nok_relationship: '',
   };
 
   uploadedDocs: Map<string, {name: string; file: File}> = new Map();
@@ -1002,15 +1333,6 @@ export class LoanCapturePage implements OnInit {
     { key: 'id_card', label: 'ID Card (NIN/Voter/Driver)', accept: 'image/*,.pdf' },
     { key: 'payslip', label: 'Recent Payslip', accept: 'image/*,.pdf' },
     { key: 'bank_statement', label: 'Bank Statement', accept: '.pdf,image/*' },
-  ];
-
-  personalFields = [
-    { key: 'phone', label: 'Phone Number', type: 'tel', placeholder: '08012345678' },
-    { key: 'email', label: 'Email', type: 'email', placeholder: 'customer@email.com' },
-    { key: 'bank_name', label: 'Bank Name', placeholder: 'e.g. Access Bank' },
-    { key: 'account_number', label: 'Account Number', placeholder: '0123456789' },
-    { key: 'bvn', label: 'BVN', placeholder: '22200000000' },
-    { key: 'home_address', label: 'Home Address', placeholder: 'Residential address' },
   ];
 
   agentBlocked = signal(false);
@@ -1057,22 +1379,82 @@ export class LoanCapturePage implements OnInit {
         if (records.length > 0) {
           const rec = records[0];
           this.staffRecord.set(rec);
-          // Auto-fill from government record (still editable)
-          if (!this.form['phone'] && rec.telephone_number) this.form['phone'] = rec.telephone_number;
-          if (!this.form['bank_name'] && rec.bank_name) this.form['bank_name'] = rec.bank_name;
-          if (!this.form['account_number'] && rec.account_number) this.form['account_number'] = rec.account_number;
-          // Check for existing customer (richer data: email, address, etc)
-          this.api.get('/customers', { search: rec.staff_id, per_page: 1 }).subscribe({
+          // Auto-fill from government record (still editable). Only populates
+          // empty fields so repeated lookups don't clobber agent edits.
+          this.applyPrefill({
+            full_name: rec.employee_name,
+            phone: rec.telephone_number,
+            bank_name: rec.bank_name,
+            account_number: rec.account_number,
+            date_of_birth: rec.date_of_birth,
+            gender: rec.gender,
+            marital_status: rec.marital_status,
+            state_of_origin: rec.state_of_origin,
+            lga: rec.lga,
+            employer: rec.employer,
+            organization: rec.organization,
+            gross_pay: rec.net_pay,
+            employment_date: rec.employment_date,
+          });
+
+          // Now check for a richer existing Customer record by IPPIS.
+          // This endpoint was added in Phase C.1 — returns 200 with
+          // {found: bool, customer: object|null}. No 404 on miss.
+          this.api.get(`/customers/by-ippis/${encodeURIComponent(rec.staff_id)}`).subscribe({
             next: cres => {
-              const customers = cres.data || [];
-              if (customers.length > 0) {
-                const c = customers[0];
-                // Only overwrite if form field is empty — don't clobber agent edits
-                if (!this.form['phone'] && c.phone) this.form['phone'] = c.phone;
-                if (!this.form['email'] && c.email) this.form['email'] = c.email;
-                if (!this.form['bank_name'] && c.bank_name) this.form['bank_name'] = c.bank_name;
-                if (!this.form['account_number'] && c.account_number) this.form['account_number'] = c.account_number;
+              const data = cres.data || {};
+              if (data.found && data.customer) {
+                const c = data.customer;
                 this.existingCustomer.set(c);
+                // Customer data is richer than government record — prefill
+                // everything the customer has that the form needs. Still
+                // only fills empty fields so agent edits win.
+                this.applyPrefill({
+                  full_name: c.full_name,
+                  phone: c.phone,
+                  alt_phone: c.alt_phone,
+                  email: c.email,
+                  date_of_birth: c.date_of_birth,
+                  gender: c.gender,
+                  marital_status: c.marital_status,
+                  number_of_children: c.number_of_children,
+                  bvn: c.bvn,
+                  mothers_maiden_name: c.mothers_maiden_name,
+                  religion: c.religion,
+                  home_address: c.home_address,
+                  permanent_address: c.permanent_address,
+                  state_of_origin: c.state_of_origin,
+                  lga: c.lga,
+                  hometown: c.hometown,
+                  // Employment
+                  job_title: c.job_title,
+                  employer: c.employer,
+                  organization: c.organization,
+                  command: c.command,
+                  employment_date: c.employment_date,
+                  id_type: c.id_type,
+                  work_id_number: c.work_id_number,
+                  work_id_issued_date: c.work_id_issued_date,
+                  work_id_expiry_date: c.work_id_expiry_date,
+                  gross_pay: c.gross_pay,
+                  // Bank
+                  bank_name: c.bank_name,
+                  account_number: c.account_number,
+                  alt_bank_name: c.alt_bank_name,
+                  alt_account_number: c.alt_account_number,
+                  alt_account_name: c.alt_account_name,
+                });
+                // Prefill NOK if customer has one (use primary if multiple).
+                const nok = (c.next_of_kins || []).find((n: any) => n.is_primary)
+                          ?? (c.next_of_kins || [])[0];
+                if (nok) {
+                  this.applyPrefill({
+                    nok_full_name: nok.full_name,
+                    nok_phone: nok.phone,
+                    nok_address: nok.address,
+                    nok_relationship: nok.relationship,
+                  });
+                }
               }
               this.staffLoading.set(false);
             },
@@ -1085,6 +1467,21 @@ export class LoanCapturePage implements OnInit {
       },
       error: () => { this.staffError.set('Lookup failed'); this.staffLoading.set(false); },
     });
+  }
+
+  /**
+   * Fill form fields from a source object, but only when the current
+   * form value is empty/falsy. Lets the agent override prefill by
+   * typing over it — repeated lookups won't clobber their edits.
+   * Also stringifies non-string values (dates, numbers) since every
+   * input binds to a string model.
+   */
+  private applyPrefill(src: Record<string, any>): void {
+    for (const [key, rawVal] of Object.entries(src)) {
+      if (rawVal === null || rawVal === undefined || rawVal === '') continue;
+      if (this.form[key]) continue; // don't overwrite existing value
+      this.form[key] = typeof rawVal === 'string' ? rawVal : String(rawVal);
+    }
   }
 
   calculate(): void {
@@ -1208,19 +1605,99 @@ export class LoanCapturePage implements OnInit {
   submittedLoanId = signal<string | null>(null);
   uploadsComplete = signal(false);
 
+  /**
+   * Build and submit the loan application payload. Shape matches
+   * the refactored CreateLoanAction (Phase C.1):
+   *
+   *   - Always uses the 'customer' nested object (create-or-reuse path).
+   *     If this agent has already looked up an existing customer by IPPIS,
+   *     we send customer_id; the 'customer' block then acts as a PATCH.
+   *     If IPPIS lookup returned no match, we omit customer_id and the
+   *     backend creates a new Customer row from 'customer'.
+   *   - Next-of-kin goes in a separate top-level 'next_of_kin' array so
+   *     it persists as a NextOfKin row rather than Customer fields.
+   *   - Loan-level metadata (loan_amount_words, loan_purpose,
+   *     repayment_method, account_statement_id/password) goes at the top.
+   */
   submit(): void {
     this.submitting.set(true);
-    const payload = {
-      product_id: this.form['product_id'],
+
+    // Customer payload — every field we captured. Backend's fillFromArray
+    // ignores keys with null/undefined values, and empty strings are fine
+    // too (they just clear optional fields on existing records).
+    const customerPayload: any = {
       staff_id: this.form['staff_id'],
-      amount_requested: this.form['amount'],
-      tenure: this.form['tenure'],
-      customer: {
-        phone: this.form['phone'], email: this.form['email'],
-        bank_name: this.form['bank_name'], account_number: this.form['account_number'],
-        bvn: this.form['bvn'], home_address: this.form['home_address'],
-      },
+      full_name: this.form['full_name'],
+      phone: this.form['phone'],
+      alt_phone: this.form['alt_phone'],
+      email: this.form['email'],
+      dob: this.form['date_of_birth'],
+      gender: this.form['gender'],
+      marital_status: this.form['marital_status'],
+      number_of_children: this.form['number_of_children'] || null,
+      bvn: this.form['bvn'],
+      mothers_maiden_name: this.form['mothers_maiden_name'],
+      religion: this.form['religion'],
+      home_address: this.form['home_address'],
+      permanent_address: this.form['permanent_address'],
+      state_of_origin: this.form['state_of_origin'],
+      lga: this.form['lga'],
+      hometown: this.form['hometown'],
+      // Employment
+      employee_id: this.form['employee_id'],
+      gross_pay: this.form['gross_pay'] || null,
+      job_title: this.form['job_title'],
+      employer: this.form['employer'],
+      organization: this.form['organization'],
+      command: this.form['command'],
+      employment_date: this.form['employment_date'],
+      id_type: this.form['id_type'],
+      work_id_number: this.form['work_id_number'],
+      work_id_issued_date: this.form['work_id_issued_date'],
+      work_id_expiry_date: this.form['work_id_expiry_date'],
+      // Bank
+      bank_name: this.form['bank_name'],
+      account_number: this.form['account_number'],
+      alt_bank_name: this.form['alt_bank_name'],
+      alt_account_number: this.form['alt_account_number'],
+      alt_account_name: this.form['alt_account_name'],
     };
+
+    // Next of kin — optional. Only send if at least a name is present.
+    const nokList: any[] = [];
+    if (this.form['nok_full_name']) {
+      nokList.push({
+        full_name: this.form['nok_full_name'],
+        phone: this.form['nok_phone'],
+        address: this.form['nok_address'],
+        relationship: this.form['nok_relationship'],
+        is_primary: true,
+      });
+    }
+
+    const payload: any = {
+      product_id: this.form['product_id'],
+      amount: this.form['amount'],
+      tenure: Number(this.form['tenure']),
+      customer: customerPayload,
+    };
+    if (nokList.length > 0) payload.next_of_kin = nokList;
+
+    // If we matched an existing customer on IPPIS lookup, include its id
+    // so the backend treats the 'customer' block as a patch instead of
+    // creating a duplicate row.
+    const existing = this.existingCustomer();
+    if (existing?.id) payload.customer_id = existing.id;
+
+    // Loan-level metadata — only include keys that have a value so we
+    // don't overwrite server-side defaults with empty strings.
+    if (this.form['bank_statement_mode'])         payload.bank_statement_mode = this.form['bank_statement_mode'];
+    if (this.form['loan_amount_words'])           payload.loan_amount_words = this.form['loan_amount_words'];
+    if (this.form['loan_purpose'])                payload.loan_purpose = this.form['loan_purpose'];
+    if (this.form['repayment_method'])            payload.repayment_method = this.form['repayment_method'];
+    if (this.form['account_statement_id'])        payload.account_statement_id = this.form['account_statement_id'];
+    if (this.form['account_statement_password']) payload.account_statement_password = this.form['account_statement_password'];
+
     this.api.post('/loans', payload).subscribe({
       next: res => {
         this.submitting.set(false);
