@@ -57,12 +57,12 @@ export class ApprovalQueueComponent implements OnInit {
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
   ngOnInit() { this.load(); }
-  load(p?: any) { this.loading.set(true); this.api.get('/approval-queue', { ...this.q, ...p }).subscribe({ next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); }, error: () => this.loading.set(false) }); }
+  load(p?: any) { this.loading.set(true); this.api.get('/approvals/queue', { ...this.q, ...p }).subscribe({ next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); }, error: () => this.loading.set(false) }); }
   onQuery(e: TableQueryEvent) { this.q = e; this.load(e); }
 
   decide(row: any, decision: string) {
     const id = row.loan_id || row.id;
-    this.api.post(`/approval-queue/loan/${id}/decide`, { decision, comment: '' }).subscribe({
+    this.api.post(`/approvals/loan/${id}/decide`, { decision, comment: '' }).subscribe({
       next: r => { this.toast.success(r.message || `Loan ${decision}d`); this.load(this.q); },
       error: e => this.toast.error(e.error?.message || 'Failed'),
     });
