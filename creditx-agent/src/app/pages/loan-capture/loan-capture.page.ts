@@ -104,6 +104,7 @@ import { ApiService } from '../../core/services/api.service';
                 <div class="cxm-lc-search-row">
                   <input type="text" class="cxm-lc-input"
                          [(ngModel)]="form['staff_id']"
+                         (ngModelChange)="onStaffIdChange()"
                          placeholder="Enter staff ID"
                          (keyup.enter)="lookupStaff()" />
                   <button class="cxm-lc-search-btn"
@@ -1369,6 +1370,19 @@ export class LoanCapturePage implements OnInit {
 
   selectedProductName(): string {
     return this.products().find(p => p.id === this.form['product_id'])?.name || '—';
+  }
+
+  /**
+   * Clear the staff lookup state when the agent edits the IPPIS input.
+   * Without this, an agent could search for staff A (match found, next
+   * button enables), then change the ID to staff B and advance past
+   * Step 2 with staffRecord still pointing at A. Clearing on change
+   * forces a fresh lookup before the wizard will accept the new ID.
+   */
+  onStaffIdChange(): void {
+    if (this.staffRecord() !== null) this.staffRecord.set(null);
+    if (this.existingCustomer() !== null) this.existingCustomer.set(null);
+    if (this.staffError() !== null) this.staffError.set(null);
   }
 
   lookupStaff(): void {
