@@ -81,7 +81,15 @@ class SystemSetting
     public function setValue(mixed $value): void
     {
         $this->value = match ($this->type) {
-            SettingType::BOOLEAN => $value ? 'true' : 'false',
+            // FILTER_VALIDATE_BOOLEAN is the right tool here — it handles
+            // both native bools and the strings the admin UI sends:
+            //   true  ← true, "true", "1", "on", "yes"
+            //   false ← false, "false", "0", "off", "no", ""
+            // A naive truthiness check ($value ? 'true' : 'false') would
+            // treat the string "false" as truthy (non-empty string) and
+            // silently store 'true' — which was the bug that caused
+            // boolean settings to "revert" on refresh.
+            SettingType::BOOLEAN => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 'true' : 'false',
             SettingType::JSON    => is_string($value) ? $value : json_encode($value),
             default              => (string) $value,
         };
