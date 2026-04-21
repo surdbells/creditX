@@ -5,7 +5,7 @@ namespace App\Action\Loan;
 use App\Domain\Entity\{Customer, Loan, LoanFeeBreakdown, LoanTrail, LoanTransaction, NextOfKin};
 use App\Domain\Enum\{FeeCalculationType, LoanStatus, LoanType};
 use App\Domain\Repository\{CustomerRepository, LoanProductRepository, LoanRepository, LocationRepository};
-use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, LoanCalculationService, NotificationDispatchService};
+use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, LoanCalculationService, NotificationDispatchService, SettingsCacheService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -42,10 +42,23 @@ final class CreateLoanAction
         private readonly AuditService $audit,
         private readonly EntityManagerInterface $em,
         private readonly NotificationDispatchService $notifService,
+        private readonly SettingsCacheService $settings,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        // Pause guard — the 'agent.accepting_loans' setting is the admin's
+        // kill-switch for new applications. Check BEFORE parsing the payload
+        // so we fail fast and give the client a clear 403 rather than a
+        // generic validation error. SettingsCacheService hits Redis first
+        // (hot path) so this is effectively free.
+        //
+        // Setting default is true — if the setting has never been created,
+        // intake is OPEN. Admin has to explicitly pause.
+        if (!$this->settings->getBool('agent.accepting_loans', true)) {
+            return $this->forbidden('Loan applications are currently paused by the administrator. Please try again later.');
+        }
+
         $data = (array) ($request->getParsedBody() ?? []);
 
         // Pre-validate the identification mode — either customer_id OR customer payload

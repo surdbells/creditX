@@ -74,7 +74,7 @@ $rolesDef = [
     ['Loan Officer', 'loan_officer', 'Loan processing', true, ['loans.view','loans.create','loans.edit','loans.approve','customers.view','customers.create','customers.edit','records.view','products.view','payments.view','reports.portfolio','messaging.view','messaging.send','notifications.view']],
     ['Accountant', 'accountant', 'Financial operations', true, ['accounting.view','accounting.create','accounting.edit','accounting.journal','accounting.reverse','payments.view','payments.create','reports.portfolio','reports.par','reports.reconciliation','reports.export','notifications.view']],
     ['Compliance Officer', 'compliance_officer', 'Regulatory compliance', true, ['loans.view','customers.view','records.view','accounting.view','reports.portfolio','reports.par','reports.cbn','reports.export','audit.view','notifications.view']],
-    ['Agent', 'agent', 'Field agent / DSA', true, ['loans.view','loans.create','loans.edit','customers.view','customers.create','customers.edit','records.view','products.view','messaging.view','messaging.send','notifications.view']],
+    ['Agent', 'agent', 'Field agent / DSA', true, ['loans.view','loans.create','loans.edit','customers.view','customers.create','customers.edit','records.view','products.view','messaging.view','messaging.send','notifications.view','settings.view']],
 ];
 
 $roleCount = 0;

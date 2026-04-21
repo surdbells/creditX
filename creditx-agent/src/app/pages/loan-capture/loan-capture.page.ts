@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -1670,7 +1670,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
     }
   `],
 })
-export class LoanCapturePage implements OnInit {
+export class LoanCapturePage implements OnInit, OnDestroy {
   step = signal(0);
   stepLabels = ['Product', 'Staff', 'Details', 'Info', 'Docs', 'Review'];
   stepHints = [
@@ -1785,21 +1785,42 @@ export class LoanCapturePage implements OnInit {
     this.bvnError.set(null);
   }
 
+  /**
+   * Polling timer for the agent.accepting_loans setting. Checked every
+   * 15s while this page is mounted so a pause toggled by admin takes
+   * effect without the agent needing to reload. Cleared on destroy.
+   */
+  private pauseCheckTimer: any = null;
+  private readonly PAUSE_CHECK_INTERVAL_MS = 15000;
+
+  /**
+   * Window focus handler reference — held so we can removeEventListener
+   * in ngOnDestroy. Without the reference, the listener would leak
+   * across navigations and accumulate.
+   */
+  private onFocusListener: (() => void) | null = null;
+
   constructor(private api: ApiService, public router: Router) {
     addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close });
   }
 
   ngOnInit(): void {
-    // Check if agents can accept loans
-    this.api.get('/settings', { per_page: 200 }).subscribe({
-      next: res => {
-        const settings = res.data || [];
-        const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
-        if (s && (s.value === 'false' || s.value === '0')) {
-          this.agentBlocked.set(true);
-        }
-      },
-    });
+    // First check fires immediately so the 'Paused' state appears on
+    // first render rather than after a 15s delay.
+    this.refreshPauseState();
+
+    // Poll every 15s so admin pauses propagate to agents who left the
+    // app open on this page. 15s is a balance — faster wastes battery
+    // and bandwidth, slower feels stale.
+    this.pauseCheckTimer = setInterval(() => this.refreshPauseState(), this.PAUSE_CHECK_INTERVAL_MS);
+
+    // Re-check whenever the tab regains focus / the app comes back to
+    // foreground. Polling timers pause in backgrounded tabs/apps on
+    // many platforms; this guarantees that switching back to a stale
+    // tab triggers an immediate refresh before any interaction.
+    this.onFocusListener = () => this.refreshPauseState();
+    window.addEventListener('focus', this.onFocusListener);
+    document.addEventListener('visibilitychange', this.onFocusListener);
 
     this.api.get('/loan-products', { per_page: 50, is_active: true }).subscribe({
       next: res => { this.products.set(res.data || []); this.productsLoading.set(false); },
@@ -1809,6 +1830,47 @@ export class LoanCapturePage implements OnInit {
     this.api.get('/banks').subscribe({
       next: res => this.banks.set(res.data || []),
       error: () => {},
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.pauseCheckTimer) {
+      clearInterval(this.pauseCheckTimer);
+      this.pauseCheckTimer = null;
+    }
+    if (this.onFocusListener) {
+      window.removeEventListener('focus', this.onFocusListener);
+      document.removeEventListener('visibilitychange', this.onFocusListener);
+      this.onFocusListener = null;
+    }
+  }
+
+  /**
+   * Fetch the current agent.accepting_loans setting and flip the
+   * agentBlocked signal if it changed. Runs on mount, on a 15s poll,
+   * and whenever the tab regains focus.
+   *
+   * Errors are silent — a transient network failure shouldn't flip
+   * the block on unnecessarily. The next tick tries again.
+   *
+   * NOTE: this requires the Agent role to have the 'settings.view'
+   * permission. Migration bin/migrate-agent-settings-view.php grants
+   * it on production; seed.php / seed-lite.php include it for fresh
+   * environments.
+   */
+  private refreshPauseState(): void {
+    this.api.get('/settings', { per_page: 200 }).subscribe({
+      next: res => {
+        const settings = res.data || [];
+        const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
+        // If the setting row doesn't exist, intake is OPEN (matches
+        // backend default). If it exists and is 'false' / '0', block.
+        const shouldBlock = !!s && (s.value === 'false' || s.value === '0');
+        if (this.agentBlocked() !== shouldBlock) {
+          this.agentBlocked.set(shouldBlock);
+        }
+      },
+      error: () => { /* swallow — next tick retries */ },
     });
   }
 
@@ -2233,7 +2295,17 @@ export class LoanCapturePage implements OnInit {
           this.router.navigate(['/loans', loanId]);
         }
       },
-      error: () => this.submitting.set(false),
+      error: (err) => {
+        this.submitting.set(false);
+        // If the backend refused because intake is paused, flip the
+        // block so the agent sees the 'Applications Paused' screen
+        // immediately rather than being stuck on the submit step with
+        // a generic error. The setting poll would catch up in ≤15s
+        // but doing it inline from the 403 is instant.
+        if (err?.status === 403) {
+          this.agentBlocked.set(true);
+        }
+      },
     });
   }
 

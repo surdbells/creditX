@@ -194,6 +194,7 @@ $rolesDef = [
         'customers.view', 'customers.create', 'customers.edit',
         'records.view',
         'messaging.view', 'messaging.send', 'notifications.view',
+        'settings.view',
     ]],
 ];
 
