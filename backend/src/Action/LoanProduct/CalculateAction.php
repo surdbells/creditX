@@ -17,11 +17,18 @@ final class CalculateAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $data = (array) ($request->getParsedBody() ?? []);
-        $productId = $data['product_id'] ?? '';
-        $amount = $data['amount'] ?? '';
+        $productId = (string) ($data['product_id'] ?? '');
+        // Cast numeric fields to string — JSON payloads may send amounts as
+        // numbers (e.g. 500000) which would otherwise TypeError against the
+        // service's `string $appAmount` signature. We keep the service
+        // contract strict (decimals as strings, matching Loan entity) and
+        // normalize at the boundary.
+        $amount = (string) ($data['amount'] ?? '');
         $tenure = (int) ($data['tenure'] ?? 0);
-        $bankStatementMode = $data['bank_statement_mode'] ?? null;
-        $oldLoanBalance = $data['old_loan_balance'] ?? '0';
+        $bankStatementMode = isset($data['bank_statement_mode']) && $data['bank_statement_mode'] !== ''
+            ? (string) $data['bank_statement_mode']
+            : null;
+        $oldLoanBalance = (string) ($data['old_loan_balance'] ?? '0');
 
         if ($productId === '' || $amount === '' || $tenure < 1) {
             return $this->validationError(['product_id' => 'Required', 'amount' => 'Required', 'tenure' => 'Must be >= 1']);

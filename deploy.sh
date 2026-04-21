@@ -167,6 +167,46 @@ if [[ $FRONTEND_ONLY -eq 0 ]]; then
   else
     warn "bin/cache-warmup.php not found — skipping warmup"
   fi
+
+  # ─── PHP opcache reset ───────────────────────────────────────────────
+  # Without this, PHP serves cached bytecode from before the deploy and
+  # new/changed routes or action files won't be picked up until opcache
+  # naturally invalidates. Route additions are the most affected because
+  # the routing table is built from the cached routes.php bytecode, so a
+  # new endpoint looks like a 404 until opcache resets.
+  #
+  # We try php-fpm reload first (the clean, graceful option that also
+  # restarts workers). If that fails we fall back to reloading common
+  # named services. Last resort: print a warning — operator can run
+  # 'sudo systemctl reload php-fpm' manually.
+  #
+  # Detection: systemd 'list-units' is cheap and tells us what's actually
+  # running rather than guessing by version numbers.
+  reload_opcache() {
+    if ! command -v systemctl >/dev/null 2>&1; then
+      return 1
+    fi
+    # Find any unit matching php*-fpm.service or php-fpm.service
+    local unit
+    unit=$(systemctl list-units --no-legend --state=active --type=service 2>/dev/null \
+      | awk '/^php[0-9.]*-?fpm\.service/ { print $1; exit }')
+    if [[ -n "$unit" ]]; then
+      if systemctl reload "$unit" 2>/dev/null; then
+        echo "$unit"; return 0
+      fi
+    fi
+    return 1
+  }
+
+  if RELOADED=$(reload_opcache); then
+    ok "Opcache reset via reload of $RELOADED"
+  else
+    warn "Could not reset PHP opcache automatically."
+    warn "  If new routes/actions return 404 after deploy, run one of:"
+    warn "    sudo systemctl reload php-fpm"
+    warn "    sudo systemctl reload php8.2-fpm      # or your PHP version"
+    warn "    sudo service php-fpm reload"
+  fi
 fi
 
 # ─── 5. Frontend builds (unless --backend-only) ─────────────────────────
