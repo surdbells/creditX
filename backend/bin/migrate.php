@@ -3,37 +3,55 @@
 declare(strict_types=1);
 
 /**
- * CreditX — Data Migration: Percentage to Fraction
+ * CreditX — Data Migration Runner
  *
- * One-shot migration that corrects historic bad data where percentage
- * fees/penalties were entered as whole-percent literals (e.g. 2.0 meaning
- * 2%) instead of the project's canonical fractional form (0.02 meaning 2%).
+ * Ships one-shot data migrations that aren't expressible via Doctrine
+ * schema:tool:update. Each migration below is:
+ *   - Idempotent (re-running finds nothing to do and exits cleanly)
+ *   - Transactional (single BEGIN/COMMIT across all migrations)
+ *   - Reversible by reasoning about its precondition, not by running
+ *     the script backwards
  *
- * Affects:
- *   - product_fees.value  WHERE calculation_type = 'percentage'
- *   - penalty_rules.value WHERE calculation_type = 'percentage'
+ * ════════════════════════════════════════════════════════════════════
+ *  MIGRATION 1 — Percentage values: whole-percent → fraction
+ * ════════════════════════════════════════════════════════════════════
+ * Affected tables:  product_fees, penalty_rules
+ * Precondition:     A row has calculation_type = 'percentage' and
+ *                   value >= 1, which indicates admin entered '2' for 2%
+ *                   instead of the project's canonical fractional form
+ *                   (0.02 for 2%).
+ * Action:           UPDATE value = value / 100
+ * Post-state:       All percentage rows have value < 1 (fractional form).
+ * Safe re-run:      After success, no rows match precondition -> no-op.
  *
- * Safety strategy — threshold rule:
- *   - Legitimate fractional values are ALWAYS < 1 (a fee > 100% of principal
- *     is not a real business case).
- *   - Percent-literal values are almost always ≥ 1 (a legitimate 0.x% fee
- *     is also rare; if you had one, this script skips it).
- *   - So: dividing rows where value >= 1.0 by 100 is safe — it can only
- *     hit rows where the admin meant a whole-percent and it got stored
- *     as such. Rows already in fractional form (< 1) are untouched.
+ * ════════════════════════════════════════════════════════════════════
+ *  MIGRATION 2 — product_fees.effect: populate from fee_type code
+ * ════════════════════════════════════════════════════════════════════
+ * Affected table:   product_fees
+ * Precondition:     A row has effect = 'deducted_from_disbursement' (the
+ *                   column default applied to rows created before the
+ *                   effect column existed) AND the fee_type.code maps to
+ *                   a known 'adds_to_gross' meaning in legacy CreditX:
+ *                     AF  (Admin Fee)     -> adds_to_gross
+ *                     IF  (Insurance Fee) -> adds_to_gross
+ *                     All other fee_type codes stay at the default.
+ * Action:           UPDATE product_fees SET effect = 'adds_to_gross'
+ * Post-state:       Admin + Insurance fees are flagged as ADDS_TO_GROSS.
+ *                   Management, BS, Processing remain DEDUCTED_FROM_DISBURSEMENT
+ *                   (legacy-correct behavior for those).
+ * Safe re-run:      After success, AF/IF rows already have adds_to_gross
+ *                   so they don't match the precondition -> no-op.
  *
- * Idempotency:
- *   After a successful run, all percentage rows are < 1. A second run sees
- *   nothing to do. Safe to re-run.
+ * ════════════════════════════════════════════════════════════════════
  *
  * Usage:
- *   php bin/migrate.php                # dry-run — SHOWS planned changes, exits
- *   php bin/migrate.php --apply        # applies, with interactive [y/N] confirm
- *   php bin/migrate.php --apply --yes  # applies with no prompt (for scripts)
+ *   php bin/migrate.php                # dry-run — SHOWS planned changes
+ *   php bin/migrate.php --apply        # applies with [y/N] prompt
+ *   php bin/migrate.php --apply --yes  # applies without prompt (scripts)
  *
  * Exit codes:
- *   0 — clean (either dry-run or successful apply)
- *   1 — DB / Doctrine error; nothing was committed
+ *   0 — clean (dry-run or successful apply)
+ *   1 — DB / Doctrine error; nothing committed
  *   2 — user declined the [y/N] prompt
  */
 
@@ -44,9 +62,6 @@ if (file_exists(__DIR__ . '/../.env')) {
     $dotenv->load();
 }
 
-// Force production mode so the EntityManager uses the filesystem cache
-// like a normal request would. Not strictly needed for DBAL SQL, but it
-// matches how deploy-time CLI tools are expected to behave.
 $_ENV['APP_ENV'] = $_ENV['APP_ENV'] ?? 'production';
 
 $args = $argv ?? [];
@@ -54,7 +69,7 @@ $apply = in_array('--apply', $args, true);
 $yes   = in_array('--yes', $args, true);
 
 echo "================================================================\n";
-echo " CreditX migration — percentage fees/penalties -> fraction form\n";
+echo " CreditX migration runner\n";
 echo "================================================================\n";
 echo " Mode: " . ($apply ? "APPLY (will mutate DB)" : "DRY-RUN (read-only)") . "\n";
 echo "\n";
@@ -67,22 +82,17 @@ try {
     exit(1);
 }
 
-/**
- * Query rows that would be affected by the migration and print a
- * before/after summary. Returns a list of [table, id, value_before, value_after]
- * tuples for the actual UPDATE step.
- */
-function planMigration(\Doctrine\DBAL\Connection $conn, string $table): array
+// ═══════════════════════════════════════════════════════════════════
+//  Migration 1 — percentage values to fractional form
+// ═══════════════════════════════════════════════════════════════════
+
+function planPercentageFix(\Doctrine\DBAL\Connection $conn, string $table): array
 {
-    // Using the same SELECT shape for both tables — they both have
-    // id (uuid), value (decimal), calculation_type (varchar).
     $sql = "SELECT id, value FROM {$table} WHERE calculation_type = 'percentage' AND value >= 1 ORDER BY value DESC";
     $rows = $conn->fetchAllAssociative($sql);
     $plan = [];
     foreach ($rows as $r) {
         $before = (string) $r['value'];
-        // bcdiv preserves decimal precision — important for money.
-        // 6 decimal places matches the column precision (scale=6).
         $after = bcdiv($before, '100', 6);
         $plan[] = [
             'table'  => $table,
@@ -94,38 +104,105 @@ function planMigration(\Doctrine\DBAL\Connection $conn, string $table): array
     return $plan;
 }
 
-$feesPlan     = planMigration($conn, 'product_fees');
-$penaltiesPlan = planMigration($conn, 'penalty_rules');
-$allPlan = array_merge($feesPlan, $penaltiesPlan);
+$mig1Plan = array_merge(
+    planPercentageFix($conn, 'product_fees'),
+    planPercentageFix($conn, 'penalty_rules'),
+);
 
-if (count($allPlan) === 0) {
-    echo "✓ Nothing to migrate. All percentage rows are already in fractional form.\n";
-    echo "  (No row in product_fees or penalty_rules has value >= 1 with type='percentage'.)\n";
+echo "───────────────────────────────────────────────────────────────\n";
+echo " Migration 1: percentage values → fractional (divide by 100)\n";
+echo "───────────────────────────────────────────────────────────────\n";
+
+if (count($mig1Plan) === 0) {
+    echo "  ✓ Nothing to do. All percentage rows are already fractional.\n";
+} else {
+    echo "  " . count($mig1Plan) . " row(s) will be changed:\n\n";
+    echo sprintf("    %-14s %-38s %-15s -> %-15s\n", 'table', 'id', 'value (before)', 'value (after)');
+    echo "    " . str_repeat('-', 86) . "\n";
+    foreach ($mig1Plan as $p) {
+        echo sprintf("    %-14s %-38s %-15s -> %-15s\n",
+            $p['table'], $p['id'], $p['before'], $p['after']);
+    }
+    echo "    " . str_repeat('-', 86) . "\n";
+}
+echo "\n";
+
+// ═══════════════════════════════════════════════════════════════════
+//  Migration 2 — product_fees.effect from fee_type code
+// ═══════════════════════════════════════════════════════════════════
+
+function planEffectBackfill(\Doctrine\DBAL\Connection $conn): array
+{
+    // Legacy CreditX reference code:
+    //   $gross_loan = $app_amount + $admin_fee + $insurance_fee;
+    // So Admin (AF) and Insurance (IF) fees should have effect=adds_to_gross.
+    // All other fee codes stay at the DB default (deducted_from_disbursement).
+    $addsToGrossCodes = ['AF', 'IF'];
+    $placeholders = implode(',', array_fill(0, count($addsToGrossCodes), '?'));
+
+    $sql = "
+        SELECT pf.id, pf.effect, ft.code AS fee_code, ft.name AS fee_name
+          FROM product_fees pf
+          JOIN fee_types ft ON ft.id = pf.fee_type_id
+         WHERE ft.code IN ({$placeholders})
+           AND pf.effect != 'adds_to_gross'
+         ORDER BY ft.code, pf.id
+    ";
+    $rows = $conn->fetchAllAssociative($sql, $addsToGrossCodes);
+    $plan = [];
+    foreach ($rows as $r) {
+        $plan[] = [
+            'id'     => $r['id'],
+            'code'   => $r['fee_code'],
+            'name'   => $r['fee_name'],
+            'before' => $r['effect'],
+            'after'  => 'adds_to_gross',
+        ];
+    }
+    return $plan;
+}
+
+$mig2Plan = planEffectBackfill($conn);
+
+echo "───────────────────────────────────────────────────────────────\n";
+echo " Migration 2: product_fees.effect → adds_to_gross (by fee code)\n";
+echo "───────────────────────────────────────────────────────────────\n";
+
+if (count($mig2Plan) === 0) {
+    echo "  ✓ Nothing to do. All Admin/Insurance fees already have effect=adds_to_gross.\n";
+} else {
+    echo "  " . count($mig2Plan) . " row(s) will be changed:\n\n";
+    echo sprintf("    %-38s %-4s %-20s %-30s -> %-15s\n",
+        'product_fee.id', 'code', 'fee name', 'effect (before)', 'effect (after)');
+    echo "    " . str_repeat('-', 115) . "\n";
+    foreach ($mig2Plan as $p) {
+        echo sprintf("    %-38s %-4s %-20s %-30s -> %-15s\n",
+            $p['id'], $p['code'], substr($p['name'], 0, 20), $p['before'], $p['after']);
+    }
+    echo "    " . str_repeat('-', 115) . "\n";
+}
+echo "\n";
+
+// ═══════════════════════════════════════════════════════════════════
+//  Apply (or exit if dry-run)
+// ═══════════════════════════════════════════════════════════════════
+
+$totalChanges = count($mig1Plan) + count($mig2Plan);
+
+if ($totalChanges === 0) {
+    echo "✓ Nothing to migrate. Database is in the expected state.\n";
     exit(0);
 }
 
-// Print the plan
-echo "Plan — " . count($allPlan) . " row(s) will be changed:\n";
-echo "  " . str_repeat('-', 86) . "\n";
-echo sprintf("  %-14s %-38s %-15s -> %-15s\n", 'table', 'id', 'value (before)', 'value (after)');
-echo "  " . str_repeat('-', 86) . "\n";
-foreach ($allPlan as $p) {
-    echo sprintf("  %-14s %-38s %-15s -> %-15s\n",
-        $p['table'], $p['id'], $p['before'], $p['after']);
-}
-echo "  " . str_repeat('-', 86) . "\n";
-echo "\n";
-
 if (!$apply) {
-    echo "Dry-run only. To apply these changes, re-run with:\n";
+    echo "Summary: {$totalChanges} row(s) across 2 migration(s) would change.\n";
+    echo "Dry-run only. To apply:\n";
     echo "  php bin/migrate.php --apply\n";
     exit(0);
 }
 
-// Interactive confirmation unless --yes given
 if (!$yes) {
-    echo "About to apply these changes in a transaction. This cannot be undone\n";
-    echo "by re-running the script — values < 1 are never touched.\n";
+    echo "About to apply {$totalChanges} change(s) across 2 migration(s) in a transaction.\n";
     echo "Proceed? [y/N]: ";
     $line = trim((string) fgets(STDIN));
     if (strtolower($line) !== 'y' && strtolower($line) !== 'yes') {
@@ -134,30 +211,57 @@ if (!$yes) {
     }
 }
 
-// Apply in a single transaction — if anything fails, nothing changes.
 echo "\nApplying...\n";
 $conn->beginTransaction();
 try {
-    $updated = 0;
-    foreach ($allPlan as $p) {
+    $mig1Count = 0;
+    foreach ($mig1Plan as $p) {
         $conn->executeStatement(
             "UPDATE {$p['table']} SET value = :value WHERE id = :id",
             ['value' => $p['after'], 'id' => $p['id']]
         );
-        $updated++;
+        $mig1Count++;
     }
+    if ($mig1Count > 0) {
+        echo "  ✓ Migration 1: updated {$mig1Count} row(s) (percentage -> fraction)\n";
+    }
+
+    $mig2Count = 0;
+    foreach ($mig2Plan as $p) {
+        $conn->executeStatement(
+            "UPDATE product_fees SET effect = :effect WHERE id = :id",
+            ['effect' => $p['after'], 'id' => $p['id']]
+        );
+        $mig2Count++;
+    }
+    if ($mig2Count > 0) {
+        echo "  ✓ Migration 2: updated {$mig2Count} row(s) (effect backfill)\n";
+    }
+
     $conn->commit();
-    echo "✓ Committed — {$updated} row(s) updated across product_fees + penalty_rules.\n";
-    echo "\n";
-    echo "Post-migration verification:\n";
-    foreach ($allPlan as $p) {
-        $current = $conn->fetchOne("SELECT value FROM {$p['table']} WHERE id = ?", [$p['id']]);
-        $ok = bccomp((string) $current, $p['after'], 6) === 0 ? '✓' : '✘';
-        echo "  {$ok} {$p['table']} {$p['id']}: {$current}\n";
-    }
-    echo "\nDone. Future admin inputs (using the updated form with fraction hints) will\n";
-    echo "go straight into the DB in the correct form. This script is idempotent —\n";
-    echo "re-running it after today will find nothing to do and exit cleanly.\n";
+    echo "\n✓ All migrations committed successfully.\n";
+
+    // Post-apply verification
+    echo "\nPost-migration verification:\n";
+    $rem1a = (int) $conn->fetchOne(
+        "SELECT COUNT(*) FROM product_fees WHERE calculation_type='percentage' AND value >= 1"
+    );
+    $rem1b = (int) $conn->fetchOne(
+        "SELECT COUNT(*) FROM penalty_rules WHERE calculation_type='percentage' AND value >= 1"
+    );
+    $rem1 = $rem1a + $rem1b;
+    echo "  " . ($rem1 === 0 ? '✓' : '✘') . " Percentage rows with value >= 1: {$rem1}\n";
+
+    $rem2 = (int) $conn->fetchOne("
+        SELECT COUNT(*)
+          FROM product_fees pf
+          JOIN fee_types ft ON ft.id = pf.fee_type_id
+         WHERE ft.code IN ('AF','IF')
+           AND pf.effect != 'adds_to_gross'
+    ");
+    echo "  " . ($rem2 === 0 ? '✓' : '✘') . " Admin/Insurance fees not adds_to_gross: {$rem2}\n";
+
+    echo "\nDone. Safe to re-run anytime — script is idempotent.\n";
     exit(0);
 } catch (\Throwable $e) {
     $conn->rollBack();

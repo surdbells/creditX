@@ -266,24 +266,34 @@ php bin/migrate.php --apply --yes
 
 ### Current migration scope
 
-`bin/migrate.php` as of commit `<this commit hash>` handles ONE migration:
+`bin/migrate.php` currently ships two migrations, applied in one
+transaction (atomic — either both land or both roll back):
 
-  **Percentage-fee / penalty-rule value correction**
+  **Migration 1 — Percentage fee / penalty-rule value correction**
 
   Historic bad data: admins entered `2` into percentage-fee value fields
-  meaning "2%", but the backend stores and calculates fees as fractions
-  (0.02 = 2%). The result was catastrophically wrong loan calculations
-  (200% fees).
+  meaning "2%", but the backend stores fees as fractions (0.02 = 2%).
+  Result: loan calculator computed 200% fees.
 
-  The migration divides `product_fees.value` and `penalty_rules.value`
-  by 100 for any row where:
+  Divides `product_fees.value` and `penalty_rules.value` by 100 where:
     - `calculation_type = 'percentage'`
     - `value >= 1`
 
-  The `>= 1` threshold is critical: it skips rows already in correct
-  fractional form (0.02, 0.05, etc.) so re-running the script is safe.
-  It also means a legitimate 1% fee expressed as "1" won't be corrected
-  unless you update it — use the admin UI for that edge case.
+  The `>= 1` threshold skips rows already in correct fractional form.
+
+  **Migration 2 — product_fees.effect backfill**
+
+  After the FeeEffect column was introduced, existing rows defaulted to
+  `deducted_from_disbursement`. But in legacy CreditX, Admin Fee and
+  Insurance Fee add to the gross loan (customer repays them through
+  the schedule), while Management Fee and BS Fee are deducted from the
+  disbursement (customer just receives less).
+
+  This migration sets `effect = 'adds_to_gross'` on any `product_fees`
+  row whose `fee_type.code` is `AF` (Admin Fee) or `IF` (Insurance Fee)
+  and which currently has the default `deducted_from_disbursement`.
+  Other fee codes remain at the default (correct for Management / BS /
+  Processing in legacy semantics).
 
 ### Idempotency
 
