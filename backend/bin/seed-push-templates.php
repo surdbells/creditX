@@ -5,26 +5,21 @@ declare(strict_types=1);
 /**
  * CreditX — Push Notification Template Seeder
  *
- * Seeds NotificationTemplate rows with channel=PUSH for the five loan
- * events currently dispatched in the codebase:
+ * Seeds NotificationTemplate rows with channel=PUSH for the eight loan
+ * lifecycle events currently dispatched in the codebase:
  *
+ *   loan_captured         — CreateLoanAction, on successful persist
+ *   loan_submitted        — SubmitLoanAction, after approval workflow init
  *   loan_approval_step    — ApprovalEngineService, intermediate approval
  *   loan_approved         — ApprovalEngineService, final approval
  *   loan_rejected         — ApprovalEngineService, rejection
  *   loan_disbursed        — DisburseLoanAction, disbursement
+ *   payment_received      — PostRepaymentAction, after audit log
  *   overdue_reminder      — OverdueService, daily sweep
  *
  * Each template is seeded at most once. The seeder checks for an existing
  * row with the same code before inserting — re-running is a no-op once
  * everything is in place.
- *
- * Scope note:
- *   Three events the user originally asked for (loan_captured, loan_submitted,
- *   payment_received) are NOT dispatched anywhere in the codebase today,
- *   so templates for those would be dead code. Seeder skips them. A
- *   follow-up commit can wire dispatchEvent() calls into the relevant
- *   actions (CreateLoanAction, SubmitLoanAction, payment handlers) and
- *   extend this seeder with the matching templates.
  *
  * Template body placeholders match the context variables that each event
  * actually passes to NotificationDispatchService::dispatchEvent, verified
@@ -35,6 +30,7 @@ declare(strict_types=1);
  *   {{loan_amount}}        all events (value formatted by caller)
  *   {{step_name}}          approval events only
  *   {{action}}             approval events only ('approved' / 'rejected')
+ *   {{payment_amount}}     payment_received only
  *
  * FCM payload notes:
  *   - title = template.subject, rendered with the context
@@ -79,6 +75,20 @@ try {
 // for readability; the final row will have e.g. 'LOAN_APPROVED_PUSH'.
 $templates = [
     [
+        'code'          => 'loan_captured_push',
+        'name'          => 'Loan Captured — Push',
+        'event_trigger' => 'loan_captured',
+        'subject'       => 'Loan captured',
+        'body'          => "Loan {{application_id}} for {{customer_name}} has been captured.",
+    ],
+    [
+        'code'          => 'loan_submitted_push',
+        'name'          => 'Loan Submitted — Push',
+        'event_trigger' => 'loan_submitted',
+        'subject'       => 'Loan submitted for approval',
+        'body'          => "Loan {{application_id}} for {{customer_name}} has been submitted for approval.",
+    ],
+    [
         'code'          => 'loan_approval_step_push',
         'name'          => 'Loan Approval Step — Push',
         'event_trigger' => 'loan_approval_step',
@@ -105,6 +115,13 @@ $templates = [
         'event_trigger' => 'loan_disbursed',
         'subject'       => 'Loan disbursed 💰',
         'body'          => "Loan {{application_id}} disbursed: ₦{{loan_amount}} to {{customer_name}}.",
+    ],
+    [
+        'code'          => 'payment_received_push',
+        'name'          => 'Payment Received — Push',
+        'event_trigger' => 'payment_received',
+        'subject'       => 'Payment received',
+        'body'          => "₦{{payment_amount}} received for loan {{application_id}} ({{customer_name}}).",
     ],
     [
         'code'          => 'overdue_reminder_push',
@@ -145,7 +162,7 @@ foreach ($toCreate as $def) {
 echo "  " . str_repeat('-', 90) . "\n\n";
 
 if (empty($toCreate)) {
-    echo "✓ Nothing to do. All 5 push templates are already seeded.\n";
+    echo "✓ Nothing to do. All 8 push templates are already seeded.\n";
     exit(0);
 }
 

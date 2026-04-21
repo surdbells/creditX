@@ -382,14 +382,17 @@ an OAuth2 service account. The legacy server-key HTTP API is NOT used
    sudo systemctl reload php-fpm
    ```
 
-### What the 5 seeded templates cover
+### What the 8 seeded templates cover
 
 | Event trigger | Fires when | Template code |
 |---|---|---|
+| `loan_captured` | Agent creates a loan application | `LOAN_CAPTURED_PUSH` |
+| `loan_submitted` | Agent submits a loan for approval | `LOAN_SUBMITTED_PUSH` |
 | `loan_approval_step` | Intermediate approval step completes | `LOAN_APPROVAL_STEP_PUSH` |
 | `loan_approved` | Loan is fully approved | `LOAN_APPROVED_PUSH` |
 | `loan_rejected` | Loan is rejected | `LOAN_REJECTED_PUSH` |
 | `loan_disbursed` | Loan is disbursed | `LOAN_DISBURSED_PUSH` |
+| `payment_received` | Customer repayment is posted | `PAYMENT_RECEIVED_PUSH` |
 | `overdue_reminder` | Overdue sweep finds a past-due loan | `OVERDUE_REMINDER_PUSH` |
 
 Agents receive push notifications on their registered devices. Each
