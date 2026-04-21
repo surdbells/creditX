@@ -5,7 +5,7 @@ namespace App\Action\Loan;
 use App\Domain\Entity\{Customer, Loan, LoanFeeBreakdown, LoanTrail, LoanTransaction, NextOfKin};
 use App\Domain\Enum\{FeeCalculationType, LoanStatus, LoanType};
 use App\Domain\Repository\{CustomerRepository, LoanProductRepository, LoanRepository, LocationRepository};
-use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, LoanCalculationService};
+use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, LoanCalculationService, NotificationDispatchService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -41,6 +41,7 @@ final class CreateLoanAction
         private readonly LoanCalculationService $calcService,
         private readonly AuditService $audit,
         private readonly EntityManagerInterface $em,
+        private readonly NotificationDispatchService $notifService,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -258,6 +259,24 @@ final class CreateLoanAction
             $this->em->commit();
 
             $this->audit->logCreate($userId, 'Loan', $loan->getId(), $loan->toArray(), $this->getClientIp($request), $this->getUserAgent($request));
+
+            // Fire loan_captured event — templates on this event (push, email,
+            // etc.) will notify the agent that the application is in the system.
+            // Best-effort: failures inside dispatchEvent are caught there and
+            // don't affect the loan creation result. We pass agent_id as
+            // user_id so PUSH channel routes to the agent's device tokens.
+            $agentId = $loan->getAgent()?->getId();
+            if ($agentId) {
+                $this->notifService->dispatchEvent('loan_captured', [
+                    'customer_name'  => $customer->getFullName(),
+                    'customer_email' => $customer->getEmail(),
+                    'customer_phone' => $customer->getPhone(),
+                    'loan_amount'    => $c['amount'],
+                    'application_id' => $loan->getApplicationId(),
+                    'user_id'        => $agentId,
+                ], $agentId, $customer->getId());
+            }
+
             return $this->created($loan->toArray(true), 'Loan application created successfully');
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) {

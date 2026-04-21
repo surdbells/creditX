@@ -5,7 +5,7 @@ namespace App\Action\Loan;
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Enum\LoanStatus;
 use App\Domain\Repository\LoanRepository;
-use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService};
+use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService, NotificationDispatchService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class SubmitLoanAction
@@ -15,6 +15,7 @@ final class SubmitLoanAction
         private readonly LoanRepository $repo,
         private readonly ApprovalEngineService $approvalEngine,
         private readonly AuditService $audit,
+        private readonly NotificationDispatchService $notifService,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -49,6 +50,21 @@ final class SubmitLoanAction
             $trail2->setDetails(['reason' => $e->getMessage()]);
             $loan->addTrail($trail2);
             $this->repo->flush();
+        }
+
+        // Fire loan_submitted event. Routes to agent's devices for PUSH.
+        // Same context shape as other loan events for template consistency.
+        $agentId = $loan->getAgent()?->getId();
+        if ($agentId) {
+            $customer = $loan->getCustomer();
+            $this->notifService->dispatchEvent('loan_submitted', [
+                'customer_name'  => $customer->getFullName(),
+                'customer_email' => $customer->getEmail(),
+                'customer_phone' => $customer->getPhone(),
+                'loan_amount'    => $loan->getAmountRequested(),
+                'application_id' => $loan->getApplicationId(),
+                'user_id'        => $agentId,
+            ], $agentId, $customer->getId());
         }
 
         $this->audit->logUpdate($userId, 'Loan', $loan->getId(), ['status' => 'previous'], ['status' => $loan->getStatus()->value], $this->getClientIp($request), $this->getUserAgent($request));
