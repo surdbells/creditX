@@ -54,6 +54,15 @@ echo "  Backend only: $BACKEND_ONLY"
 echo "  Frontend only:$FRONTEND_ONLY"
 echo "  Current HEAD: $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
 
+# Refuse to deploy if there are uncommitted changes on the server
+# (they'd block git pull --ff-only and signal something was edited in place)
+if [[ -n "$(git status --porcelain)" ]]; then
+  red "✘ Uncommitted changes detected in $ROOT:"
+  git status --short | sed 's/^/    /' >&2
+  red "  Commit, stash, or reset before deploying."
+  exit 1
+fi
+
 # ─── 1. Git pull ─────────────────────────────────────────────────────────
 step "1/5 Pulling latest from git"
 git fetch --prune
