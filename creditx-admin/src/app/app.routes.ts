@@ -22,7 +22,7 @@ export const routes: Routes = [
       { path: 'roles', loadComponent: () => import('./features/roles/roles.component').then(m => m.RolesComponent) },
       { path: 'locations', loadComponent: () => import('./features/locations/locations.component').then(m => m.LocationsComponent) },
       { path: 'settings', loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent) },
-      { path: 'agent-settings', loadComponent: () => import('./features/agent-settings/agent-settings.component').then(m => m.AgentSettingsComponent) },
+      { path: 'agent-targets', loadComponent: () => import('./features/agent-targets/agent-targets.component').then(m => m.AgentTargetsComponent) },
       { path: 'audit-logs', loadComponent: () => import('./features/audit-logs/audit-logs.component').then(m => m.AuditLogsComponent) },
       { path: 'record-types', loadComponent: () => import('./features/record-types/record-types.component').then(m => m.RecordTypesComponent) },
       { path: 'government-records', loadComponent: () => import('./features/government-records/government-records.component').then(m => m.GovernmentRecordsComponent) },
