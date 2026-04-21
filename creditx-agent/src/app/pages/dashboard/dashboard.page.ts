@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonRefresher, IonRefresherContent, IonIcon, IonBadge } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonRefresher, IonRefresherContent, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { searchOutline, addOutline, documentTextOutline, chatbubbleEllipsesOutline, notificationsOutline, trendingUpOutline, walletOutline, peopleOutline, timeOutline } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
@@ -10,20 +10,18 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, IonContent, IonHeader, IonToolbar, IonTitle, IonRefresher, IonRefresherContent, IonIcon, IonBadge],
+  imports: [CommonModule, RouterLink, IonContent, IonHeader, IonToolbar, IonTitle, IonRefresher, IonRefresherContent, IonIcon],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
         <ion-title>
-          <span class="text-[#0A4F2A] font-bold">Credit</span><span class="text-[#C9A227] font-bold">X</span>
+          <span class="cxm-db-brand-credit">Credit</span><span class="cxm-db-brand-x">X</span>
         </ion-title>
-        <div slot="end" class="flex items-center gap-2 pr-4">
-          <a routerLink="/notifications" class="relative p-2">
-            <ion-icon name="notifications-outline" class="text-xl text-gray-600"></ion-icon>
+        <div slot="end" class="cxm-db-toolbar-end">
+          <a routerLink="/notifications" class="cxm-db-bell" aria-label="Notifications">
+            <ion-icon name="notifications-outline" style="font-size: 20px"></ion-icon>
             @if (unreadCount() > 0) {
-              <span class="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
-                {{ unreadCount() > 9 ? '9+' : unreadCount() }}
-              </span>
+              <span class="cxm-db-bell-count tabular-nums">{{ unreadCount() > 9 ? '9+' : unreadCount() }}</span>
             }
           </a>
         </div>
@@ -34,67 +32,78 @@ import { AuthService } from '../../core/services/auth.service';
         <ion-refresher-content></ion-refresher-content>
       </ion-refresher>
 
-      <div class="p-4 space-y-4">
+      <div class="px-4 pt-4 pb-6 flex flex-col gap-4 cxm-stagger">
         <!-- Welcome -->
         <div>
-          <h2 class="text-lg font-semibold text-gray-800">Welcome, {{ auth.user()?.first_name }}</h2>
-          <p class="text-xs text-gray-500">{{ today }}</p>
+          <div class="cxm-eyebrow cxm-eyebrow-primary">{{ today }}</div>
+          <h1 class="cxm-db-greeting">Hi, {{ auth.user()?.first_name }} 👋</h1>
         </div>
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-2 gap-3">
-          <a routerLink="/lookup" class="flex items-center gap-3 p-4 rounded-2xl bg-[#0A4F2A]/5 border border-[#0A4F2A]/10">
-            <div class="w-10 h-10 rounded-xl bg-[#0A4F2A] flex items-center justify-center">
-              <ion-icon name="search-outline" class="text-white text-lg"></ion-icon>
+          <a routerLink="/lookup" class="cxm-action-tile">
+            <div class="cxm-action-icon cxm-action-icon-primary">
+              <ion-icon name="search-outline" style="font-size: 18px"></ion-icon>
             </div>
-            <div><div class="text-sm font-semibold text-gray-800">Lookup</div><div class="text-[10px] text-gray-500">Staff records</div></div>
+            <div class="cxm-action-tile-meta">
+              <div class="cxm-action-tile-label">Lookup</div>
+              <div class="cxm-action-tile-desc">Staff records</div>
+            </div>
           </a>
-          <a routerLink="/loans/new" class="flex items-center gap-3 p-4 rounded-2xl bg-[#C9A227]/5 border border-[#C9A227]/10">
-            <div class="w-10 h-10 rounded-xl bg-[#C9A227] flex items-center justify-center">
-              <ion-icon name="add-outline" class="text-white text-lg"></ion-icon>
+          <a routerLink="/loans/new" class="cxm-action-tile">
+            <div class="cxm-action-icon cxm-action-icon-gold">
+              <ion-icon name="add-outline" style="font-size: 18px"></ion-icon>
             </div>
-            <div><div class="text-sm font-semibold text-gray-800">New Loan</div><div class="text-[10px] text-gray-500">Capture application</div></div>
+            <div class="cxm-action-tile-meta">
+              <div class="cxm-action-tile-label">New Loan</div>
+              <div class="cxm-action-tile-desc">Capture application</div>
+            </div>
           </a>
         </div>
 
         <!-- Monthly Target Progress -->
         @if (targetStats()) {
-          <div class="p-4 rounded-2xl bg-gradient-to-br from-[#0A4F2A] to-[#0d6538] text-white shadow-lg">
-            <div class="flex items-center justify-between mb-3">
+          <div class="cxm-db-target">
+            <div class="cxm-db-target-header">
               <div>
-                <div class="text-xs text-white/70">Monthly Target</div>
-                <div class="text-xs font-medium text-[#C9A227]">{{ targetStats()?.month_label }}</div>
+                <div class="cxm-eyebrow" style="color: rgba(255, 255, 255, 0.7)">Monthly Target</div>
+                <div class="cxm-db-target-month">{{ targetStats()?.month_label }}</div>
               </div>
-              <ion-icon name="trending-up-outline" class="text-xl text-[#C9A227]"></ion-icon>
+              <ion-icon name="trending-up-outline" style="font-size: 22px; color: var(--cx-accent-400)"></ion-icon>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="cxm-db-target-body">
               <!-- Circular Progress -->
-              <div class="relative w-20 h-20 flex-shrink-0">
-                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <div class="cxm-db-progress-ring">
+                <svg viewBox="0 0 36 36" style="transform: rotate(-90deg)">
                   <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"></circle>
-                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#C9A227" stroke-width="3"
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--cx-accent-400)" stroke-width="3"
                           stroke-linecap="round"
                           [attr.stroke-dasharray]="100"
                           [attr.stroke-dashoffset]="100 - (targetStats()?.progress_pct || 0)"
                           style="transition: stroke-dashoffset 0.6s ease"></circle>
                 </svg>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <span class="text-base font-bold">{{ targetStats()?.progress_pct }}%</span>
-                </div>
+                <div class="cxm-db-progress-pct tabular-nums">{{ targetStats()?.progress_pct }}%</div>
               </div>
               <!-- Stats -->
-              <div class="flex-1 space-y-1.5">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-xs text-white/70">Disbursed</span>
-                  <span class="text-sm font-bold">{{ targetStats()?.disbursed_count }} <span class="text-xs text-white/60">of {{ targetStats()?.target }}</span></span>
+              <div class="cxm-db-target-stats">
+                <div class="cxm-db-target-row">
+                  <span class="cxm-db-target-label">Disbursed</span>
+                  <span class="cxm-db-target-value tabular-nums">
+                    {{ targetStats()?.disbursed_count }}
+                    <span class="cxm-db-target-of">of {{ targetStats()?.target }}</span>
+                  </span>
                 </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-xs text-white/70">Remaining</span>
-                  <span class="text-sm font-bold text-[#C9A227]">{{ targetStats()?.remaining }} loans</span>
+                <div class="cxm-db-target-row">
+                  <span class="cxm-db-target-label">Remaining</span>
+                  <span class="cxm-db-target-value cxm-db-target-gold tabular-nums">
+                    {{ targetStats()?.remaining }} loans
+                  </span>
                 </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-xs text-white/70">Value</span>
-                  <span class="text-xs font-semibold">₦{{ targetStats()?.disbursed_amount | number:'1.0-0' }}</span>
+                <div class="cxm-db-target-row">
+                  <span class="cxm-db-target-label">Value</span>
+                  <span class="cxm-db-target-value tabular-nums">
+                    ₦{{ targetStats()?.disbursed_amount | number:'1.0-0' }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -104,37 +113,40 @@ import { AuthService } from '../../core/services/auth.service';
         <!-- Stats -->
         <div class="grid grid-cols-3 gap-3">
           @for (stat of stats(); track stat.label) {
-            <div class="p-3 rounded-2xl bg-white border border-gray-100 shadow-sm text-center">
-              <div class="text-xs text-gray-500">{{ stat.label }}</div>
-              <div class="text-lg font-bold mt-0.5" [style.color]="stat.color">{{ stat.value }}</div>
+            <div class="cxm-db-stat">
+              <div class="cxm-db-stat-label">{{ stat.label }}</div>
+              <div class="cxm-db-stat-value tabular-nums" [style.color]="stat.color">{{ stat.value }}</div>
             </div>
           }
         </div>
 
         <!-- Recent Loans -->
         <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-gray-800">Recent Applications</h3>
-            <a routerLink="/loans" class="text-xs font-medium text-[#0A4F2A]">View All</a>
+          <div class="cxm-section-header">
+            <h3 class="cxm-section-title">Recent Applications</h3>
+            <a routerLink="/loans" class="cxm-section-link">View all →</a>
           </div>
           @if (recentLoans().length === 0) {
-            <div class="p-6 rounded-2xl bg-gray-50 text-center">
-              <ion-icon name="document-text-outline" class="text-3xl text-gray-300"></ion-icon>
-              <p class="text-xs text-gray-400 mt-2">No loan applications yet</p>
+            <div class="cxm-empty">
+              <div class="cxm-empty-icon">
+                <ion-icon name="document-text-outline" style="font-size: 24px"></ion-icon>
+              </div>
+              <div class="cxm-empty-title">No applications yet</div>
+              <div class="cxm-empty-desc">Capture your first loan to see it here.</div>
             </div>
           } @else {
-            <div class="space-y-2">
+            <div class="flex flex-col gap-2">
               @for (loan of recentLoans(); track loan.id) {
-                <a [routerLink]="['/loans', loan.id]" class="flex items-center justify-between p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                  <div>
-                    <div class="text-sm font-medium text-gray-800">{{ loan.customer_name }}</div>
-                    <div class="text-xs text-gray-400">{{ loan.application_id }}</div>
+                <a [routerLink]="['/loans', loan.id]" class="cxm-row">
+                  <div class="cxm-row-main">
+                    <div class="cxm-row-primary">{{ loan.customer_name }}</div>
+                    <div class="cxm-row-secondary">{{ loan.application_id }}</div>
                   </div>
-                  <div class="text-right">
-                    <div class="text-sm font-semibold text-gray-800">₦{{ loan.amount_requested | number:'1.0-0' }}</div>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                          [class]="statusClass(loan.status)">
-                      {{ loan.status | titlecase }}
+                  <div class="cxm-row-trail">
+                    <div class="cxm-row-trail-primary tabular-nums">₦{{ loan.amount_requested | number:'1.0-0' }}</div>
+                    <span class="cxm-status" [attr.data-tone]="statusTone(loan.status)" style="margin-top: 3px">
+                      <span class="cxm-status-dot"></span>
+                      <span>{{ loan.status | titlecase }}</span>
                     </span>
                   </div>
                 </a>
@@ -145,6 +157,151 @@ import { AuthService } from '../../core/services/auth.service';
       </div>
     </ion-content>
   `,
+  styles: [`
+    .cxm-db-brand-credit { color: var(--cx-primary-600); font-weight: 700; }
+    .cxm-db-brand-x { color: var(--cx-accent-500); font-weight: 700; }
+
+    .cxm-db-toolbar-end { padding-right: 12px; }
+    .cxm-db-bell {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: var(--cx-surface-2);
+      color: var(--cx-text-secondary);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-db-bell:active {
+      background: var(--cx-stone-200);
+      transform: scale(0.92);
+    }
+    .cxm-db-bell-count {
+      position: absolute;
+      top: -2px; right: -2px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: var(--cx-danger);
+      color: #fff;
+      border-radius: var(--cx-radius-pill);
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--cx-surface);
+    }
+
+    .cxm-db-greeting {
+      margin: 3px 0 0;
+      font-size: var(--cx-text-xl);
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--cx-text);
+      line-height: 1.2;
+    }
+
+    /* Monthly target card */
+    .cxm-db-target {
+      padding: 16px;
+      background: linear-gradient(135deg, var(--cx-primary-700) 0%, var(--cx-primary-600) 100%);
+      color: #fff;
+      border-radius: var(--cx-radius-2xl);
+      box-shadow: 0 6px 16px rgba(10, 79, 42, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+    .cxm-db-target::before {
+      content: '';
+      position: absolute;
+      top: -30%; right: -15%;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, rgba(201, 162, 39, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cxm-db-target-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .cxm-db-target-month {
+      font-size: var(--cx-text-xs);
+      font-weight: 600;
+      color: var(--cx-accent-400);
+      margin-top: 2px;
+    }
+    .cxm-db-target-body {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+    }
+    .cxm-db-progress-ring {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      flex-shrink: 0;
+    }
+    .cxm-db-progress-ring svg { width: 100%; height: 100%; }
+    .cxm-db-progress-pct {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--cx-text-md);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .cxm-db-target-stats { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .cxm-db-target-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .cxm-db-target-label {
+      font-size: var(--cx-text-xs);
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .cxm-db-target-value {
+      font-size: var(--cx-text-sm);
+      font-weight: 700;
+    }
+    .cxm-db-target-of {
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .cxm-db-target-gold { color: var(--cx-accent-400); }
+
+    /* Stat cards */
+    .cxm-db-stat {
+      padding: 12px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      text-align: center;
+    }
+    .cxm-db-stat-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--cx-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .cxm-db-stat-value {
+      font-size: var(--cx-text-xl);
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin-top: 3px;
+      line-height: 1;
+    }
+  `],
 })
 export class DashboardPage implements OnInit {
   stats = signal<{label: string; value: string|number; color: string}[]>([]);
@@ -166,9 +323,9 @@ export class DashboardPage implements OnInit {
         this.targetStats.set(res.data);
         const bs = res.data?.by_status || {};
         this.stats.set([
-          { label: 'Submitted', value: (bs.submitted || 0) + (bs.under_review || 0), color: '#C9A227' },
-          { label: 'Approved', value: bs.approved || 0, color: '#16a34a' },
-          { label: 'Rejected', value: bs.rejected || 0, color: '#dc2626' },
+          { label: 'Submitted', value: (bs.submitted || 0) + (bs.under_review || 0), color: 'var(--cx-accent-600)' },
+          { label: 'Approved', value: bs.approved || 0, color: 'var(--cx-primary-600)' },
+          { label: 'Rejected', value: bs.rejected || 0, color: 'var(--cx-danger)' },
         ]);
       },
       error: () => {
@@ -179,9 +336,9 @@ export class DashboardPage implements OnInit {
             const active = (res.data || []).filter((l: any) => ['active','overdue','disbursed'].includes(l.status)).length;
             const pending = (res.data || []).filter((l: any) => ['submitted','under_review','captured'].includes(l.status)).length;
             this.stats.set([
-              { label: 'Total', value: total, color: '#0A4F2A' },
-              { label: 'Active', value: active, color: '#16a34a' },
-              { label: 'Pending', value: pending, color: '#C9A227' },
+              { label: 'Total', value: total, color: 'var(--cx-primary-700)' },
+              { label: 'Active', value: active, color: 'var(--cx-primary-600)' },
+              { label: 'Pending', value: pending, color: 'var(--cx-accent-600)' },
             ]);
           },
         });
@@ -211,5 +368,13 @@ export class DashboardPage implements OnInit {
       disbursed: 'bg-blue-100 text-blue-700', closed: 'bg-blue-100 text-blue-700',
     };
     return map[status] || 'bg-gray-100 text-gray-600';
+  }
+
+  statusTone(status: string): string {
+    const s = (status || '').toLowerCase();
+    if (['active', 'approved', 'disbursed', 'closed'].includes(s)) return 'success';
+    if (['submitted', 'under_review', 'captured', 'draft'].includes(s)) return 'warning';
+    if (['rejected', 'overdue'].includes(s)) return 'danger';
+    return 'neutral';
   }
 }

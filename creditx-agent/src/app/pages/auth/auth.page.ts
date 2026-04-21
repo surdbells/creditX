@@ -15,90 +15,336 @@ import { environment } from '../../../environments/environment';
   imports: [CommonModule, FormsModule, IonContent, IonSpinner, IonIcon],
   template: `
     <ion-content [fullscreen]="true">
-      <div class="min-h-full flex items-center justify-center bg-gradient-to-b from-cx-primary-dark to-cx-primary px-6">
-        <div class="w-full max-w-sm">
-          <div class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8">
-            <!-- Logo -->
-            <div class="text-center mb-8">
-              <div class="w-16 h-16 bg-gradient-to-br from-cx-primary to-cx-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <span class="text-2xl font-black text-white">CX</span>
-              </div>
-              <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                <span class="text-cx-primary">Credit</span><span class="text-cx-accent">X</span>
-              </h1>
-              <p class="text-xs font-medium text-gray-400 mt-1 tracking-wider uppercase">Agent Portal</p>
+      <div class="cxm-auth-shell">
+        <div class="cxm-auth-bg"></div>
+        <div class="cxm-auth-card cx-animate-in">
+          <!-- Logo -->
+          <div class="cxm-auth-logo-wrap">
+            <div class="cxm-auth-logo">
+              <span>CX</span>
             </div>
-
-            @if (error()) {
-              <div class="mb-5 p-3 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
-                <p class="text-xs font-medium text-red-600 dark:text-red-400 text-center">{{ error() }}</p>
-              </div>
-            }
-
-            <!-- Login Form -->
-            @if (!requires2FA()) {
-              <div class="space-y-4">
-                <div>
-                  <label class="text-[11px] font-semibold text-gray-400 mb-1.5 block uppercase tracking-wider">Email</label>
-                  <input type="email" class="w-full px-4 py-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-cx-primary focus:ring-2 focus:ring-cx-primary/10 focus:outline-none"
-                    [(ngModel)]="email" placeholder="agent@company.com" [disabled]="loading()" />
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-gray-400 mb-1.5 block uppercase tracking-wider">Password</label>
-                  <div class="relative">
-                    <input [type]="showPwd() ? 'text' : 'password'" class="w-full px-4 py-3.5 pr-12 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:border-cx-primary focus:ring-2 focus:ring-cx-primary/10 focus:outline-none"
-                      [(ngModel)]="password" placeholder="Enter password" [disabled]="loading()" />
-                    <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" (click)="showPwd.set(!showPwd())">
-                      <ion-icon [name]="showPwd() ? 'eye-off-outline' : 'eye-outline'" class="text-xl"></ion-icon>
-                    </button>
-                  </div>
-                </div>
-                <button class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cx-primary to-cx-primary-light text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cx-primary/25 active:scale-[0.98] transition-all disabled:opacity-50"
-                        [disabled]="loading()" (click)="login()">
-                  @if (loading()) {
-                    <ion-spinner name="crescent" class="w-5 h-5 text-white"></ion-spinner> Signing in...
-                  } @else {
-                    <ion-icon name="log-in-outline" class="text-lg"></ion-icon> Sign In
-                  }
-                </button>
-              </div>
-            }
-
-            <!-- 2FA OTP Screen -->
-            @if (requires2FA()) {
-              <div class="text-center mb-6">
-                <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-cx-primary/10 flex items-center justify-center">
-                  <ion-icon name="shield-checkmark-outline" class="text-3xl text-cx-primary"></ion-icon>
-                </div>
-                <h2 class="text-base font-bold text-gray-900 dark:text-white">Verification</h2>
-                <p class="text-xs text-gray-400 mt-1">Enter the 6-digit code sent to <strong class="text-gray-600 dark:text-gray-300">{{ otpEmail }}</strong></p>
-              </div>
-              <div class="space-y-4">
-                <input type="text" class="w-full px-4 py-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-center text-2xl tracking-[0.5em] font-bold text-gray-900 dark:text-white focus:border-cx-primary focus:outline-none"
-                  maxlength="6" [(ngModel)]="otpCode" placeholder="000000" [disabled]="loading()" />
-                <button class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cx-primary to-cx-primary-light text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-all disabled:opacity-50"
-                        [disabled]="loading() || otpCode.length < 6" (click)="verifyOtp()">
-                  @if (loading()) {
-                    <ion-spinner name="crescent" class="w-5 h-5 text-white"></ion-spinner> Verifying...
-                  } @else {
-                    <ion-icon name="shield-checkmark-outline" class="text-lg"></ion-icon> Verify
-                  }
-                </button>
-                <div class="flex items-center justify-between">
-                  <button class="text-xs text-gray-400" (click)="requires2FA.set(false); otpCode = ''">
-                    <ion-icon name="arrow-back-outline" class="align-middle mr-1"></ion-icon>Back
-                  </button>
-                  <button class="text-xs text-cx-primary font-semibold" (click)="login()" [disabled]="loading()">Resend Code</button>
-                </div>
-              </div>
-            }
+            <h1 class="cxm-auth-brand">
+              <span class="cxm-auth-brand-credit">Credit</span><span class="cxm-auth-brand-x">X</span>
+            </h1>
+            <div class="cxm-auth-portal">Agent Portal</div>
           </div>
-          <p class="text-center text-[10px] text-white/50 mt-6 font-medium">&copy; {{ year }} DOST HQ LIMITED</p>
+
+          @if (error()) {
+            <div class="cxm-auth-error">
+              <ion-icon name="alert-circle-outline" style="font-size: 14px"></ion-icon>
+              <span>{{ error() }}</span>
+            </div>
+          }
+
+          <!-- Login Form -->
+          @if (!requires2FA()) {
+            <div class="cxm-auth-form">
+              <div class="cxm-auth-field">
+                <label class="cxm-auth-label">Email</label>
+                <input type="email" class="cxm-auth-input"
+                  [(ngModel)]="email" placeholder="agent@company.com" [disabled]="loading()" />
+              </div>
+              <div class="cxm-auth-field">
+                <label class="cxm-auth-label">Password</label>
+                <div class="cxm-auth-input-wrap">
+                  <input [type]="showPwd() ? 'text' : 'password'" class="cxm-auth-input cxm-auth-input-pwd"
+                    [(ngModel)]="password" placeholder="Enter password" [disabled]="loading()" (keyup.enter)="login()" />
+                  <button type="button" class="cxm-auth-pwd-toggle" (click)="showPwd.set(!showPwd())" aria-label="Toggle password">
+                    <ion-icon [name]="showPwd() ? 'eye-off-outline' : 'eye-outline'" style="font-size: 18px"></ion-icon>
+                  </button>
+                </div>
+              </div>
+              <button class="cxm-auth-cta" [disabled]="loading()" (click)="login()">
+                @if (loading()) {
+                  <ion-spinner name="crescent" style="width: 18px; height: 18px"></ion-spinner>
+                  <span>Signing in...</span>
+                } @else {
+                  <ion-icon name="log-in-outline" style="font-size: 18px"></ion-icon>
+                  <span>Sign In</span>
+                }
+              </button>
+            </div>
+          }
+
+          <!-- 2FA OTP Screen -->
+          @if (requires2FA()) {
+            <div>
+              <div class="cxm-auth-2fa-head">
+                <div class="cxm-auth-2fa-icon">
+                  <ion-icon name="shield-checkmark-outline" style="font-size: 28px"></ion-icon>
+                </div>
+                <div class="cxm-auth-2fa-title">Verification</div>
+                <div class="cxm-auth-2fa-sub">
+                  Enter the 6-digit code sent to <strong>{{ otpEmail }}</strong>
+                </div>
+              </div>
+              <div class="cxm-auth-form">
+                <input type="text" class="cxm-auth-otp-input tabular-nums"
+                  maxlength="6" [(ngModel)]="otpCode" placeholder="000000" [disabled]="loading()" />
+                <button class="cxm-auth-cta" [disabled]="loading() || otpCode.length < 6" (click)="verifyOtp()">
+                  @if (loading()) {
+                    <ion-spinner name="crescent" style="width: 18px; height: 18px"></ion-spinner>
+                    <span>Verifying...</span>
+                  } @else {
+                    <ion-icon name="shield-checkmark-outline" style="font-size: 18px"></ion-icon>
+                    <span>Verify</span>
+                  }
+                </button>
+                <div class="cxm-auth-2fa-actions">
+                  <button class="cxm-auth-back-btn" (click)="requires2FA.set(false); otpCode = ''">
+                    <ion-icon name="arrow-back-outline" style="font-size: 14px"></ion-icon>
+                    <span>Back</span>
+                  </button>
+                  <button class="cxm-auth-resend-btn" (click)="login()" [disabled]="loading()">Resend Code</button>
+                </div>
+              </div>
+            </div>
+          }
         </div>
+        <p class="cxm-auth-footer">&copy; {{ year }} DOST HQ LIMITED</p>
       </div>
     </ion-content>
   `,
-  styles: [`:host { display: block; } ion-content { --background: transparent; }`],
+  styles: [`
+    :host { display: block; }
+    ion-content { --background: transparent; }
+
+    .cxm-auth-shell {
+      position: relative;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      padding-top: calc(24px + env(safe-area-inset-top));
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+    .cxm-auth-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(201, 162, 39, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 85% 80%, rgba(10, 79, 42, 0.3) 0%, transparent 50%),
+        linear-gradient(160deg, var(--cx-primary-800) 0%, var(--cx-primary-600) 50%, var(--cx-primary-700) 100%);
+      z-index: 0;
+    }
+
+    .cxm-auth-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 380px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-2xl);
+      padding: 28px 24px;
+      box-shadow: 0 20px 48px rgba(4, 32, 16, 0.35), 0 8px 16px rgba(4, 32, 16, 0.2);
+    }
+
+    .cxm-auth-logo-wrap {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .cxm-auth-logo {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
+      border-radius: var(--cx-radius-xl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      box-shadow: 0 8px 20px rgba(10, 79, 42, 0.3);
+    }
+    .cxm-auth-logo span {
+      font-size: var(--cx-text-xl);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+    .cxm-auth-brand {
+      margin: 0;
+      font-size: var(--cx-text-xl);
+      font-weight: 700;
+      letter-spacing: -0.015em;
+    }
+    .cxm-auth-brand-credit { color: var(--cx-primary-600); }
+    .cxm-auth-brand-x { color: var(--cx-accent-500); }
+    .cxm-auth-portal {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--cx-text-muted);
+      margin-top: 3px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cxm-auth-error {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 12px;
+      background: var(--cx-danger-50);
+      border: 1px solid rgba(193, 48, 48, 0.15);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-xs);
+      color: var(--cx-danger);
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .cxm-auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .cxm-auth-field { display: flex; flex-direction: column; }
+    .cxm-auth-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--cx-text-muted);
+      margin-bottom: 6px;
+    }
+    .cxm-auth-input-wrap { position: relative; }
+    .cxm-auth-input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-auth-input-pwd { padding-right: 44px; }
+    .cxm-auth-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: 0 0 0 3px rgba(10, 79, 42, 0.1);
+    }
+    .cxm-auth-input:disabled { opacity: 0.5; }
+    .cxm-auth-pwd-toggle {
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--cx-text-muted);
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cxm-auth-cta {
+      margin-top: 4px;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
+      color: #fff;
+      border: none;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 6px 14px rgba(10, 79, 42, 0.25);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-auth-cta:disabled { opacity: 0.6; box-shadow: none; }
+    .cxm-auth-cta:not(:disabled):active {
+      transform: scale(0.985);
+      box-shadow: 0 2px 8px rgba(10, 79, 42, 0.2);
+    }
+
+    /* 2FA */
+    .cxm-auth-2fa-head {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .cxm-auth-2fa-icon {
+      width: 52px; height: 52px;
+      margin: 0 auto 10px;
+      border-radius: var(--cx-radius-xl);
+      background: var(--cx-primary-50);
+      color: var(--cx-primary-600);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cxm-auth-2fa-title {
+      font-size: var(--cx-text-md);
+      font-weight: 600;
+      color: var(--cx-text);
+      letter-spacing: -0.01em;
+    }
+    .cxm-auth-2fa-sub {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 3px;
+    }
+    .cxm-auth-2fa-sub strong { color: var(--cx-text-secondary); }
+
+    .cxm-auth-otp-input {
+      width: 100%;
+      padding: 14px;
+      background: var(--cx-surface-2);
+      border: 1px solid transparent;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-2xl);
+      font-weight: 700;
+      letter-spacing: 0.4em;
+      text-align: center;
+      color: var(--cx-text);
+      outline: none;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-auth-otp-input:focus {
+      background: var(--cx-surface);
+      border-color: var(--cx-primary-600);
+      box-shadow: 0 0 0 3px rgba(10, 79, 42, 0.1);
+    }
+
+    .cxm-auth-2fa-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2px;
+    }
+    .cxm-auth-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: transparent;
+      border: none;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      padding: 4px 0;
+    }
+    .cxm-auth-resend-btn {
+      background: transparent;
+      border: none;
+      font-size: var(--cx-text-xs);
+      font-weight: 600;
+      color: var(--cx-primary-600);
+      padding: 4px 0;
+    }
+
+    .cxm-auth-footer {
+      position: relative;
+      z-index: 1;
+      margin-top: 20px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 500;
+    }
+  `],
 })
 export class AuthPage {
   email = ''; password = ''; otpCode = ''; showPwd = signal(false);

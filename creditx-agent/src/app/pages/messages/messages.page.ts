@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonIcon, IonRefresher, IonRefresherContent, IonFab, IonFabButton, IonBadge } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonIcon, IonRefresher, IonRefresherContent } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { addOutline, chatbubbleEllipsesOutline, timeOutline } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
@@ -9,7 +9,7 @@ import { ApiService } from '../../core/services/api.service';
 @Component({
   selector: 'app-messages',
   standalone: true,
-  imports: [CommonModule, RouterLink, IonContent, IonHeader, IonToolbar, IonTitle, IonIcon, IonRefresher, IonRefresherContent, IonFab, IonFabButton, IonBadge],
+  imports: [CommonModule, RouterLink, IonContent, IonHeader, IonToolbar, IonTitle, IonIcon, IonRefresher, IonRefresherContent],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar><ion-title>Messages</ion-title></ion-toolbar>

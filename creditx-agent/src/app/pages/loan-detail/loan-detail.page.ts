@@ -1,14 +1,14 @@
 import { Component, OnInit, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline } from 'ionicons/icons';
+import { timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-loan-detail',
   standalone: true,
-  imports: [CommonModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon],
+  imports: [CommonModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -18,97 +18,316 @@ import { ApiService } from '../../core/services/api.service';
     </ion-header>
     <ion-content [fullscreen]="true">
       @if (loading()) {
-        <div class="flex justify-center py-16"><ion-spinner name="crescent"></ion-spinner></div>
+        <div class="cxm-loading">
+          <div class="cxm-loading-dots"><span></span><span></span><span></span></div>
+          <span class="cxm-loading-text">Loading loan details...</span>
+        </div>
       } @else if (loan()) {
-        <div class="p-4 space-y-4">
-          <!-- Status Banner -->
-          <div class="p-4 rounded-2xl text-center" [class]="statusBannerClass(loan()?.status)">
-            <span class="text-sm font-semibold capitalize">{{ loan()?.status?.replace('_',' ') }}</span>
+        <!-- Hero -->
+        <div class="cxm-ld-hero cx-animate-in">
+          <div class="cxm-eyebrow" style="color: rgba(255, 255, 255, 0.7)">{{ loan()?.product_name }}</div>
+          <div class="cxm-ld-customer">{{ loan()?.customer_name }}</div>
+          <div class="cxm-ld-app-id tabular-nums">{{ loan()?.application_id }}</div>
+          <div class="cxm-ld-status-row">
+            <span class="cxm-ld-status" [attr.data-tone]="statusTone(loan()?.status)">
+              <span class="cxm-status-dot"></span>
+              <span>{{ loan()?.status?.replace('_',' ') | titlecase }}</span>
+            </span>
           </div>
+        </div>
 
+        <div class="px-4 pb-6 flex flex-col gap-3 -mt-4">
           <!-- Summary Cards -->
           <div class="grid grid-cols-2 gap-3">
-            <div class="p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <div class="text-xs text-gray-500">Amount</div>
-              <div class="text-lg font-bold text-gray-800">₦{{ loan()?.amount_requested | number:'1.0-0' }}</div>
+            <div class="cxm-ld-stat">
+              <div class="cxm-eyebrow">Amount</div>
+              <div class="cxm-ld-stat-value tabular-nums">₦{{ loan()?.amount_requested | number:'1.0-0' }}</div>
             </div>
-            <div class="p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <div class="text-xs text-gray-500">Net Disbursed</div>
-              <div class="text-lg font-bold text-[#0A4F2A]">₦{{ loan()?.net_disbursed | number:'1.0-0' }}</div>
+            <div class="cxm-ld-stat">
+              <div class="cxm-eyebrow cxm-eyebrow-primary">Net Disbursed</div>
+              <div class="cxm-ld-stat-value cxm-ld-stat-primary tabular-nums">₦{{ loan()?.net_disbursed | number:'1.0-0' }}</div>
             </div>
-            <div class="p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <div class="text-xs text-gray-500">Tenure</div>
-              <div class="text-lg font-bold text-gray-800">{{ loan()?.tenure }} mo</div>
+            <div class="cxm-ld-stat">
+              <div class="cxm-eyebrow">Tenure</div>
+              <div class="cxm-ld-stat-value tabular-nums">{{ loan()?.tenure }} <span class="cxm-ld-stat-unit">mo</span></div>
             </div>
-            <div class="p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <div class="text-xs text-gray-500">Rate</div>
-              <div class="text-lg font-bold text-[#C9A227]">{{ loan()?.interest_rate }}%</div>
+            <div class="cxm-ld-stat">
+              <div class="cxm-eyebrow cxm-eyebrow-gold">Rate</div>
+              <div class="cxm-ld-stat-value cxm-ld-stat-gold tabular-nums">{{ loan()?.interest_rate }}<span class="cxm-ld-stat-unit">%</span></div>
             </div>
           </div>
 
           <!-- Loan Info -->
-          <div class="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
-            <h3 class="text-sm font-semibold text-gray-800 mb-3">Loan Information</h3>
-            @for (field of infoFields(); track field.label) {
-              <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                <span class="text-gray-500">{{ field.label }}</span>
-                <span class="font-medium text-gray-800 text-right">{{ field.value || '—' }}</span>
-              </div>
-            }
+          <div class="cxm-card">
+            <div class="cxm-section-header" style="margin-bottom: 10px">
+              <h3 class="cxm-section-title">Loan Information</h3>
+            </div>
+            <div class="cxm-ld-fields">
+              @for (field of infoFields(); track field.label) {
+                <div class="cxm-ld-field">
+                  <span class="cxm-ld-field-label">{{ field.label }}</span>
+                  <span class="cxm-ld-field-value">{{ field.value || '—' }}</span>
+                </div>
+              }
+            </div>
           </div>
 
           <!-- Fee Breakdown -->
           @if (loan()?.fee_breakdowns?.length) {
-            <div class="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">Fee Breakdown</h3>
-              @for (fee of loan()?.fee_breakdowns; track fee.id) {
-                <div class="flex justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                  <span class="text-gray-500">{{ fee.fee_type_name }}</span>
-                  <span class="font-medium text-gray-800">₦{{ fee.amount | number:'1.2-2' }}</span>
-                </div>
-              }
+            <div class="cxm-card">
+              <div class="cxm-section-header" style="margin-bottom: 10px">
+                <h3 class="cxm-section-title">Fee Breakdown</h3>
+              </div>
+              <div class="cxm-ld-fields">
+                @for (fee of loan()?.fee_breakdowns; track fee.id) {
+                  <div class="cxm-ld-field">
+                    <span class="cxm-ld-field-label">{{ fee.fee_type_name }}</span>
+                    <span class="cxm-ld-field-value tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                  </div>
+                }
+              </div>
             </div>
           }
 
           <!-- Approval Progress -->
           @if (approvals().length) {
-            <div class="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">Approval Progress</h3>
-              @for (a of approvals(); track a.id) {
-                <div class="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                  <ion-icon
-                    [name]="a.status === 'approved' || a.status === 'auto_approved' ? 'checkmark-circle-outline' : a.status === 'rejected' ? 'close-circle-outline' : 'time-outline'"
-                    [class]="a.status === 'approved' || a.status === 'auto_approved' ? 'text-green-500 text-lg' : a.status === 'rejected' ? 'text-red-500 text-lg' : 'text-gray-400 text-lg'"
-                  ></ion-icon>
-                  <div class="flex-1">
-                    <div class="text-sm font-medium text-gray-800">{{ a.step_name }}</div>
-                    <div class="text-xs text-gray-500">{{ a.role_name }} &bull; {{ a.status }}</div>
+            <div class="cxm-card">
+              <div class="cxm-section-header" style="margin-bottom: 12px">
+                <h3 class="cxm-section-title">Approval Progress</h3>
+              </div>
+              <div class="cxm-ld-timeline">
+                @for (a of approvals(); track a.id; let idx = $index; let last = $last) {
+                  <div class="cxm-ld-step">
+                    <div class="cxm-ld-step-rail">
+                      <div class="cxm-ld-step-icon" [attr.data-state]="approvalState(a.status)">
+                        <ion-icon [name]="approvalIcon(a.status)" style="font-size: 14px"></ion-icon>
+                      </div>
+                      @if (!last) { <div class="cxm-ld-step-line"></div> }
+                    </div>
+                    <div class="cxm-ld-step-body">
+                      <div class="cxm-ld-step-name">{{ a.step_name }}</div>
+                      <div class="cxm-ld-step-meta">
+                        <span>{{ a.role_name }}</span>
+                        <span class="cxm-ld-step-dot">·</span>
+                        <span class="cxm-ld-step-status" [attr.data-state]="approvalState(a.status)">{{ a.status | titlecase }}</span>
+                      </div>
+                      @if (a.decided_at) {
+                        <div class="cxm-ld-step-time tabular-nums">{{ a.decided_at }}</div>
+                      }
+                    </div>
                   </div>
-                  @if (a.decided_at) { <div class="text-xs text-gray-400">{{ a.decided_at }}</div> }
-                </div>
-              }
+                }
+              </div>
             </div>
           }
 
           <!-- Activity Trail -->
           @if (loan()?.trails?.length) {
-            <div class="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">Activity Trail</h3>
-              @for (trail of loan()?.trails; track trail.id) {
-                <div class="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                  <div class="w-2 h-2 rounded-full bg-[#0A4F2A] mt-1.5 flex-shrink-0"></div>
-                  <div>
-                    <div class="text-sm text-gray-800">{{ trail.action }}</div>
-                    <div class="text-xs text-gray-400">{{ trail.created_at }}</div>
+            <div class="cxm-card">
+              <div class="cxm-section-header" style="margin-bottom: 10px">
+                <h3 class="cxm-section-title">Activity Trail</h3>
+              </div>
+              <div class="cxm-ld-trail">
+                @for (trail of loan()?.trails; track trail.id) {
+                  <div class="cxm-ld-trail-item">
+                    <span class="cxm-ld-trail-dot"></span>
+                    <div class="cxm-ld-trail-body">
+                      <div class="cxm-ld-trail-action">{{ trail.action }}</div>
+                      <div class="cxm-ld-trail-time tabular-nums">{{ trail.created_at }}</div>
+                    </div>
                   </div>
-                </div>
-              }
+                }
+              </div>
             </div>
           }
         </div>
       }
     </ion-content>
   `,
+  styles: [`
+    :host { display: block; }
+
+    /* Hero banner */
+    .cxm-ld-hero {
+      padding: 20px 20px 40px;
+      background: linear-gradient(135deg, var(--cx-primary-600) 0%, var(--cx-primary-500) 100%);
+      color: #fff;
+      position: relative;
+    }
+    .cxm-ld-hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0; right: 0;
+      height: 20px;
+      background: var(--cx-bg);
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+    }
+    .cxm-ld-customer {
+      font-size: var(--cx-text-xl);
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+    .cxm-ld-app-id {
+      font-family: var(--cx-font-mono, monospace);
+      font-size: var(--cx-text-xs);
+      color: rgba(255, 255, 255, 0.75);
+      margin-top: 3px;
+    }
+    .cxm-ld-status-row { margin-top: 10px; position: relative; z-index: 1; }
+    .cxm-ld-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(6px);
+      border-radius: var(--cx-radius-pill);
+      font-size: var(--cx-text-xs);
+      font-weight: 500;
+      color: #fff;
+    }
+    .cxm-ld-status[data-tone="success"] { background: rgba(255, 255, 255, 0.95); color: var(--cx-primary-700); }
+    .cxm-ld-status[data-tone="warning"] { background: rgba(201, 162, 39, 0.95); color: var(--cx-accent-900); }
+    .cxm-ld-status[data-tone="danger"] { background: rgba(193, 48, 48, 0.95); color: #fff; }
+
+    /* Stat cards */
+    .cxm-ld-stat {
+      padding: 12px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg);
+      position: relative;
+      z-index: 1;
+    }
+    .cxm-ld-stat-value {
+      font-size: var(--cx-text-lg);
+      font-weight: 700;
+      color: var(--cx-text);
+      letter-spacing: -0.015em;
+      margin-top: 4px;
+      line-height: 1.1;
+    }
+    .cxm-ld-stat-primary { color: var(--cx-primary-600); }
+    .cxm-ld-stat-gold { color: var(--cx-accent-600); }
+    .cxm-ld-stat-unit {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text-muted);
+    }
+
+    /* Field lists */
+    .cxm-ld-fields { display: flex; flex-direction: column; }
+    .cxm-ld-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-ld-field:last-child { border-bottom: none; }
+    .cxm-ld-field-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      flex-shrink: 0;
+    }
+    .cxm-ld-field-value {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+      text-align: right;
+    }
+
+    /* Timeline (approvals) */
+    .cxm-ld-timeline { display: flex; flex-direction: column; gap: 4px; }
+    .cxm-ld-step {
+      display: flex;
+      gap: 12px;
+    }
+    .cxm-ld-step-rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .cxm-ld-step-icon {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .cxm-ld-step-icon[data-state="approved"] { background: var(--cx-primary-600); color: #fff; }
+    .cxm-ld-step-icon[data-state="rejected"] { background: var(--cx-danger); color: #fff; }
+    .cxm-ld-step-icon[data-state="pending"] { background: var(--cx-accent-500); color: #fff; }
+    .cxm-ld-step-line {
+      width: 2px;
+      flex: 1;
+      background: var(--cx-border-subtle);
+      margin: 3px 0 0;
+      min-height: 14px;
+    }
+    .cxm-ld-step-body {
+      padding-bottom: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .cxm-ld-step-name {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+    }
+    .cxm-ld-step-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      margin-top: 1px;
+    }
+    .cxm-ld-step-dot { color: var(--cx-stone-400); }
+    .cxm-ld-step-status[data-state="approved"] { color: var(--cx-primary-700); font-weight: 500; }
+    .cxm-ld-step-status[data-state="rejected"] { color: var(--cx-danger); font-weight: 500; }
+    .cxm-ld-step-status[data-state="pending"] { color: var(--cx-accent-700); font-weight: 500; }
+    .cxm-ld-step-time {
+      font-size: 10px;
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+    }
+
+    /* Activity trail */
+    .cxm-ld-trail { display: flex; flex-direction: column; gap: 2px; }
+    .cxm-ld-trail-item {
+      display: flex;
+      gap: 10px;
+      padding: 6px 0;
+    }
+    .cxm-ld-trail-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--cx-primary-600);
+      margin-top: 6px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(10, 79, 42, 0.15);
+    }
+    .cxm-ld-trail-body { flex: 1; }
+    .cxm-ld-trail-action {
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+    }
+    .cxm-ld-trail-time {
+      font-size: 10px;
+      color: var(--cx-text-muted);
+      margin-top: 1px;
+    }
+  `],
 })
 export class LoanDetailPage implements OnInit {
   @Input() id = '';
@@ -117,7 +336,7 @@ export class LoanDetailPage implements OnInit {
   loading = signal(true);
 
   constructor(private api: ApiService) {
-    addIcons({ timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline });
+    addIcons({ timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close });
   }
 
   ngOnInit(): void {
@@ -152,5 +371,27 @@ export class LoanDetailPage implements OnInit {
       disbursed:'bg-blue-50 text-blue-700', closed:'bg-blue-50 text-blue-700',
     };
     return map[status] || 'bg-gray-50 text-gray-700';
+  }
+
+  statusTone(status: string): string {
+    const s = (status || '').toLowerCase();
+    if (['active', 'approved', 'disbursed', 'closed'].includes(s)) return 'success';
+    if (['submitted', 'under_review', 'captured', 'draft'].includes(s)) return 'warning';
+    if (['rejected', 'overdue'].includes(s)) return 'danger';
+    return 'neutral';
+  }
+
+  approvalState(status: string): string {
+    const s = (status || '').toLowerCase();
+    if (s === 'approved' || s === 'auto_approved') return 'approved';
+    if (s === 'rejected') return 'rejected';
+    return 'pending';
+  }
+
+  approvalIcon(status: string): string {
+    const s = (status || '').toLowerCase();
+    if (s === 'approved' || s === 'auto_approved') return 'checkmark';
+    if (s === 'rejected') return 'close';
+    return 'time-outline';
   }
 }
