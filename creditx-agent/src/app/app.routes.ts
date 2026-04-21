@@ -16,6 +16,7 @@ export const routes: Routes = [
       { path: 'calculator', loadComponent: () => import('./pages/calculator/calculator.page').then(m => m.CalculatorPage) },
       { path: 'messages', loadComponent: () => import('./pages/messages/messages.page').then(m => m.MessagesPage) },
       { path: 'messages/:id', loadComponent: () => import('./pages/message-thread/message-thread.page').then(m => m.MessageThreadPage) },
+      { path: 'channels/:id', loadComponent: () => import('./pages/channel-thread/channel-thread.page').then(m => m.ChannelThreadPage) },
       { path: 'notifications', loadComponent: () => import('./pages/notifications/notifications.page').then(m => m.NotificationsPage) },
       { path: 'profile', loadComponent: () => import('./pages/profile/profile.page').then(m => m.ProfilePage) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
