@@ -218,7 +218,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
             <div class="flex flex-col gap-3">
 
               <!-- Personal section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-personal">
                 <div class="cxm-lc-section-title">Personal Information</div>
                 <div class="flex flex-col gap-3">
                   <div>
@@ -283,7 +283,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
               </div>
 
               <!-- Contact section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-contact">
                 <div class="cxm-lc-section-title">Contact Information</div>
                 <div class="flex flex-col gap-3">
                   <div>
@@ -341,7 +341,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
               </div>
 
               <!-- Employment section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-employment">
                 <div class="cxm-lc-section-title">Employment Information</div>
                 <div class="flex flex-col gap-3">
                   <div class="grid grid-cols-2 gap-3">
@@ -410,7 +410,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
               </div>
 
               <!-- Loan extras section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-loan">
                 <div class="cxm-lc-section-title">Loan Details</div>
                 <div class="flex flex-col gap-3">
                   <div>
@@ -452,7 +452,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
               </div>
 
               <!-- Bank section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-bank">
                 <div class="cxm-lc-section-title">Disbursement Bank</div>
                 <div class="flex flex-col gap-3">
                   <div>
@@ -492,7 +492,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
               </div>
 
               <!-- Next of Kin section -->
-              <div class="cxm-lc-card">
+              <div class="cxm-lc-card" id="section-nok">
                 <div class="cxm-lc-section-title">Next of Kin</div>
                 <div class="flex flex-col gap-3">
                   <div>
@@ -582,8 +582,15 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
           <!-- Step 6: Review & Submit -->
           @if (step() === 5) {
             <div class="flex flex-col gap-3">
+
+              <!-- Loan summary (product, staff, amounts) -->
               <div class="cxm-lc-card">
-                <h3 class="cxm-lc-review-title">Application Summary</h3>
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Loan Summary</h3>
+                  <button class="cxm-lc-edit-btn" (click)="step.set(2)" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
                 <div class="cxm-lc-review-fields">
                   <div class="cxm-lc-field">
                     <span class="cxm-lc-field-label">Product</span>
@@ -594,27 +601,332 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                     <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['staff_id'] }}</span>
                   </div>
                   <div class="cxm-lc-field">
-                    <span class="cxm-lc-field-label">Customer</span>
-                    <span class="cxm-lc-field-value">{{ staffRecord()?.employee_name }}</span>
-                  </div>
-                  <div class="cxm-lc-field">
                     <span class="cxm-lc-field-label">Amount</span>
-                    <span class="cxm-lc-field-value tabular-nums">₦{{ form['amount'] | number:'1.2-2' }}</span>
+                    <span class="cxm-lc-field-value tabular-nums">₦{{ form['amount'] | number:'1.0-0' }}</span>
                   </div>
                   <div class="cxm-lc-field">
                     <span class="cxm-lc-field-label">Tenure</span>
                     <span class="cxm-lc-field-value tabular-nums">{{ form['tenure'] }} months</span>
                   </div>
-                  @if (calcResult()) {
+                  @if (calcResult(); as calc) {
                     <div class="cxm-lc-review-divider"></div>
                     <div class="cxm-lc-field">
                       <span class="cxm-lc-field-label">Net Disbursed</span>
-                      <span class="cxm-lc-field-value cxm-lc-field-primary tabular-nums">₦{{ calcResult()?.net_disbursed | number:'1.2-2' }}</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-primary tabular-nums">₦{{ calc.net_disbursed | number:'1.0-0' }}</span>
                     </div>
                     <div class="cxm-lc-field">
                       <span class="cxm-lc-field-label">Monthly Payment</span>
-                      <span class="cxm-lc-field-value cxm-lc-field-gold tabular-nums">₦{{ calcResult()?.mr_principal_interest | number:'1.2-2' }}</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-gold tabular-nums">₦{{ calc.mr_principal_interest | number:'1.0-0' }}</span>
                     </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Personal -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Personal Information</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-personal')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['full_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Full Name</span>
+                      <span class="cxm-lc-field-value">{{ form['full_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['date_of_birth']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Date of Birth</span>
+                      <span class="cxm-lc-field-value">{{ form['date_of_birth'] }}</span>
+                    </div>
+                  }
+                  @if (form['gender']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Gender</span>
+                      <span class="cxm-lc-field-value">{{ form['gender'] }}</span>
+                    </div>
+                  }
+                  @if (form['marital_status']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Marital Status</span>
+                      <span class="cxm-lc-field-value">{{ form['marital_status'] }}</span>
+                    </div>
+                  }
+                  @if (form['number_of_children']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Children</span>
+                      <span class="cxm-lc-field-value tabular-nums">{{ form['number_of_children'] }}</span>
+                    </div>
+                  }
+                  @if (form['bvn']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">BVN</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono tabular-nums">{{ form['bvn'] }}</span>
+                    </div>
+                  }
+                  @if (form['mothers_maiden_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Mother's Maiden</span>
+                      <span class="cxm-lc-field-value">{{ form['mothers_maiden_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['religion']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Religion</span>
+                      <span class="cxm-lc-field-value">{{ form['religion'] }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Contact -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Contact Information</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-contact')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['phone']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Phone</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['phone'] }}</span>
+                    </div>
+                  }
+                  @if (form['alt_phone']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Alt Phone</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['alt_phone'] }}</span>
+                    </div>
+                  }
+                  @if (form['email']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Email</span>
+                      <span class="cxm-lc-field-value">{{ form['email'] }}</span>
+                    </div>
+                  }
+                  @if (form['home_address']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Home Address</span>
+                      <span class="cxm-lc-field-value">{{ form['home_address'] }}</span>
+                    </div>
+                  }
+                  @if (form['permanent_address']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Permanent</span>
+                      <span class="cxm-lc-field-value">{{ form['permanent_address'] }}</span>
+                    </div>
+                  }
+                  @if (form['state_of_origin']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">State</span>
+                      <span class="cxm-lc-field-value">{{ form['state_of_origin'] }}</span>
+                    </div>
+                  }
+                  @if (form['lga']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">LGA</span>
+                      <span class="cxm-lc-field-value">{{ form['lga'] }}</span>
+                    </div>
+                  }
+                  @if (form['hometown']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Home Town</span>
+                      <span class="cxm-lc-field-value">{{ form['hometown'] }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Employment -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Employment</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-employment')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['employee_id']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Employee ID</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['employee_id'] }}</span>
+                    </div>
+                  }
+                  @if (form['gross_pay']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Net Pay</span>
+                      <span class="cxm-lc-field-value tabular-nums">₦{{ form['gross_pay'] | number:'1.0-0' }}</span>
+                    </div>
+                  }
+                  @if (form['job_title']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Job Title</span>
+                      <span class="cxm-lc-field-value">{{ form['job_title'] }}</span>
+                    </div>
+                  }
+                  @if (form['employer']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Employer</span>
+                      <span class="cxm-lc-field-value">{{ form['employer'] }}</span>
+                    </div>
+                  }
+                  @if (form['organization']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Sub-Organization</span>
+                      <span class="cxm-lc-field-value">{{ form['organization'] }}</span>
+                    </div>
+                  }
+                  @if (form['command']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Command</span>
+                      <span class="cxm-lc-field-value">{{ form['command'] }}</span>
+                    </div>
+                  }
+                  @if (form['employment_date']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Employment Date</span>
+                      <span class="cxm-lc-field-value">{{ form['employment_date'] }}</span>
+                    </div>
+                  }
+                  @if (form['id_type']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">ID Type</span>
+                      <span class="cxm-lc-field-value">{{ form['id_type'] }}</span>
+                    </div>
+                  }
+                  @if (form['work_id_number']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Work ID #</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['work_id_number'] }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Loan Details -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Loan Details</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-loan')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['loan_amount_words']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Amount in Words</span>
+                      <span class="cxm-lc-field-value">{{ form['loan_amount_words'] }}</span>
+                    </div>
+                  }
+                  @if (form['loan_purpose']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Purpose</span>
+                      <span class="cxm-lc-field-value">{{ form['loan_purpose'] }}</span>
+                    </div>
+                  }
+                  @if (form['repayment_method']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Repayment</span>
+                      <span class="cxm-lc-field-value">{{ form['repayment_method'] }}</span>
+                    </div>
+                  }
+                  @if (form['bank_statement_mode']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">BS Mode</span>
+                      <span class="cxm-lc-field-value">{{ form['bank_statement_mode'] }}</span>
+                    </div>
+                  }
+                  @if (form['account_statement_id']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Statement ID</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['account_statement_id'] }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Bank -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Disbursement Bank</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-bank')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['bank_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Bank</span>
+                      <span class="cxm-lc-field-value">{{ form['bank_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['account_number']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Account #</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono tabular-nums">{{ form['account_number'] }}</span>
+                    </div>
+                  }
+                  @if (form['account_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Account Name</span>
+                      <span class="cxm-lc-field-value">{{ form['account_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['alt_bank_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Alt Bank</span>
+                      <span class="cxm-lc-field-value">{{ form['alt_bank_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['alt_account_number']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Alt Account #</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono tabular-nums">{{ form['alt_account_number'] }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Next of Kin -->
+              <div class="cxm-lc-card">
+                <div class="cxm-lc-review-head">
+                  <h3 class="cxm-lc-review-title">Next of Kin</h3>
+                  <button class="cxm-lc-edit-btn" (click)="goToEdit('section-nok')" type="button">
+                    <span>Edit</span>
+                  </button>
+                </div>
+                <div class="cxm-lc-review-fields">
+                  @if (form['nok_full_name']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Name</span>
+                      <span class="cxm-lc-field-value">{{ form['nok_full_name'] }}</span>
+                    </div>
+                  }
+                  @if (form['nok_relationship']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Relationship</span>
+                      <span class="cxm-lc-field-value">{{ form['nok_relationship'] }}</span>
+                    </div>
+                  }
+                  @if (form['nok_phone']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Phone</span>
+                      <span class="cxm-lc-field-value cxm-lc-field-mono">{{ form['nok_phone'] }}</span>
+                    </div>
+                  }
+                  @if (form['nok_address']) {
+                    <div class="cxm-lc-field">
+                      <span class="cxm-lc-field-label">Address</span>
+                      <span class="cxm-lc-field-value">{{ form['nok_address'] }}</span>
+                    </div>
+                  }
+                  @if (!form['nok_full_name']) {
+                    <div class="cxm-lc-review-empty">No next of kin on file</div>
                   }
                 </div>
               </div>
@@ -1176,12 +1488,46 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
     }
 
     /* ─── Review (step 6) ─── */
+    .cxm-lc-review-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
     .cxm-lc-review-title {
       margin: 0 0 10px;
       font-size: var(--cx-text-sm);
       font-weight: 600;
       color: var(--cx-text);
       letter-spacing: -0.005em;
+    }
+    .cxm-lc-review-head .cxm-lc-review-title { margin: 0; }
+
+    /* Per-section edit jump button — small pill, neutral styling */
+    .cxm-lc-edit-btn {
+      padding: 4px 12px;
+      background: var(--cx-stone-100);
+      color: var(--cx-text-secondary);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-pill);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-edit-btn:active {
+      transform: scale(0.96);
+      background: var(--cx-stone-200);
+    }
+
+    /* Empty-section placeholder — e.g. NOK card when agent skipped NOK */
+    .cxm-lc-review-empty {
+      padding: 12px 0;
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      font-style: italic;
+      text-align: center;
     }
     .cxm-lc-review-fields { display: flex; flex-direction: column; }
     .cxm-lc-field {
@@ -1654,6 +2000,30 @@ export class LoanCapturePage implements OnInit {
         && !!this.form['phone']
         && !!this.form['bvn']
         && this.bvnError() === null;
+  }
+
+  /**
+   * Jump from the Review step (5) back to Step 3 with a specific
+   * section scrolled into view. Used by the Edit links on each
+   * section of the Review summary.
+   *
+   * Sequence:
+   *   1. Set step to 3 — Angular re-renders Step 3's template (Step 5
+   *      was rendered, so Step 3's DOM wasn't in the tree).
+   *   2. Wait one tick (setTimeout 0) so the newly-rendered DOM is
+   *      queryable by getElementById.
+   *   3. scrollIntoView with block: 'start' and smooth behavior.
+   *
+   * If the anchor element isn't found (bad sectionId or DOM not ready),
+   * scroll silently fails — agent still lands on Step 3 at its natural
+   * scroll position, which is a sane fallback.
+   */
+  goToEdit(sectionId: string): void {
+    this.step.set(3);
+    setTimeout(() => {
+      const el = document.getElementById(sectionId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   }
 
   getUploadedDoc(key: string): {name: string; file: File} | undefined {
