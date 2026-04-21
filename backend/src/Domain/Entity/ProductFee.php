@@ -6,6 +6,7 @@ namespace App\Domain\Entity;
 
 use App\Domain\Enum\FeeAppliesTo;
 use App\Domain\Enum\FeeCalculationType;
+use App\Domain\Enum\FeeEffect;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -43,6 +44,21 @@ class ProductFee
     #[ORM\Column(type: 'string', length: 20, enumType: FeeAppliesTo::class)]
     private FeeAppliesTo $appliesTo = FeeAppliesTo::PRINCIPAL;
 
+    /**
+     * How this fee affects the loan computation.
+     * ADDS_TO_GROSS: added to app_amount when computing gross_loan; customer
+     *                repays it over the loan term. (Admin Fee, Insurance Fee.)
+     * DEDUCTED_FROM_DISBURSEMENT: subtracted from app_amount when computing
+     *                net_disbursed; customer receives less but doesn't repay
+     *                this as part of the schedule. (Management Fee, BS Fee.)
+     *
+     * Default is DEDUCTED_FROM_DISBURSEMENT to match pre-effect behavior
+     * where all 'is_deducted_at_source' fees reduced net. The migration
+     * script corrects existing rows based on their fee_type code.
+     */
+    #[ORM\Column(type: 'string', length: 30, enumType: FeeEffect::class, options: ['default' => 'deducted_from_disbursement'])]
+    private FeeEffect $effect = FeeEffect::DEDUCTED_FROM_DISBURSEMENT;
+
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isActive = true;
 
@@ -64,6 +80,8 @@ class ProductFee
     public function setIsDeductedAtSource(bool $v): void { $this->isDeductedAtSource = $v; }
     public function getAppliesTo(): FeeAppliesTo { return $this->appliesTo; }
     public function setAppliesTo(FeeAppliesTo $v): void { $this->appliesTo = $v; }
+    public function getEffect(): FeeEffect { return $this->effect; }
+    public function setEffect(FeeEffect $v): void { $this->effect = $v; }
     public function isActive(): bool { return $this->isActive; }
     public function setIsActive(bool $v): void { $this->isActive = $v; }
 
@@ -95,6 +113,7 @@ class ProductFee
             'value'                => $this->value,
             'is_deducted_at_source' => $this->isDeductedAtSource,
             'applies_to'           => $this->appliesTo->value,
+            'effect'               => $this->effect->value,
             'is_active'            => $this->isActive,
             'created_at'           => $this->createdAt->format('Y-m-d H:i:s'),
         ];

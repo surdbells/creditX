@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace App\Action\LoanProduct;
 
 use App\Domain\Entity\{LoanProduct, ProductFee};
-use App\Domain\Enum\{FeeAppliesTo, FeeCalculationType, InterestMethod};
+use App\Domain\Enum\{FeeAppliesTo, FeeCalculationType, FeeEffect, InterestMethod};
 use App\Domain\Repository\{FeeTypeRepository, LoanProductRepository};
 use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -67,6 +67,10 @@ final class CreateProductAction
                 $pf->setValue((string) ($feeData['value'] ?? '0'));
                 $pf->setIsDeductedAtSource(filter_var($feeData['is_deducted_at_source'] ?? true, FILTER_VALIDATE_BOOLEAN));
                 $pf->setAppliesTo(FeeAppliesTo::from($feeData['applies_to'] ?? 'principal'));
+                // Effect: default to DEDUCTED_FROM_DISBURSEMENT (matches legacy
+                // treatment of Management/BS fees — most common case). Admin can
+                // override via the product form.
+                $pf->setEffect(FeeEffect::from($feeData['effect'] ?? 'deducted_from_disbursement'));
                 $p->addFee($pf);
             }
         }
