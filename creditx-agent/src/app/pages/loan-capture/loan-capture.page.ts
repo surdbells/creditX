@@ -6,6 +6,7 @@ import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
 import { addIcons } from 'ionicons';
 import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
+import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-states';
 
 @Component({
   selector: 'app-loan-capture',
@@ -309,11 +310,27 @@ import { ApiService } from '../../core/services/api.service';
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <label class="cxm-lc-label">State of Origin</label>
-                      <input class="cxm-lc-input" [(ngModel)]="form['state_of_origin']" placeholder="e.g. Lagos" />
+                      <select class="cxm-lc-select"
+                              [(ngModel)]="form['state_of_origin']"
+                              (ngModelChange)="onStateChange($event)">
+                        <option value="">Select state...</option>
+                        @for (s of states; track s.name) {
+                          <option [value]="s.name">{{ s.name }}</option>
+                        }
+                      </select>
                     </div>
                     <div>
                       <label class="cxm-lc-label">LGA</label>
-                      <input class="cxm-lc-input" [(ngModel)]="form['lga']" placeholder="Local government" />
+                      <select class="cxm-lc-select"
+                              [(ngModel)]="form['lga']"
+                              [disabled]="availableLgas().length === 0">
+                        <option value="">
+                          {{ availableLgas().length === 0 ? 'Select state first' : 'Select LGA...' }}
+                        </option>
+                        @for (lga of availableLgas(); track lga) {
+                          <option [value]="lga">{{ lga }}</option>
+                        }
+                      </select>
                     </div>
                   </div>
                   <div>
@@ -1367,6 +1384,33 @@ export class LoanCapturePage implements OnInit {
   banks = signal<{code: string; name: string}[]>([]);
 
   /**
+   * Nigerian states and cascading LGA list. Source is a static TS
+   * file (core/data/nigerian-states.ts) — no network call. See the
+   * file header for rationale.
+   *
+   * `states` is the full 37-state list (used in the State dropdown).
+   * `availableLgas` is a signal that recomputes whenever the agent
+   * picks a different state — it powers the LGA dropdown's options.
+   */
+  readonly states = NIGERIAN_STATES;
+  availableLgas = signal<string[]>([]);
+
+  /**
+   * Fired when the State of Origin dropdown changes. Rebuilds the LGA
+   * list and clears the previously-selected LGA if it isn't valid for
+   * the new state (e.g. agent switched from Lagos with 'Ikeja' selected
+   * to Rivers — 'Ikeja' isn't a Rivers LGA so we blank it).
+   */
+  onStateChange(newState: string): void {
+    const lgas = getLgasForState(newState);
+    this.availableLgas.set(lgas);
+    const current = this.form['lga'];
+    if (current && !lgas.includes(current)) {
+      this.form['lga'] = '';
+    }
+  }
+
+  /**
    * BVN validation — Nigerian BVN is exactly 11 digits, all numeric.
    * Signal tracks the current error message (or null if valid/empty).
    * Empty is treated as 'not-yet-filled' so the error only appears
@@ -1557,6 +1601,14 @@ export class LoanCapturePage implements OnInit {
     // trigger validation so the agent sees the error immediately rather
     // than on submit.
     if (src['bvn']) this.onBvnChange(this.form['bvn']);
+
+    // If state was prefilled, populate the LGA dropdown so the prefilled
+    // LGA value (if any) has a matching option. Otherwise the dropdown
+    // shows blank because its options list is empty until a state is
+    // chosen via the UI.
+    if (this.form['state_of_origin'] && this.availableLgas().length === 0) {
+      this.availableLgas.set(getLgasForState(this.form['state_of_origin']));
+    }
   }
 
   calculate(): void {
