@@ -125,31 +125,104 @@ final class ApprovalEngineService
             throw new DomainException('Workflow not found for this loan product');
         }
 
-        // Find the approval record this user can act on
-        $approval = $this->findActionableApproval($loan, $user, $workflow);
+        /*
+         * Race-condition protection via explicit transaction + pessimistic
+         * row lock.
+         *
+         * Without this, two reviewers in the same role clicking Approve
+         * on the same loan step at the same instant would both:
+         *   1. Read the approval row (status=PENDING)
+         *   2. Call approve() (mutates in memory)
+         *   3. flush() (DB UPDATE)
+         * Last-write-wins: whichever request committed second silently
+         * overwrites the other's approver_id + decided_at. Two trails
+         * land but only one approver is recorded. For a loan with
+         * thousands of dollars at stake, this is an auditability hole.
+         *
+         * Fix: open an explicit transaction, re-fetch the identified
+         * approval row WITH LockMode::PESSIMISTIC_WRITE (PostgreSQL
+         * translates this to SELECT ... FOR UPDATE). Other transactions
+         * trying to act on the same row block until this one commits or
+         * rolls back. The second reviewer's request then sees the
+         * committed result and the state guard in approve()/reject()
+         * catches the 'already decided' case cleanly.
+         */
+        $this->em->beginTransaction();
+        try {
+            // Identify the candidate approval (no lock yet — findActionable
+            // uses indexed queries that would hold too many row locks).
+            $candidate = $this->findActionableApproval($loan, $user, $workflow);
+            if ($candidate === null) {
+                $this->em->rollback();
+                throw new DomainException('No pending approval step found for your role');
+            }
 
-        if ($approval === null) {
-            throw new DomainException('No pending approval step found for your role');
+            // Re-fetch with a pessimistic write lock so concurrent deciders
+            // serialize here. The second request blocks on this line until
+            // the first commits, then retrieves the row in its new state
+            // and the state guard in approve()/reject() rejects it.
+            $approval = $this->em->find(
+                LoanApproval::class,
+                $candidate->getId(),
+                \Doctrine\DBAL\LockMode::PESSIMISTIC_WRITE,
+            );
+            if ($approval === null) {
+                $this->em->rollback();
+                throw new DomainException('Approval record could not be locked');
+            }
+
+            // Defensive status check before calling the entity mutator.
+            // approve()/reject() also guard against non-PENDING state
+            // (commit L — entity-level defense) but a 400 from this
+            // service-level check is cheaper to produce and carries a
+            // clearer message for the admin UI to toast.
+            if (!$approval->isPending()) {
+                $this->em->rollback();
+                throw new DomainException(
+                    'This approval step has already been decided by another reviewer'
+                );
+            }
+
+            // Process decision — these now throw if the row is not
+            // PENDING (belt + suspenders vs the check above which can
+            // race if we ever remove the lock).
+            if ($action === 'approve') {
+                $approval->approve($user, $comment);
+            } else {
+                $approval->reject($user, $comment);
+            }
+
+            // Trail
+            $trail = new LoanTrail();
+            $trail->setUserId($user->getId());
+            $trail->setAction("Step '{$approval->getStep()->getName()}' " . ($action === 'approve' ? 'approved' : 'rejected'));
+            $trail->setDetails(['step_id' => $approval->getStep()->getId(), 'comment' => $comment]);
+            $loan->addTrail($trail);
+
+            // Determine overall loan status based on all approvals
+            $result = $this->evaluateOverallStatus($loan, $workflow);
+
+            $this->em->flush();
+            $this->em->commit();
+        } catch (DomainException $e) {
+            // A DomainException may come from two places:
+            //   (a) Explicit throws above with rollback() already done
+            //       (candidate null, approval null, non-pending state)
+            //   (b) Entity-level guards in approve()/reject() when the
+            //       state changed between our check and the mutator call
+            //       — no rollback() has fired yet
+            // Safe to always attempt rollback; Doctrine no-ops if no tx
+            // is active and we ensure the tx is closed either way.
+            if ($this->em->getConnection()->isTransactionActive()) {
+                $this->em->rollback();
+            }
+            throw $e;
+        } catch (\Throwable $e) {
+            if ($this->em->getConnection()->isTransactionActive()) {
+                $this->em->rollback();
+            }
+            throw new DomainException('Failed to record decision: ' . $e->getMessage());
         }
-
-        // Process decision
-        if ($action === 'approve') {
-            $approval->approve($user, $comment);
-        } else {
-            $approval->reject($user, $comment);
-        }
-
-        // Trail
-        $trail = new LoanTrail();
-        $trail->setUserId($user->getId());
-        $trail->setAction("Step '{$approval->getStep()->getName()}' " . ($action === 'approve' ? 'approved' : 'rejected'));
-        $trail->setDetails(['step_id' => $approval->getStep()->getId(), 'comment' => $comment]);
-        $loan->addTrail($trail);
-
-        // Determine overall loan status based on all approvals
-        $result = $this->evaluateOverallStatus($loan, $workflow);
-
-        $this->em->flush();
 
         // Dispatch notifications for approval action (Gap 3)
         if ($this->notifService !== null) {

@@ -62,10 +62,16 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
     -->
     @if (modalOpen()) {
       <div class="cx-aq-backdrop" (click)="closeModal()"></div>
-      <div class="cx-aq-modal cx-animate-in" role="dialog" aria-labelledby="aq-modal-title">
+      <div class="cx-aq-modal cx-animate-in"
+           [class.cx-aq-modal-compact]="mode() === 'quick-approve'"
+           role="dialog" aria-labelledby="aq-modal-title">
         <div class="cx-aq-modal-head">
           <div>
-            <div class="cx-aq-modal-eyebrow">Reviewing</div>
+            <div class="cx-aq-modal-eyebrow">
+              @if (mode() === 'quick-approve') { Confirm approval }
+              @else if (mode() === 'reject') { Rejecting }
+              @else { Reviewing }
+            </div>
             <h2 id="aq-modal-title" class="cx-aq-modal-title tabular-nums">
               {{ activeRow()?.application_id }}
             </h2>
@@ -77,7 +83,45 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
         </div>
 
         <div class="cx-aq-modal-body">
-          @if (detailLoading()) {
+          @if (mode() === 'quick-approve') {
+            <!--
+              Compact confirmation panel. No loan detail fetch — the row
+              data that spawned the modal is already visible in the header
+              (application_id + customer name). Reviewer just confirms
+              the action they intended.
+            -->
+            <div class="cx-aq-quick-panel">
+              <div class="cx-aq-quick-icon">
+                <lucide-icon name="check-circle" [size]="32"></lucide-icon>
+              </div>
+              <div class="cx-aq-quick-message">
+                Approve this loan application at the current workflow step?
+              </div>
+              <div class="cx-aq-quick-summary">
+                @if (activeRow()?.amount_requested) {
+                  <div class="cx-aq-quick-row">
+                    <span>Amount</span>
+                    <span class="tabular-nums">₦{{ activeRow()?.amount_requested | number:'1.2-2' }}</span>
+                  </div>
+                }
+                @if (activeRow()?.product_name) {
+                  <div class="cx-aq-quick-row">
+                    <span>Product</span>
+                    <span>{{ activeRow()?.product_name }}</span>
+                  </div>
+                }
+                @if (activeRow()?.current_step) {
+                  <div class="cx-aq-quick-row">
+                    <span>Step</span>
+                    <span>{{ activeRow()?.current_step }}</span>
+                  </div>
+                }
+              </div>
+              <div class="cx-aq-quick-hint">
+                Tap Review instead if you want to see the full loan details before deciding.
+              </div>
+            </div>
+          } @else if (detailLoading()) {
             <div class="cx-aq-modal-loading">
               <lucide-icon name="loader-2" [size]="24" class="cx-spin"></lucide-icon>
               <span>Loading loan details...</span>
@@ -301,6 +345,18 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                 </button>
               </div>
             </div>
+          } @else if (mode() === 'quick-approve') {
+            <div class="cx-aq-decision-area">
+              <div class="cx-aq-buttons">
+                <button class="cx-btn cx-btn-ghost" (click)="closeModal()" [disabled]="deciding()">
+                  Cancel
+                </button>
+                <button class="cx-btn cx-btn-primary" (click)="confirmQuickApprove()" [disabled]="deciding()">
+                  <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+                  <span>Confirm Approval</span>
+                </button>
+              </div>
+            </div>
           }
         </div>
       </div>
@@ -332,6 +388,24 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       flex-direction: column;
       z-index: 101;
       overflow: hidden;
+    }
+    /*
+     * Compact variant for the quick-approve mode — narrower and
+     * shorter since there's no loan detail body to render, just
+     * a confirmation panel and two buttons.
+     */
+    .cx-aq-modal-compact {
+      width: min(440px, calc(100vw - 32px));
+      max-height: auto;
+    }
+    @media (max-width: 640px) {
+      .cx-aq-modal-compact {
+        width: calc(100vw - 32px);
+        height: auto;
+        max-height: calc(100vh - 64px);
+        top: 50%;
+        border-radius: var(--cx-radius-xl, 16px);
+      }
     }
     @media (max-width: 640px) {
       .cx-aq-modal {
@@ -577,7 +651,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   // Modal state
   modalOpen = signal(false);
-  mode = signal<'review' | 'reject'>('review');
+  mode = signal<'review' | 'reject' | 'quick-approve'>('review');
   activeRow = signal<any>(null);
   loanDetail = signal<any>(null);
   approvals = signal<any[]>([]);
@@ -643,15 +717,35 @@ export class ApprovalQueueComponent implements OnInit {
   }
 
   /**
-   * Quick approve from the row. No modal, no comment, just a confirm
-   * dialog. Fast lane for reviewers confident in the loan after a
-   * glance at the row — rare for rejection (which should always be
-   * reasoned) but common for approvals.
+   * Quick approve from the row. Opens a styled inline confirmation
+   * overlay instead of the browser's native confirm() dialog — the
+   * native dialog feels jarring against the polished admin UI and
+   * doesn't respect dark mode / design tokens.
+   *
+   * Confirmation is still required (muscle-memory approval-without-
+   * review is a real risk at volume). The reviewer clicks the
+   * check icon → modal appears → they read the application_id +
+   * customer summary → click Confirm to send.
    */
   quickApprove(row: any) {
     const loanId = row.loan_id || row.id;
     if (!loanId) return;
-    if (!confirm(`Approve loan ${row.application_id}?`)) return;
+    this.activeRow.set(row);
+    this.loanDetail.set(null);
+    this.approvals.set([]);
+    this.comment = '';
+    this.mode.set('quick-approve');
+    this.modalOpen.set(true);
+  }
+
+  /**
+   * Fire the quick-approve decision after confirmation. No loan
+   * detail fetch needed — the row data already shows the info the
+   * reviewer needed to confirm against.
+   */
+  confirmQuickApprove() {
+    const loanId = this.activeRow()?.loan_id || this.activeRow()?.id;
+    if (!loanId) return;
     this.decide(loanId, 'approve', null);
   }
 

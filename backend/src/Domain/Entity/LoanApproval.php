@@ -73,9 +73,26 @@ class LoanApproval
 
     /**
      * Record an approval decision.
+     *
+     * Guards against double-decide: only a PENDING approval can be
+     * approved. If two reviewers click Approve on the same step
+     * concurrently, the second request gets a DomainException when
+     * it tries to act on what is now an APPROVED row.
+     *
+     * Paired with the pessimistic row lock in ApprovalEngineService::
+     * decide() which serializes the two requests so the second one
+     * sees the committed result of the first before hitting this
+     * check. Without the lock, this guard still catches most cases
+     * but there's a tiny window where two requests read the row as
+     * PENDING before either writes. The lock closes that window.
      */
     public function approve(User $approver, ?string $comment = null): void
     {
+        if ($this->status !== ApprovalStatus::PENDING) {
+            throw new \App\Domain\Exception\DomainException(
+                'This approval step has already been decided (' . $this->status->value . ')'
+            );
+        }
         $this->status = ApprovalStatus::APPROVED;
         $this->approver = $approver;
         $this->comment = $comment;
@@ -84,9 +101,17 @@ class LoanApproval
 
     /**
      * Record a rejection decision.
+     *
+     * Same state guard as approve() — prevents double-decide when
+     * two reviewers act concurrently. See approve() for details.
      */
     public function reject(User $approver, ?string $comment = null): void
     {
+        if ($this->status !== ApprovalStatus::PENDING) {
+            throw new \App\Domain\Exception\DomainException(
+                'This approval step has already been decided (' . $this->status->value . ')'
+            );
+        }
         $this->status = ApprovalStatus::REJECTED;
         $this->approver = $approver;
         $this->comment = $comment;
