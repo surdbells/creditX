@@ -515,7 +515,9 @@ export class ChannelThreadPage implements OnInit, OnDestroy {
    * bubbles stable; only the new ones animate in.
    */
   private pollMessages(): void {
-    this.api.get(`/channels/${this.id}/messages`).subscribe({
+    // Silent poll: every 10s while the thread is open. A transient
+    // failure shouldn't fire a toast — the next tick retries.
+    this.api.get(`/channels/${this.id}/messages`, undefined, { silent: true }).subscribe({
       next: res => {
         const incoming = res.data || [];
         // Only update if the count changed or last-id differs — avoids
@@ -552,7 +554,9 @@ export class ChannelThreadPage implements OnInit, OnDestroy {
    * just moves the timestamp forward).
    */
   markRead(): void {
-    this.api.post(`/channels/${this.id}/mark-read`, {}).subscribe({
+    // Silent: mark-read is idempotent and high-frequency; a failed
+    // call is corrected on the next thread open or polling tick.
+    this.api.post(`/channels/${this.id}/mark-read`, {}, { silent: true }).subscribe({
       next: () => {},
       error: () => {},
     });

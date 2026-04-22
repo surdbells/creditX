@@ -6,6 +6,7 @@ import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
 import { addIcons } from 'ionicons';
 import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
+import { ToastService } from '../../core/services/toast.service';
 import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-states';
 
 @Component({
@@ -1820,7 +1821,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
    */
   private onFocusListener: (() => void) | null = null;
 
-  constructor(private api: ApiService, public router: Router) {
+  constructor(private api: ApiService, public router: Router, private toast: ToastService) {
     addIcons({ chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, searchOutline, calculatorOutline, cloudUploadOutline, closeCircleOutline, checkmarkCircle, documentOutline, refreshOutline, informationCircleOutline, alertCircleOutline, closeCircle, checkmark, close });
   }
 
@@ -1879,7 +1880,10 @@ export class LoanCapturePage implements OnInit, OnDestroy {
    * environments.
    */
   private refreshPauseState(): void {
-    this.api.get('/settings', { per_page: 200 }).subscribe({
+    // Silent: this polls every 15s; a transient network hiccup would
+    // fire a confusing 'network error' toast. Real failures (e.g. user
+    // interaction on this page) still surface via the page's own flow.
+    this.api.get('/settings', { per_page: 200 }, { silent: true }).subscribe({
       next: res => {
         const settings = res.data || [];
         const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
@@ -2330,6 +2334,10 @@ export class LoanCapturePage implements OnInit, OnDestroy {
         const customerId = res.data?.customer_id || '';
         this.submittedLoanId.set(loanId);
         this.submittedCustomerId.set(customerId);
+        // Success toast confirms to the agent that the server accepted
+        // the application. The doc-upload phase then runs in the
+        // background with its own per-doc progress indicators.
+        this.toast.success('Loan application submitted successfully');
         if (loanId && customerId && this.uploadedDocs.size > 0) {
           this.uploadDocuments(loanId, customerId);
           this.pollUploadsComplete(loanId);
