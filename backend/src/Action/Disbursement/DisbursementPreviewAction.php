@@ -84,8 +84,8 @@ final class DisbursementPreviewAction
         $settlementGls = array_map(
             fn($gl) => [
                 'id'           => $gl->getId(),
-                'name'         => $gl->getName(),
-                'code'         => $gl->getCode(),
+                'name'         => $gl->getAccountName(),
+                'code'         => $gl->getAccountCode(),
                 'account_type' => $gl->getAccountType()->value,
             ],
             $this->glRepo->findByAccountType(AccountType::ASSET),
