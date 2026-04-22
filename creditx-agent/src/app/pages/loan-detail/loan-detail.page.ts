@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, Input } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -7,7 +7,10 @@ import { addIcons } from 'ionicons';
 import {
   timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
   chatbubbleEllipsesOutline, paperPlaneOutline, createOutline, informationCircleOutline,
+  documentTextOutline, eyeOutline, arrowBackOutline, downloadOutline,
 } from 'ionicons/icons';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -127,6 +130,27 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
           }
 
+          <!-- Documents — tap to preview (opens fullscreen overlay) -->
+          @if (loan()?.documents?.length) {
+            <div class="cxm-card">
+              <div class="cxm-section-header" style="margin-bottom: 10px">
+                <h3 class="cxm-section-title">Documents</h3>
+              </div>
+              <div class="cxm-ld-docs">
+                @for (doc of loan()?.documents; track doc.id) {
+                  <button type="button" class="cxm-ld-doc-row" (click)="openDocPreview(doc)">
+                    <ion-icon name="document-text-outline" style="font-size: 18px; color: var(--cx-text-muted)"></ion-icon>
+                    <div class="cxm-ld-doc-meta">
+                      <div class="cxm-ld-doc-type">{{ prettyDocType(doc.document_type || doc.type) }}</div>
+                      <div class="cxm-ld-doc-name">{{ doc.file_name }}</div>
+                    </div>
+                    <ion-icon name="eye-outline" style="font-size: 16px; color: var(--cx-text-muted)"></ion-icon>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <!-- Activity Trail -->
           @if (loan()?.trails?.length) {
             <div class="cxm-card">
@@ -241,6 +265,47 @@ import { ToastService } from '../../core/services/toast.service';
               <span>Send</span>
             }
           </button>
+        </div>
+      </div>
+    }
+
+    <!--
+      Document preview overlay — fullscreen on mobile for maximum
+      viewing area. Images render inline, PDFs in an iframe, other
+      file types fall back to a download link. Close button returns
+      to the loan detail page exactly as it was.
+    -->
+    @if (docPreviewDoc(); as pd) {
+      <div class="cxm-ld-doc-viewer cx-animate-in" role="dialog">
+        <div class="cxm-ld-doc-viewer-head">
+          <button class="cxm-ld-doc-viewer-back" (click)="closeDocPreview()" aria-label="Close preview">
+            <ion-icon name="arrow-back-outline" style="font-size: 20px"></ion-icon>
+          </button>
+          <div class="cxm-ld-doc-viewer-meta">
+            <div class="cxm-ld-doc-viewer-type">{{ prettyDocType(pd.document_type || pd.type) }}</div>
+            <div class="cxm-ld-doc-viewer-name">{{ pd.file_name }}</div>
+          </div>
+          <a class="cxm-ld-doc-viewer-action" [href]="docUrl(pd)" [download]="pd.file_name" title="Download">
+            <ion-icon name="download-outline" style="font-size: 18px"></ion-icon>
+          </a>
+        </div>
+        <div class="cxm-ld-doc-viewer-body">
+          @if (isImage(pd.mime_type)) {
+            <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cxm-ld-doc-img" />
+          } @else if (isPdf(pd.mime_type)) {
+            <iframe [src]="docUrlSafe(pd)" class="cxm-ld-doc-frame" frameborder="0"></iframe>
+          } @else {
+            <div class="cxm-ld-doc-fallback">
+              <ion-icon name="document-text-outline" style="font-size: 48px; color: #fff"></ion-icon>
+              <div class="cxm-ld-doc-fallback-message">
+                This file type ({{ pd.mime_type || 'unknown' }}) can't be previewed inline.
+              </div>
+              <a class="cxm-ld-action-btn cxm-ld-action-primary" [href]="docUrl(pd)" target="_blank" rel="noopener">
+                <ion-icon name="download-outline" style="font-size: 16px"></ion-icon>
+                <span>Open file</span>
+              </a>
+            </div>
+          }
         </div>
       </div>
     }
@@ -636,6 +701,123 @@ import { ToastService } from '../../core/services/toast.service';
       padding: 12px 20px 16px;
       border-top: 1px solid var(--cx-border-subtle);
     }
+
+    /* ═══ Documents card ═══ */
+    .cxm-ld-docs { display: flex; flex-direction: column; gap: 6px; }
+    .cxm-ld-doc-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--cx-surface-2, #f5f5f4);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      width: 100%;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      text-align: left;
+      transition: background 120ms;
+    }
+    .cxm-ld-doc-row:active {
+      background: var(--cx-surface-hover, var(--cx-surface));
+    }
+    .cxm-ld-doc-meta { flex: 1; min-width: 0; }
+    .cxm-ld-doc-type {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--cx-text);
+    }
+    .cxm-ld-doc-name {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ═══ Document preview overlay — fullscreen on mobile ═══
+     *
+     * Opens as a full-viewport layer on top of everything including
+     * the tab bar. Images shrink to fit via object-fit: contain,
+     * PDFs render in an iframe that the system can pinch-zoom,
+     * fallback for unknown MIME types shows a download link.
+     */
+    .cxm-ld-doc-viewer {
+      position: fixed;
+      inset: 0;
+      background: #1a1a1a;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+    }
+    .cxm-ld-doc-viewer-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      padding-top: calc(12px + env(safe-area-inset-top));
+      background: var(--cx-surface);
+      border-bottom: 1px solid var(--cx-border);
+      flex-shrink: 0;
+    }
+    .cxm-ld-doc-viewer-back,
+    .cxm-ld-doc-viewer-action {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--cx-surface-2);
+      border: none;
+      border-radius: 50%;
+      color: var(--cx-text);
+      cursor: pointer;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .cxm-ld-doc-viewer-meta { flex: 1; min-width: 0; }
+    .cxm-ld-doc-viewer-type {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cxm-ld-doc-viewer-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--cx-text);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cxm-ld-doc-viewer-body {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    .cxm-ld-doc-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .cxm-ld-doc-frame { width: 100%; height: 100%; background: #fff; border: none; }
+    .cxm-ld-doc-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: #fff;
+      padding: 48px;
+      text-align: center;
+    }
+    .cxm-ld-doc-fallback-message {
+      font-size: 14px;
+      max-width: 300px;
+      line-height: 1.5;
+    }
   `],
 })
 export class LoanDetailPage implements OnInit {
@@ -661,6 +843,7 @@ export class LoanDetailPage implements OnInit {
     addIcons({
       timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
       chatbubbleEllipsesOutline, paperPlaneOutline, createOutline, informationCircleOutline,
+      documentTextOutline, eyeOutline, arrowBackOutline, downloadOutline,
     });
   }
 
@@ -885,5 +1068,41 @@ export class LoanDetailPage implements OnInit {
     if (s === 'approved' || s === 'auto_approved') return 'checkmark';
     if (s === 'rejected') return 'close';
     return 'time-outline';
+  }
+
+  // ─── Document preview ───
+  docPreviewDoc = signal<any>(null);
+  private sanitizer = inject(DomSanitizer);
+
+  openDocPreview(doc: any): void { this.docPreviewDoc.set(doc); }
+  closeDocPreview(): void { this.docPreviewDoc.set(null); }
+
+  isImage(mime: string | null | undefined): boolean {
+    return !!(mime && mime.startsWith('image/'));
+  }
+  isPdf(mime: string | null | undefined): boolean {
+    return mime === 'application/pdf';
+  }
+  /**
+   * Build a serve URL for a document. Uses the backend's
+   * /api/storage/{path:.*} unauthenticated endpoint (ServeFileAction)
+   * that streams the file with the right Content-Type header.
+   */
+  docUrl(doc: any): string {
+    if (!doc?.file_path) return '';
+    return `${environment.apiUrl}/storage/${doc.file_path}`;
+  }
+  docUrlSafe(doc: any): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));
+  }
+  /**
+   * Humanise a DocumentType enum value. 'id_card' → 'ID Card',
+   * 'bank_statement' → 'Bank Statement'.
+   */
+  prettyDocType(type: string | null | undefined): string {
+    if (!type) return '—';
+    const special: Record<string, string> = { 'id_card': 'ID Card', 'work_id': 'Work ID' };
+    if (special[type]) return special[type];
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   }
 }

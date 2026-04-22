@@ -1,7 +1,9 @@
-import { Component, OnInit, signal, Input } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
+import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
@@ -217,14 +219,19 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             @if (customer()?.documents?.length) {
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 @for (doc of customer()?.documents; track doc.id) {
-                  <div class="flex items-center gap-3 p-3 rounded-xl border border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors">
+                  <button type="button"
+                          class="cx-cust-doc-card"
+                          (click)="openDocPreview(doc)">
                     <lucide-icon name="file-text" [size]="20" class="text-[var(--cx-primary)] flex-shrink-0"></lucide-icon>
-                    <div class="min-w-0 flex-1">
+                    <div class="min-w-0 flex-1 text-left">
                       <div class="text-sm font-medium truncate text-[var(--cx-text)]">{{ doc.file_name }}</div>
                       <div class="text-xs text-[var(--cx-text-muted)]">{{ doc.type }}</div>
                     </div>
-                    <cx-status-badge [status]="doc.status"></cx-status-badge>
-                  </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <cx-status-badge [status]="doc.status"></cx-status-badge>
+                      <lucide-icon name="eye" [size]="14" class="text-[var(--cx-text-muted)]"></lucide-icon>
+                    </div>
+                  </button>
                 }
               </div>
             } @else {
@@ -234,6 +241,48 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
         }
       }
     </div>
+
+    <!-- Document preview overlay (shared pattern) -->
+    @if (docPreviewDoc(); as pd) {
+      <div class="cx-cd-doc-backdrop" (click)="closeDocPreview()"></div>
+      <div class="cx-cd-doc-viewer" role="dialog">
+        <div class="cx-cd-doc-viewer-head">
+          <div class="cx-cd-doc-viewer-meta">
+            <div class="cx-cd-doc-viewer-type">{{ pd.type || '—' }}</div>
+            <div class="cx-cd-doc-viewer-name">{{ pd.file_name }}</div>
+          </div>
+          <div class="cx-cd-doc-viewer-actions">
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" target="_blank" rel="noopener" title="Open in new tab">
+              <lucide-icon name="external-link" [size]="14"></lucide-icon>
+            </a>
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" [download]="pd.file_name" title="Download">
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+            </a>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="closeDocPreview()" aria-label="Close preview">
+              <lucide-icon name="x" [size]="16"></lucide-icon>
+            </button>
+          </div>
+        </div>
+        <div class="cx-cd-doc-viewer-body">
+          @if (isImage(pd.mime_type)) {
+            <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-cd-doc-img" />
+          } @else if (isPdf(pd.mime_type)) {
+            <iframe [src]="docUrlSafe(pd)" class="cx-cd-doc-frame" frameborder="0"></iframe>
+          } @else {
+            <div class="cx-cd-doc-fallback">
+              <lucide-icon name="file-text" [size]="48"></lucide-icon>
+              <div class="cx-cd-doc-fallback-message">
+                This file type ({{ pd.mime_type || 'unknown' }}) can't be previewed inline.
+              </div>
+              <a class="cx-btn cx-btn-primary" [href]="docUrl(pd)" target="_blank" rel="noopener">
+                <lucide-icon name="download" [size]="14"></lucide-icon>
+                <span>Open file</span>
+              </a>
+            </div>
+          }
+        </div>
+      </div>
+    }
   `,
   styles: [`
     :host { display: block; }
@@ -319,6 +368,98 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
       color: var(--cx-text-muted);
       text-align: center;
     }
+
+    /* ═══ Customer documents — clickable cards ═══ */
+    .cx-cust-doc-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      width: 100%;
+      border-radius: var(--cx-radius-xl, 12px);
+      border: 1px solid var(--cx-border);
+      background: var(--cx-surface);
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      transition: background var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-cust-doc-card:hover {
+      background: var(--cx-surface-hover, var(--cx-surface-2));
+    }
+
+    /* ═══ Document preview overlay ═══ */
+    .cx-cd-doc-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 110;
+      backdrop-filter: blur(4px);
+    }
+    .cx-cd-doc-viewer {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(1100px, 90vw);
+      height: 90vh;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 16px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4);
+      z-index: 111;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    @media (max-width: 640px) {
+      .cx-cd-doc-viewer { width: 100vw; height: 100vh; border-radius: 0; }
+    }
+    .cx-cd-doc-viewer-head {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--cx-border);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .cx-cd-doc-viewer-meta { flex: 1; min-width: 0; }
+    .cx-cd-doc-viewer-type {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-cd-doc-viewer-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--cx-text);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-cd-doc-viewer-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .cx-cd-doc-viewer-body {
+      flex: 1;
+      overflow: auto;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    .cx-cd-doc-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .cx-cd-doc-frame { width: 100%; height: 100%; background: #fff; border: none; }
+    .cx-cd-doc-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: #fff;
+      padding: 48px;
+      text-align: center;
+    }
+    .cx-cd-doc-fallback-message { font-size: 14px; max-width: 360px; line-height: 1.5; }
   `],
 })
 export class CustomerDetailComponent implements OnInit {
@@ -437,5 +578,26 @@ export class CustomerDetailComponent implements OnInit {
       { label: 'Bank Name', value: c.bank_name }, { label: 'Account Number', value: c.account_number },
       { label: 'Alt Bank', value: c.alt_bank_name }, { label: 'Alt Account', value: c.alt_account_number },
     ];
+  }
+
+  // ─── Document preview ───
+  docPreviewDoc = signal<any>(null);
+  private sanitizer = inject(DomSanitizer);
+
+  openDocPreview(doc: any): void { this.docPreviewDoc.set(doc); }
+  closeDocPreview(): void { this.docPreviewDoc.set(null); }
+
+  isImage(mime: string | null | undefined): boolean {
+    return !!(mime && mime.startsWith('image/'));
+  }
+  isPdf(mime: string | null | undefined): boolean {
+    return mime === 'application/pdf';
+  }
+  docUrl(doc: any): string {
+    if (!doc?.file_path) return '';
+    return `${environment.apiUrl}/storage/${doc.file_path}`;
+  }
+  docUrlSafe(doc: any): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));
   }
 }

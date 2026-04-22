@@ -493,17 +493,49 @@ final class ApprovalEngineService
     {
         $userRoleSlugs = $user->getRoles()->map(fn($r) => $r->getSlug())->toArray();
 
+        /*
+         * Global-authority mode — parallels the queue's global-visibility
+         * mode (see getQueue). A user with the 'loans.approve' permission
+         * can decide on ANY pending step, regardless of which role the
+         * step is routed to. Super Admin, Credit Manager, and similar
+         * elevated roles should be able to act on the queue they can see.
+         *
+         * Without this, a Super Admin with loans.approve saw loans in
+         * their queue but got 'No pending approval step found for your
+         * role' when they clicked Approve — the role-scoped decision
+         * check refused them even though the visibility check admitted
+         * them. Reported as 'decide endpoint returns No pending approval
+         * step found for your role from the approval queue' this session.
+         *
+         * For role-scoped users (no loans.approve permission), the
+         * original behavior applies — they can only decide on steps
+         * routed to their specific role.
+         */
+        $hasGlobalAuthority = $user->hasPermission('loans.approve');
+
         if ($workflow->getMode() === ApprovalMode::SEQUENTIAL) {
             // In sequential mode, only the next pending step can be acted on
             $next = $this->approvalRepo->findNextPending($loan->getId());
-            if ($next !== null && in_array($next->getStep()->getRole()->getSlug(), $userRoleSlugs, true)) {
+            if ($next === null) {
+                return null;
+            }
+            if ($hasGlobalAuthority) {
+                return $next;
+            }
+            if (in_array($next->getStep()->getRole()->getSlug(), $userRoleSlugs, true)) {
                 return $next;
             }
             return null;
         }
 
-        // Parallel mode — user can act on any pending step matching their role
+        // Parallel mode — user can act on any pending step matching their
+        // role (or any pending step at all if they have global authority).
         $pending = $this->approvalRepo->findAllPending($loan->getId());
+        if ($hasGlobalAuthority && !empty($pending)) {
+            // Global authority: act on the earliest-created pending step
+            // by default (matches the queue's sort order).
+            return $pending[0];
+        }
         foreach ($pending as $approval) {
             if (in_array($approval->getStep()->getRole()->getSlug(), $userRoleSlugs, true)) {
                 return $approval;

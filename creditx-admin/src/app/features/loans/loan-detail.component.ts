@@ -1,8 +1,10 @@
-import { Component, OnInit, signal, Input } from '@angular/core';
+import { Component, OnInit, inject, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
+import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -246,7 +248,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             } @else {
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 @for (doc of documents(); track doc.id) {
-                  <div class="cx-loan-doc-card">
+                  <button type="button" class="cx-loan-doc-card cx-loan-doc-clickable" (click)="openDocPreview(doc)">
                     <div class="cx-loan-doc-icon" [attr.data-mime]="docMimeCategory(doc.mime_type)">
                       <lucide-icon [name]="docIcon(doc.mime_type)" [size]="20"></lucide-icon>
                     </div>
@@ -259,8 +261,9 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                     </div>
                     <div class="cx-loan-doc-actions">
                       <cx-status-badge [status]="doc.status"></cx-status-badge>
+                      <lucide-icon name="eye" [size]="14" class="cx-loan-doc-eye"></lucide-icon>
                     </div>
-                  </div>
+                  </button>
                 }
               </div>
             }
@@ -282,6 +285,52 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
         </div>
       </div>
     </cx-form-dialog>
+
+    <!--
+      Document preview overlay. Shared pattern with approval-queue's
+      modal-overlay preview: backdrop + viewer card, supports images
+      inline, PDFs in iframe, everything else via download fallback.
+    -->
+    @if (docPreviewDoc(); as pd) {
+      <div class="cx-ld-doc-backdrop" (click)="closeDocPreview()"></div>
+      <div class="cx-ld-doc-viewer" role="dialog">
+        <div class="cx-ld-doc-viewer-head">
+          <div class="cx-ld-doc-viewer-meta">
+            <div class="cx-ld-doc-viewer-type">{{ prettyDocType(pd.type || pd.document_type) }}</div>
+            <div class="cx-ld-doc-viewer-name">{{ pd.file_name }}</div>
+          </div>
+          <div class="cx-ld-doc-viewer-actions">
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" target="_blank" rel="noopener" title="Open in new tab">
+              <lucide-icon name="external-link" [size]="14"></lucide-icon>
+            </a>
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" [download]="pd.file_name" title="Download">
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+            </a>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="closeDocPreview()" aria-label="Close preview">
+              <lucide-icon name="x" [size]="16"></lucide-icon>
+            </button>
+          </div>
+        </div>
+        <div class="cx-ld-doc-viewer-body">
+          @if (isImage(pd.mime_type)) {
+            <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-ld-doc-img" />
+          } @else if (isPdf(pd.mime_type)) {
+            <iframe [src]="docUrlSafe(pd)" class="cx-ld-doc-frame" frameborder="0"></iframe>
+          } @else {
+            <div class="cx-ld-doc-fallback">
+              <lucide-icon name="file-text" [size]="48"></lucide-icon>
+              <div class="cx-ld-doc-fallback-message">
+                This file type ({{ pd.mime_type || 'unknown' }}) can't be previewed inline.
+              </div>
+              <a class="cx-btn cx-btn-primary" [href]="docUrl(pd)" target="_blank" rel="noopener">
+                <lucide-icon name="download" [size]="14"></lucide-icon>
+                <span>Open file</span>
+              </a>
+            </div>
+          }
+        </div>
+      </div>
+    }
   `,
   styles: [`
     :host { display: block; }
@@ -445,6 +494,112 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
     }
     .cx-loan-doc-actions {
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    /*
+     * Clickable doc card — renders as a <button> so keyboard users can
+     * tab + Enter. Reset button defaults (background/border/text-align/
+     * font) so the content layout stays identical to the div version.
+     */
+    .cx-loan-doc-clickable {
+      width: 100%;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+    }
+    .cx-loan-doc-eye {
+      color: var(--cx-text-muted);
+    }
+
+    /* ═══ Document preview overlay ═══
+     * Same pattern as approval-queue's overlay: backdrop + centered
+     * viewer, dark body, image / iframe / fallback switch. See that
+     * component for the authoritative style decisions.
+     */
+    .cx-ld-doc-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 110;
+      backdrop-filter: blur(4px);
+    }
+    .cx-ld-doc-viewer {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(1100px, 90vw);
+      height: 90vh;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 16px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4);
+      z-index: 111;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    @media (max-width: 640px) {
+      .cx-ld-doc-viewer {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+      }
+    }
+    .cx-ld-doc-viewer-head {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--cx-border);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .cx-ld-doc-viewer-meta { flex: 1; min-width: 0; }
+    .cx-ld-doc-viewer-type {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-ld-doc-viewer-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--cx-text);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-ld-doc-viewer-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .cx-ld-doc-viewer-body {
+      flex: 1;
+      overflow: auto;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    .cx-ld-doc-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .cx-ld-doc-frame { width: 100%; height: 100%; background: #fff; border: none; }
+    .cx-ld-doc-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: #fff;
+      padding: 48px;
+      text-align: center;
+    }
+    .cx-ld-doc-fallback-message {
+      font-size: 14px;
+      max-width: 360px;
+      line-height: 1.5;
     }
   `],
 })
@@ -617,4 +772,34 @@ export class LoanDetailComponent implements OnInit {
   }
 
   private fmt(n: any): string { return Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+  // ─── Document preview ───
+  docPreviewDoc = signal<any>(null);
+  private sanitizer = inject(DomSanitizer);
+
+  openDocPreview(doc: any): void { this.docPreviewDoc.set(doc); }
+  closeDocPreview(): void { this.docPreviewDoc.set(null); }
+
+  isImage(mime: string | null | undefined): boolean {
+    return !!(mime && mime.startsWith('image/'));
+  }
+
+  isPdf(mime: string | null | undefined): boolean {
+    return mime === 'application/pdf';
+  }
+
+  /**
+   * Build a serve URL for a document. Uses the backend's
+   * /api/storage/{path:.*} unauthenticated streaming endpoint that
+   * returns the file with the right Content-Type. environment.apiUrl
+   * already includes the /api prefix.
+   */
+  docUrl(doc: any): string {
+    if (!doc?.file_path) return '';
+    return `${environment.apiUrl}/storage/${doc.file_path}`;
+  }
+
+  docUrlSafe(doc: any): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));
+  }
 }

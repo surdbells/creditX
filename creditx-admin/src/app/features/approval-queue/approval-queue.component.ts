@@ -1,7 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
+import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -244,11 +246,14 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                 <h3 class="cx-aq-section-title">Documents</h3>
                 <div class="cx-aq-docs">
                   @for (doc of l.documents; track doc.id) {
-                    <div class="cx-aq-doc">
-                      <lucide-icon name="file-text" [size]="14"></lucide-icon>
+                    <button type="button" class="cx-aq-doc cx-aq-doc-clickable" (click)="openDocPreview(doc)">
+                      <lucide-icon [name]="docIcon(doc.mime_type)" [size]="14"></lucide-icon>
                       <span class="cx-aq-doc-type">{{ prettyDocType(doc.document_type || doc.type) }}</span>
                       <span class="cx-aq-doc-name">{{ doc.file_name || '—' }}</span>
-                    </div>
+                      <span class="cx-aq-doc-open">
+                        <lucide-icon name="eye" [size]="12"></lucide-icon>
+                      </span>
+                    </button>
                   }
                 </div>
               </section>
@@ -356,6 +361,54 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                   <span>Confirm Approval</span>
                 </button>
               </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!--
+      Document preview overlay. Sits on top of the review modal when
+      the reviewer clicks a document in the docs section. Images
+      render inline via <img>, PDFs via <iframe>, anything else
+      falls back to a download link. Dark backdrop, close button
+      returns to the review modal.
+    -->
+    @if (docPreviewDoc(); as pd) {
+      <div class="cx-aq-doc-backdrop" (click)="closeDocPreview()"></div>
+      <div class="cx-aq-doc-viewer" role="dialog">
+        <div class="cx-aq-doc-viewer-head">
+          <div class="cx-aq-doc-viewer-meta">
+            <div class="cx-aq-doc-viewer-type">{{ prettyDocType(pd.document_type || pd.type) }}</div>
+            <div class="cx-aq-doc-viewer-name">{{ pd.file_name }}</div>
+          </div>
+          <div class="cx-aq-doc-viewer-actions">
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" target="_blank" rel="noopener" title="Open in new tab">
+              <lucide-icon name="external-link" [size]="14"></lucide-icon>
+            </a>
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" [download]="pd.file_name" title="Download">
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+            </a>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="closeDocPreview()" aria-label="Close preview">
+              <lucide-icon name="x" [size]="16"></lucide-icon>
+            </button>
+          </div>
+        </div>
+        <div class="cx-aq-doc-viewer-body">
+          @if (isImage(pd.mime_type)) {
+            <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-aq-doc-img" />
+          } @else if (isPdf(pd.mime_type)) {
+            <iframe [src]="docUrlSafe(pd)" class="cx-aq-doc-frame" frameborder="0"></iframe>
+          } @else {
+            <div class="cx-aq-doc-fallback">
+              <lucide-icon name="file-text" [size]="48"></lucide-icon>
+              <div class="cx-aq-doc-fallback-message">
+                This file type ({{ pd.mime_type || 'unknown' }}) can't be previewed inline.
+              </div>
+              <a class="cx-btn cx-btn-primary" [href]="docUrl(pd)" target="_blank" rel="noopener">
+                <lucide-icon name="download" [size]="14"></lucide-icon>
+                <span>Open file</span>
+              </a>
             </div>
           }
         </div>
@@ -598,6 +651,28 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       font-size: 13px;
       color: var(--cx-text);
     }
+    /*
+     * Clickable doc row — renders as a <button> so keyboard users can
+     * tab to it and hit Enter to preview. Full-width left-aligned text
+     * plus a subtle hover to signal interactivity.
+     */
+    .cx-aq-doc-clickable {
+      width: 100%;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      transition: background 120ms;
+      font-family: inherit;
+    }
+    .cx-aq-doc-clickable:hover {
+      background: var(--cx-surface-hover, var(--cx-stone-100));
+    }
+    .cx-aq-doc-open {
+      margin-left: auto;
+      color: var(--cx-text-muted);
+      display: flex;
+      align-items: center;
+    }
     .cx-aq-doc-type { font-weight: 500; }
     .cx-aq-doc-name { color: var(--cx-text-muted); font-size: 12px; }
     .cx-aq-empty {
@@ -607,6 +682,107 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       font-size: 13px;
       background: var(--cx-surface-2);
       border-radius: var(--cx-radius-md);
+    }
+
+    /* ═══ Document preview overlay ═══
+     *
+     * Sits on TOP of the review modal (z-index 110 > modal 101). The
+     * review modal stays mounted underneath so closing the preview
+     * returns the reviewer to exactly where they were in the modal.
+     */
+    .cx-aq-doc-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 110;
+      backdrop-filter: blur(4px);
+    }
+    .cx-aq-doc-viewer {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(1100px, 90vw);
+      height: 90vh;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 16px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4);
+      z-index: 111;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    @media (max-width: 640px) {
+      .cx-aq-doc-viewer {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+      }
+    }
+    .cx-aq-doc-viewer-head {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--cx-border);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .cx-aq-doc-viewer-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .cx-aq-doc-viewer-type {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-aq-doc-viewer-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--cx-text);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-aq-doc-viewer-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .cx-aq-doc-viewer-body {
+      flex: 1;
+      overflow: auto;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    .cx-aq-doc-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .cx-aq-doc-frame {
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      border: none;
+    }
+    .cx-aq-doc-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      color: #fff;
+      padding: 48px;
+      text-align: center;
+    }
+    .cx-aq-doc-fallback-message {
+      font-size: 14px;
+      max-width: 360px;
+      line-height: 1.5;
     }
 
     /* Timeline */
@@ -720,6 +896,11 @@ export class ApprovalQueueComponent implements OnInit {
   detailLoading = signal(false);
   deciding = signal(false);
   comment = '';
+
+  // Document preview overlay — sits on top of the review modal
+  docPreviewDoc = signal<any>(null);
+
+  private sanitizer = inject(DomSanitizer);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
@@ -874,5 +1055,63 @@ export class ApprovalQueueComponent implements OnInit {
     };
     if (special[type]) return special[type];
     return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  /**
+   * Return a registered lucide icon name based on the document's MIME.
+   * Constrained to icons already in app.config.ts LucideAngularModule.pick.
+   * Images fall back to 'file-text' rather than requiring a new icon
+   * registration — the MIME-tinted background in the doc row already
+   * visually distinguishes images from PDFs.
+   */
+  docIcon(mime: string | null | undefined): string {
+    if (!mime) return 'file-text';
+    if (mime.includes('sheet') || mime.includes('excel')) return 'file-spreadsheet';
+    return 'file-text';
+  }
+
+  isImage(mime: string | null | undefined): boolean {
+    return !!(mime && mime.startsWith('image/'));
+  }
+
+  isPdf(mime: string | null | undefined): boolean {
+    return mime === 'application/pdf';
+  }
+
+  /**
+   * Build the serve URL for a document. The backend exposes
+   * /api/storage/{path:.*} which streams the file with the right
+   * Content-Type header (see ServeFileAction). environment.apiUrl
+   * already includes the /api prefix.
+   *
+   * Returns empty string for docs without a file_path so the <img>/
+   * <iframe> src remains empty rather than loading a broken path.
+   */
+  docUrl(doc: any): string {
+    if (!doc?.file_path) return '';
+    return `${environment.apiUrl}/storage/${doc.file_path}`;
+  }
+
+  /**
+   * SafeResourceUrl wrapper for <iframe src>. Angular's default
+   * security strips iframe URLs unless they're marked trusted. We
+   * only iframe PDFs served from our own backend, so bypassing is
+   * safe — the URL comes from our DB via our API, not user input.
+   */
+  docUrlSafe(doc: any): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));
+  }
+
+  /**
+   * Open a document in the preview overlay. The overlay sits on top
+   * of the review modal — the review stays mounted so closing the
+   * preview returns the reviewer right where they were.
+   */
+  openDocPreview(doc: any): void {
+    this.docPreviewDoc.set(doc);
+  }
+
+  closeDocPreview(): void {
+    this.docPreviewDoc.set(null);
   }
 }
