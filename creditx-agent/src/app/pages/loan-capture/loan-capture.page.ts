@@ -2141,7 +2141,21 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   // Per-document upload state: docKey -> { progress: 0-100, status: 'pending'|'uploading'|'done'|'error', error?: string }
   uploadStates = signal<Map<string, { progress: number; status: 'pending' | 'uploading' | 'done' | 'error'; error?: string }>>(new Map());
 
-  private uploadDocuments(loanId: string): void {
+  /**
+   * Upload all staged documents after a successful loan submit.
+   *
+   * The backend route is POST /api/documents/upload (NOT /documents —
+   * that path is GET-only for listing). The action requires a
+   * multipart payload with:
+   *   - file         (the binary)
+   *   - type         (DocumentType enum value — passport, id_card, etc.)
+   *   - customer_id  (REQUIRED — the document attaches to the customer)
+   *   - loan_id      (optional — links the doc to a specific loan)
+   *
+   * customer_id comes from the loan creation response; the agent
+   * captures it in submit() and threads it through to this method.
+   */
+  private uploadDocuments(loanId: string, customerId: string): void {
     const states = new Map(this.uploadStates());
     this.uploadedDocs.forEach((_, docType) => {
       states.set(docType, { progress: 0, status: 'pending' });
@@ -2152,11 +2166,12 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       const formData = new FormData();
       formData.append('file', doc.file);
       formData.append('type', docType);
+      formData.append('customer_id', customerId);
       formData.append('loan_id', loanId);
 
       this.setUploadState(docType, { progress: 0, status: 'uploading' });
 
-      this.api.uploadWithProgress(`/documents`, formData).subscribe({
+      this.api.uploadWithProgress(`/documents/upload`, formData).subscribe({
         next: (event: any) => {
           if (event.type === 1 /* HttpEventType.UploadProgress */ && event.total) {
             const pct = Math.round((event.loaded / event.total) * 100);
@@ -2185,13 +2200,15 @@ export class LoanCapturePage implements OnInit, OnDestroy {
 
   retryUpload(docKey: string, loanId: string): void {
     const doc = this.uploadedDocs.get(docKey);
-    if (!doc || !loanId) return;
+    const customerId = this.submittedCustomerId();
+    if (!doc || !loanId || !customerId) return;
     const formData = new FormData();
     formData.append('file', doc.file);
     formData.append('type', docKey);
+    formData.append('customer_id', customerId);
     formData.append('loan_id', loanId);
     this.setUploadState(docKey, { progress: 0, status: 'uploading' });
-    this.api.uploadWithProgress(`/documents`, formData).subscribe({
+    this.api.uploadWithProgress(`/documents/upload`, formData).subscribe({
       next: (event: any) => {
         if (event.type === 1 && event.total) {
           this.setUploadState(docKey, { progress: Math.round((event.loaded / event.total) * 100), status: 'uploading' });
@@ -2204,6 +2221,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   }
 
   submittedLoanId = signal<string | null>(null);
+  // Captured at loan-create time so the retry handler can re-upload
+  // without losing which customer the documents attach to.
+  submittedCustomerId = signal<string | null>(null);
   uploadsComplete = signal(false);
 
   /**
@@ -2307,9 +2327,11 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       next: res => {
         this.submitting.set(false);
         const loanId = res.data?.id || '';
+        const customerId = res.data?.customer_id || '';
         this.submittedLoanId.set(loanId);
-        if (loanId && this.uploadedDocs.size > 0) {
-          this.uploadDocuments(loanId);
+        this.submittedCustomerId.set(customerId);
+        if (loanId && customerId && this.uploadedDocs.size > 0) {
+          this.uploadDocuments(loanId, customerId);
           this.pollUploadsComplete(loanId);
         } else {
           this.router.navigate(['/loans', loanId]);
