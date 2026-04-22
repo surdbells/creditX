@@ -168,8 +168,75 @@ final class ApprovalEngineService
                     'step_name' => $approval->getStep()->getName(),
                     'action' => $action,
                     'user_id' => $loan->getAgentId(),
+                    // Reviewer's comment — drives the rejection-reason
+                    // template (see seed-loan-rejected-templates.php).
+                    // For approvals, comment is optional and may be null.
+                    // Template engine's missing-variable tolerance handles
+                    // the null case gracefully ({comment} renders empty).
+                    'comment' => $comment ?? '',
+                    // Reviewer name so the agent knows who decided
+                    'reviewer_name' => $user->getFullName(),
                 ], $loan->getAgentId(), $loan->getCustomer()->getId());
             } catch (\Exception $e) { /* notification failure should not block */ }
+        }
+
+        // ─── Auto-create loan-scoped conversation on rejection ───
+        //
+        // When a reviewer rejects a loan (either a mandatory step that
+        // fails the whole loan, or a non-mandatory step with a specific
+        // concern), the reason needs to reach the originating agent as
+        // a message they can see, respond to, and track. Notifications
+        // alone aren't enough — agents may want to follow up with the
+        // reviewer, and a DM thread gives them a place to do that.
+        //
+        // We only auto-create on rejection (not approval) because the
+        // approval path already dispatches a push + email + in-app
+        // notification, and there's typically no need for further
+        // conversation. Rejected loans almost always spark an agent
+        // question: 'why?' / 'how to fix?' / 'appeal?'.
+        //
+        // The conversation is scoped to the loan (loan_id set) so it
+        // shows up filterable in the agent's inbox alongside any other
+        // messages about the loan.
+        if ($action === 'reject' && $comment && $loan->getAgentId()) {
+            try {
+                $agent = $this->em->getRepository(\App\Domain\Entity\User::class)
+                    ->find($loan->getAgentId());
+                if ($agent !== null) {
+                    $conv = new \App\Domain\Entity\Conversation();
+                    $conv->setAgent($agent);
+                    $conv->setLoanId($loan->getId());
+
+                    // Subject mirrors the loan-reject template's tone —
+                    // scannable at a glance in the inbox list.
+                    $subject = $result['loan_status'] === LoanStatus::REJECTED->value
+                        ? "Loan {$loan->getApplicationId()} rejected"
+                        : "Step '{$approval->getStep()->getName()}' rejected for {$loan->getApplicationId()}";
+                    $conv->setSubject($subject);
+
+                    // Message body carries the reviewer's reason verbatim
+                    // plus context so the agent doesn't have to go look
+                    // anything up.
+                    $msg = new \App\Domain\Entity\Message();
+                    $msg->setSenderId($user->getId());
+                    $body = "Your loan application {$loan->getApplicationId()} "
+                        . "for {$loan->getCustomer()->getFullName()} "
+                        . "was rejected at the '{$approval->getStep()->getName()}' step "
+                        . "by {$user->getFullName()}.\n\n"
+                        . "Reason:\n{$comment}";
+                    $msg->setBody($body);
+                    $conv->addMessage($msg);
+
+                    $this->em->persist($conv);
+                    $this->em->flush();
+                }
+            } catch (\Exception $e) {
+                // Conversation creation is best-effort. The notification
+                // went out; if the DM fails (e.g. orphaned agent_id),
+                // the agent still gets the push/email. Don't let this
+                // secondary channel failure block the primary decision
+                // from committing.
+            }
         }
 
         return $result;
