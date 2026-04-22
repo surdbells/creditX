@@ -644,15 +644,42 @@ export class LoanDetailPage implements OnInit {
 
   ngOnInit(): void {
     if (this.id) {
-      this.api.get(`/loans/${this.id}`).subscribe({
-        next: res => { this.loan.set(res.data); this.loading.set(false); },
-        error: () => this.loading.set(false),
-      });
-      this.api.get(`/approvals/loan/${this.id}`).subscribe({
-        next: res => this.approvals.set(res.data || []),
-        error: () => {},
-      });
+      this.loadLoan();
     }
+  }
+
+  /**
+   * Ionic lifecycle: fires every time the page becomes the active
+   * page in the navigation stack — including when navigating back
+   * to it from an edit wizard. ngOnInit only fires once (on first
+   * mount), so we use this hook to re-fetch fresh data on return.
+   *
+   * Guard against running before ngOnInit has set up (the hook can
+   * fire before the first ngOnInit on fast enters). If id is set
+   * AND loan is already non-null, it's a re-entry and we should
+   * refetch. If loan is null, ngOnInit is handling the initial load.
+   */
+  ionViewWillEnter(): void {
+    if (this.id && this.loan() !== null) {
+      this.loadLoan();
+    }
+  }
+
+  /**
+   * Fetch loan + approvals and populate the signals. Factored out
+   * so both ngOnInit and ionViewWillEnter can reuse the same code
+   * path instead of duplicating the subscription setup.
+   */
+  private loadLoan(): void {
+    this.loading.set(true);
+    this.api.get(`/loans/${this.id}`).subscribe({
+      next: res => { this.loan.set(res.data); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+    this.api.get(`/approvals/loan/${this.id}`).subscribe({
+      next: res => this.approvals.set(res.data || []),
+      error: () => {},
+    });
   }
 
   /**

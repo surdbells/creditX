@@ -562,10 +562,10 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                 <div class="cxm-lc-doc">
                   <div class="cxm-lc-doc-head">
                     <span class="cxm-lc-doc-name">{{ docType.label }}</span>
-                    @if (getUploadedDoc(docType.key)) {
-                      <span class="cxm-status" data-tone="success">
+                    @if (getUploadedDoc(docType.key); as dd) {
+                      <span class="cxm-status" [attr.data-tone]="isExistingDoc(dd) ? 'info' : 'success'">
                         <span class="cxm-status-dot"></span>
-                        <span>Ready</span>
+                        <span>{{ isExistingDoc(dd) ? 'Already uploaded' : 'Ready' }}</span>
                       </span>
                     }
                   </div>
@@ -576,11 +576,33 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                       </div>
                       <div class="cxm-lc-doc-selected-meta">
                         <div class="cxm-lc-doc-selected-name">{{ docFile.name }}</div>
-                        <div class="cxm-lc-doc-selected-size tabular-nums">{{ formatFileSize(docFile.file.size) }}</div>
+                        @if (isExistingDoc(docFile)) {
+                          <div class="cxm-lc-doc-selected-size" style="color: var(--cx-text-muted); font-size: 11px">
+                            Saved on server · Tap Replace to upload a new file
+                          </div>
+                        } @else {
+                          <div class="cxm-lc-doc-selected-size tabular-nums">{{ formatFileSize(docFile.file?.size || 0) }}</div>
+                        }
                       </div>
-                      <button type="button" class="cxm-lc-doc-remove" (click)="removeUpload(docType.key)" aria-label="Remove">
-                        <ion-icon name="close" style="font-size: 16px"></ion-icon>
-                      </button>
+                      @if (isExistingDoc(docFile)) {
+                        <!--
+                          Existing docs get a Replace button (relabels the
+                          file input) instead of a Remove button. Removing
+                          an existing doc via the wizard would put the loan
+                          in a bad state (3 of 4 required docs) without a
+                          clear recovery path — we don't expose that.
+                          Replace lets the agent swap the file; the old
+                          server-side record stays attached until Save.
+                        -->
+                        <label class="cxm-lc-doc-remove" aria-label="Replace" style="cursor: pointer">
+                          <input type="file" class="hidden" [accept]="docType.accept" (change)="onFileSelected($event, docType.key)" />
+                          <ion-icon name="refresh-outline" style="font-size: 16px"></ion-icon>
+                        </label>
+                      } @else {
+                        <button type="button" class="cxm-lc-doc-remove" (click)="removeUpload(docType.key)" aria-label="Remove">
+                          <ion-icon name="close" style="font-size: 16px"></ion-icon>
+                        </button>
+                      }
                     </div>
                   } @else {
                     <label class="cxm-lc-doc-drop">
@@ -1822,7 +1844,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     nok_full_name: '', nok_phone: '', nok_address: '', nok_relationship: '',
   };
 
-  uploadedDocs: Map<string, {name: string; file: File}> = new Map();
+  uploadedDocs: Map<string, {name: string; file?: File; existing?: boolean; documentId?: string}> = new Map();
   uploadError = signal<string|null>(null);
   docTypes = [
     { key: 'passport', label: 'Passport Photograph', accept: 'image/*' },
@@ -2398,8 +2420,19 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     }, 100);
   }
 
-  getUploadedDoc(key: string): {name: string; file: File} | undefined {
-    return this.uploadedDocs.get(key);
+  getUploadedDoc(key: string): {name: string; file?: File; existing?: boolean; documentId?: string} | undefined {
+    return this.uploadedDocs.get(key) as any;
+  }
+
+  /**
+   * True when an uploadedDocs entry came from the loan's existing
+   * documents rather than a File picked this session. Drives the
+   * Step 4 UI distinction — existing entries show 'Already uploaded'
+   * and a Replace button; newly staged entries show the file size
+   * and a Remove button.
+   */
+  isExistingDoc(doc: any): boolean {
+    return !!(doc && doc.existing === true);
   }
 
   formatFileSize(bytes: number): string {
@@ -2505,7 +2538,10 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   retryUpload(docKey: string, loanId: string): void {
     const doc = this.uploadedDocs.get(docKey);
     const customerId = this.submittedCustomerId();
-    if (!doc || !loanId || !customerId) return;
+    // Retry only applies to newly-uploaded files that failed. Existing
+    // docs don't need retrying — they're already on the server. Guard
+    // on doc.file being present (narrows the ?File type for append).
+    if (!doc || !doc.file || !loanId || !customerId) return;
     const formData = new FormData();
     formData.append('file', doc.file);
     formData.append('type', docKey);
