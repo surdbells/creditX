@@ -12,6 +12,25 @@ class GeneralLedgerRepository extends BaseRepository
 
     public function findByAccountNumber(string $num): ?GeneralLedger { return $this->findOneBy(['accountNumber' => $num]); }
 
+    /**
+     * Find all active GL accounts of a given type. Used by the
+     * disbursement preview to populate the settlement-account dropdown
+     * (ASSET accounts like bank/cash are eligible settlement GLs).
+     *
+     * @return GeneralLedger[]
+     */
+    public function findByAccountType(\App\Domain\Enum\AccountType $type): array
+    {
+        return $this->em->createQueryBuilder()
+            ->select('g')->from(GeneralLedger::class, 'g')
+            ->where('g.accountType = :type')
+            ->andWhere('g.isActive = true')
+            ->orderBy('g.accountCode', 'ASC')
+            ->setParameter('type', $type->value)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function codeExists(string $code, ?string $excludeId = null): bool
     {
         $qb = $this->em->createQueryBuilder()->select('COUNT(g.id)')->from(GeneralLedger::class, 'g')

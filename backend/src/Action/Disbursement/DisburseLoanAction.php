@@ -29,6 +29,15 @@ final class DisburseLoanAction
         $data = (array) ($request->getParsedBody() ?? []);
         $settlementGlId = $data['settlement_gl_id'] ?? '';
         $effectiveDate = $data['effective_date'] ?? date('Y-m-d');
+        // Optional top-up override from the disbursement dialog. Null
+        // means 'use the capture-time value'. Empty-string is treated
+        // as null too — the UI sends '' when the admin leaves the
+        // field untouched. Numeric zero is a meaningful value (means
+        // 'no top-up applies') and is preserved.
+        $topUpOverrideRaw = $data['top_up_balance'] ?? null;
+        $topUpOverride = ($topUpOverrideRaw === null || $topUpOverrideRaw === '')
+            ? null
+            : (string) $topUpOverrideRaw;
 
         if ($settlementGlId === '') return $this->validationError(['settlement_gl_id' => 'Settlement GL account is required']);
 
@@ -60,7 +69,7 @@ final class DisburseLoanAction
         }
 
         try {
-            $result = $this->disbService->disburse($loan, $settlementGlId, $effectiveDate, $userId);
+            $result = $this->disbService->disburse($loan, $settlementGlId, $effectiveDate, $userId, $topUpOverride);
         } catch (\App\Domain\Exception\DomainException $e) {
             return $this->error($e->getMessage(), 400);
         }

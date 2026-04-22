@@ -328,6 +328,10 @@ return function (App $app): void {
             ->add(new RbacMiddleware('loans.view'));
 
         // ─── Disbursement ───
+        $api->get('/loans/{id}/disbursement-preview', Disbursement\DisbursementPreviewAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
+        $api->get('/disbursement-queue', Disbursement\DisbursementQueueAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
         $api->post('/loans/{id}/disburse', Disbursement\DisburseLoanAction::class)
             ->add(new RbacMiddleware('loans.disburse'));
 

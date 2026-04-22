@@ -35,9 +35,21 @@ final class DisbursementService
      * @param string $settlementGlId GL account for settlement (bank/cash)
      * @param string $effectiveDate Disbursement effective date (Y-m-d)
      * @param string|null $userId The user performing disbursement
+     * @param string|null $topUpBalanceOverride Optional override for the
+     *        top-up balance originally captured at submission. When provided
+     *        (from DisbursementPreviewAction's auto-detect or a manual entry
+     *        on the disburse dialog), the loan's captured top-up balance is
+     *        replaced and the calculation re-run before posting. Pass null
+     *        to preserve the capture-time value.
      * @throws DomainException
      */
-    public function disburse(Loan $loan, string $settlementGlId, string $effectiveDate, ?string $userId = null): array
+    public function disburse(
+        Loan $loan,
+        string $settlementGlId,
+        string $effectiveDate,
+        ?string $userId = null,
+        ?string $topUpBalanceOverride = null,
+    ): array
     {
         if ($loan->getStatus() !== LoanStatus::APPROVED) {
             throw new DomainException('Loan must be in Approved status to disburse');
@@ -51,6 +63,44 @@ final class DisbursementService
         $transaction = $loan->getTransaction();
         if ($transaction === null) {
             throw new DomainException('Loan transaction record not found');
+        }
+
+        /*
+         * Apply top-up balance override if provided.
+         *
+         * At capture time, the agent enters (or the system auto-detects)
+         * the customer's outstanding balance from their prior loan. That
+         * value is stored on LoanTransaction.topUpBalance and is what
+         * drives net_disbursed = gross - fees - top_up.
+         *
+         * Between capture and disbursement (which can be days or weeks
+         * depending on the approval workflow), the customer may have
+         * continued paying down their prior loan. The admin disbursement
+         * dialog re-detects the current outstanding balance and can pass
+         * it here as an override.
+         *
+         * When overridden, we:
+         *   1. Update LoanTransaction.topUpBalance
+         *   2. Update Loan.topUpBalance (kept in sync)
+         *   3. Re-run LoanCalculationService to compute fresh net_disbursed
+         *   4. Update LoanTransaction.netDisbursed
+         *
+         * The fee breakdown is NOT recalculated — fees are a function of
+         * gross loan and product config, not top-up. Only the DR/CR net
+         * disbursed and B/F top-up amounts change based on the override.
+         */
+        if ($topUpBalanceOverride !== null) {
+            $newTopUp = number_format((float) $topUpBalanceOverride, 2, '.', '');
+            $calc = $this->calcService->calculate(
+                $loan->getProduct(),
+                $loan->getAmountRequested(),
+                $loan->getTenure(),
+                $loan->getBankStatementMode(),
+                $newTopUp,
+            );
+            $transaction->setTopUpBalance($newTopUp);
+            $transaction->setNetDisbursed($calc['net_disbursed']);
+            $loan->setTopUpBalance(bccomp($newTopUp, '0.00', 2) > 0 ? $newTopUp : null);
         }
 
         $callback = 'DISB-' . $loan->getApplicationId() . '-' . date('YmdHis');
