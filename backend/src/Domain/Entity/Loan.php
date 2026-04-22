@@ -300,6 +300,19 @@ class Loan
             $data['transaction'] = $this->transaction?->toArray();
             $data['fee_breakdowns'] = $this->feeBreakdowns->map(fn(LoanFeeBreakdown $f) => $f->toArray())->toArray();
             $data['trails'] = $this->trails->map(fn(LoanTrail $t) => $t->toArray())->toArray();
+            // Full customer object with all 36+ fields — consumed by the
+            // agent edit-loan wizard to pre-populate Step 3. The existing
+            // flattened customer_id / customer_name / customer_staff_id
+            // fields above are kept for backward compatibility (loan list
+            // renders, approval queue, etc. rely on them).
+            $data['customer'] = $this->customer->toArray();
+            // Next-of-kin array — the agent wizard captures one NOK in
+            // Step 3, but the customer may have multiple NOKs from earlier
+            // loans. We return them all; the edit wizard renders the
+            // first one editable and indicates if there are more.
+            $data['next_of_kin'] = $this->customer->getNextOfKins()->map(
+                fn(NextOfKin $n) => $n->toArray()
+            )->toArray();
         }
 
         return $data;
