@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -16,12 +16,21 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
-        <ion-buttons slot="start"><ion-back-button defaultHref="/loans"></ion-back-button></ion-buttons>
-        <ion-title>New Application</ion-title>
+        <ion-buttons slot="start"><ion-back-button [defaultHref]="isEditMode() ? ('/loans/' + id) : '/loans'"></ion-back-button></ion-buttons>
+        <ion-title>{{ isEditMode() ? 'Edit Loan' : 'New Application' }}</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content [fullscreen]="true">
-      @if (agentBlocked()) {
+      @if (editLoading()) {
+        <!--
+          Edit-mode hydration is in flight. Block the form so the agent
+          doesn't type into fields that are about to be overwritten.
+        -->
+        <div class="cxm-empty cxm-lc-blocked">
+          <ion-spinner name="crescent" style="width: 32px; height: 32px"></ion-spinner>
+          <div class="cxm-empty-title" style="margin-top: 16px">Loading loan...</div>
+        </div>
+      } @else if (agentBlocked()) {
         <div class="cxm-empty cxm-lc-blocked">
           <div class="cxm-empty-icon" style="background: var(--cx-danger-50); color: var(--cx-danger)">
             <ion-icon name="close-circle-outline" style="font-size: 28px"></ion-icon>
@@ -33,7 +42,13 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
       } @else {
         <!-- Page header -->
         <div class="cxm-page-header cx-animate-in" style="padding-bottom: 12px">
-          <div class="cxm-eyebrow cxm-eyebrow-primary">Step {{ step() + 1 }} of {{ stepLabels.length }}</div>
+          <div class="cxm-eyebrow cxm-eyebrow-primary">
+            @if (isEditMode()) {
+              Editing {{ editLoan()?.application_id || 'loan' }}
+            } @else {
+              Step {{ step() + 1 }} of {{ stepLabels.length }}
+            }
+          </div>
           <h1 class="cxm-title">{{ stepLabels[step()] }}</h1>
           <p class="cxm-subtitle">{{ stepHints[step()] }}</p>
         </div>
@@ -1013,10 +1028,10 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                       [disabled]="submitting() || !canSubmit()" (click)="submit()">
                 @if (submitting()) {
                   <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
-                  <span>Submitting...</span>
+                  <span>{{ isEditMode() ? 'Saving...' : 'Submitting...' }}</span>
                 } @else {
                   <ion-icon name="checkmark-circle-outline" style="font-size: 16px"></ion-icon>
-                  <span>Submit Application</span>
+                  <span>{{ isEditMode() ? 'Save Changes' : 'Submit Application' }}</span>
                 }
               </button>
             }
@@ -1728,6 +1743,39 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
   `],
 })
 export class LoanCapturePage implements OnInit, OnDestroy {
+  /**
+   * Route parameter binding. When the route is /loans/:id/edit this
+   * gets populated with the loan id; when /loans/new it stays empty.
+   * withComponentInputBinding (enabled in app.config.ts, commit A) wires
+   * URL params to @Input properties automatically — no ActivatedRoute
+   * injection needed.
+   *
+   * Edit vs create mode is derived from whether id has a value.
+   */
+  @Input() id = '';
+
+  /**
+   * True when the page is hydrating an existing loan for editing.
+   * Set once when the route param arrives; stays stable for the
+   * lifetime of the component.
+   */
+  isEditMode = computed(() => !!this.id);
+
+  /**
+   * Loading flag for the initial hydration in edit mode. While this
+   * is true, the wizard shows a spinner instead of the form so the
+   * agent doesn't start typing into empty fields that are about to
+   * be overwritten by the fetch result.
+   */
+  editLoading = signal(false);
+
+  /**
+   * The fetched loan payload. Held here for reference (e.g. the
+   * page header shows the application_id when editing, and the
+   * submit handler uses it to know the loan exists).
+   */
+  editLoan = signal<any>(null);
+
   step = signal(0);
   stepLabels = ['Product', 'Staff', 'Details', 'Info', 'Docs', 'Review'];
   stepHints = [
@@ -1862,22 +1910,30 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // First check fires immediately so the 'Paused' state appears on
-    // first render rather than after a 15s delay.
-    this.refreshPauseState();
+    // Edit mode: pause-guard is irrelevant (agent is editing an existing
+    // loan, not intaking a new one). Skip the poll setup and the
+    // synchronous first-check so editing works even when the admin has
+    // paused intake. The pause guard exists to stop NEW applications;
+    // updating an already-captured loan is a legitimate workflow even
+    // during pauses.
+    if (!this.isEditMode()) {
+      // First check fires immediately so the 'Paused' state appears on
+      // first render rather than after a 15s delay.
+      this.refreshPauseState();
 
-    // Poll every 15s so admin pauses propagate to agents who left the
-    // app open on this page. 15s is a balance — faster wastes battery
-    // and bandwidth, slower feels stale.
-    this.pauseCheckTimer = setInterval(() => this.refreshPauseState(), this.PAUSE_CHECK_INTERVAL_MS);
+      // Poll every 15s so admin pauses propagate to agents who left the
+      // app open on this page. 15s is a balance — faster wastes battery
+      // and bandwidth, slower feels stale.
+      this.pauseCheckTimer = setInterval(() => this.refreshPauseState(), this.PAUSE_CHECK_INTERVAL_MS);
 
-    // Re-check whenever the tab regains focus / the app comes back to
-    // foreground. Polling timers pause in backgrounded tabs/apps on
-    // many platforms; this guarantees that switching back to a stale
-    // tab triggers an immediate refresh before any interaction.
-    this.onFocusListener = () => this.refreshPauseState();
-    window.addEventListener('focus', this.onFocusListener);
-    document.addEventListener('visibilitychange', this.onFocusListener);
+      // Re-check whenever the tab regains focus / the app comes back to
+      // foreground. Polling timers pause in backgrounded tabs/apps on
+      // many platforms; this guarantees that switching back to a stale
+      // tab triggers an immediate refresh before any interaction.
+      this.onFocusListener = () => this.refreshPauseState();
+      window.addEventListener('focus', this.onFocusListener);
+      document.addEventListener('visibilitychange', this.onFocusListener);
+    }
 
     this.api.get('/loan-products', { per_page: 50, is_active: true }).subscribe({
       next: res => { this.products.set(res.data || []); this.productsLoading.set(false); },
@@ -1887,6 +1943,175 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     this.api.get('/banks').subscribe({
       next: res => this.banks.set(res.data || []),
       error: () => {},
+    });
+
+    // Edit-mode hydration. Fetch the loan and populate everything.
+    if (this.isEditMode()) {
+      this.hydrateForEdit();
+    }
+  }
+
+  /**
+   * Fetch the loan by id and populate form, signals, and existing-docs
+   * state so the wizard is ready to be edited.
+   *
+   * Skips forward to Step 3 (Details) on success — product + staff
+   * lookup steps are inapplicable in edit mode (product is immutable
+   * via the agent wizard, customer can't be changed per session
+   * decision).
+   *
+   * On error: toast fires via the API error interceptor. We navigate
+   * back to the detail page so the agent isn't stuck on an empty
+   * wizard.
+   */
+  private hydrateForEdit(): void {
+    this.editLoading.set(true);
+    this.api.get(`/loans/${this.id}`).subscribe({
+      next: res => {
+        const loan = res.data;
+        if (!loan) {
+          this.editLoading.set(false);
+          this.router.navigate(['/loans']);
+          return;
+        }
+        this.editLoan.set(loan);
+
+        // ── Hydrate form from loan + customer ─────────────────────
+        const c = loan.customer || {};
+        const nokArr = Array.isArray(loan.next_of_kin) ? loan.next_of_kin : [];
+        const nok = nokArr[0] || {};
+
+        this.form['product_id'] = loan.product_id || '';
+        this.form['amount'] = loan.amount_requested || '';
+        this.form['tenure'] = String(loan.tenure || '');
+        // Loan-level metadata
+        this.form['bank_statement_mode'] = loan.bank_statement_mode || '';
+        this.form['loan_amount_words'] = loan.loan_amount_words || '';
+        this.form['loan_purpose'] = loan.loan_purpose || '';
+        this.form['repayment_method'] = loan.repayment_method || '';
+        this.form['account_statement_id'] = loan.account_statement_id || '';
+        // account_statement_password is intentionally not returned by
+        // the backend (Loan::toArray redacts it). Leave blank; the agent
+        // re-enters if they want to change it, otherwise it stays as-is
+        // on the server via the partial-update semantics.
+
+        // Customer core
+        this.form['staff_id'] = c.staff_id || '';
+        this.form['full_name'] = c.full_name || '';
+        this.form['date_of_birth'] = c.dob || '';
+        this.form['gender'] = c.gender || '';
+        this.form['marital_status'] = c.marital_status || '';
+        this.form['number_of_children'] = c.number_of_children != null ? String(c.number_of_children) : '';
+        this.form['bvn'] = c.bvn || '';
+        this.form['mothers_maiden_name'] = c.mothers_maiden_name || '';
+        this.form['religion'] = c.religion || '';
+        // Customer contact
+        this.form['phone'] = c.phone || '';
+        this.form['alt_phone'] = c.alt_phone || '';
+        this.form['email'] = c.email || '';
+        this.form['home_address'] = c.home_address || '';
+        this.form['permanent_address'] = c.permanent_address || '';
+        this.form['state_of_origin'] = c.state_of_origin || '';
+        this.form['lga'] = c.lga || '';
+        this.form['hometown'] = c.hometown || '';
+        // If state is populated, recompute the available LGAs so the
+        // dropdown isn't empty when the agent looks at it.
+        if (c.state_of_origin) {
+          this.availableLgas.set(getLgasForState(c.state_of_origin));
+        }
+        // Customer employment
+        this.form['employee_id'] = c.staff_id || '';
+        this.form['gross_pay'] = c.gross_pay != null ? String(c.gross_pay) : '';
+        this.form['job_title'] = c.job_title || '';
+        this.form['employer'] = c.employer || '';
+        this.form['organization'] = c.organization || '';
+        this.form['command'] = c.command || '';
+        this.form['employment_date'] = c.employment_date || '';
+        this.form['id_type'] = c.id_type || '';
+        this.form['work_id_number'] = c.work_id_number || '';
+        this.form['work_id_issued_date'] = c.work_id_issued_date || '';
+        this.form['work_id_expiry_date'] = c.work_id_expiry_date || '';
+        // Customer bank
+        this.form['bank_name'] = c.bank_name || '';
+        this.form['account_number'] = c.account_number || '';
+        this.form['alt_bank_name'] = c.alt_bank_name || '';
+        this.form['alt_account_number'] = c.alt_account_number || '';
+        this.form['alt_account_name'] = c.alt_account_name || '';
+        // NOK (first one — the wizard only edits one)
+        this.form['nok_full_name'] = nok.full_name || '';
+        this.form['nok_phone'] = nok.phone || '';
+        this.form['nok_address'] = nok.address || '';
+        this.form['nok_relationship'] = nok.relationship || '';
+
+        // ── Signals ────────────────────────────────────────────────
+        this.existingCustomer.set(c);
+        // Synthesize a staffRecord shape from customer data so any UI
+        // that reads staffRecord() (Step 3 header, review sections)
+        // gets the data it expects. The gross_pay / net_pay aren't
+        // stored on Customer — show whatever's on the record + sensible
+        // fallbacks so UI doesn't break with 'undefined'.
+        this.staffRecord.set({
+          employee_id: c.staff_id || '',
+          employee_name: c.full_name || '',
+          job_title: c.job_title || '',
+          organization: c.organization || '',
+          gross_pay: c.gross_pay != null ? Number(c.gross_pay) : 0,
+          net_pay: 0, // not stored on Customer; UI tolerant
+        });
+
+        // Transaction → calcResult (so the numbers on Step 3 / Review
+        // show without forcing a recalculate). If transaction is missing
+        // (shouldn't be but defensive), leave calcResult null.
+        if (loan.transaction) {
+          this.calcResult.set({
+            gross_loan: loan.gross_loan,
+            net_disbursed: loan.net_disbursed,
+            interest_rate: loan.interest_rate,
+            fee_details: loan.fee_breakdowns || [],
+            transaction: loan.transaction,
+          });
+        }
+
+        // ── Existing documents: mark as staged so the Step 4 gate is
+        // satisfied when the loan was captured with all 4 docs. The
+        // map value is a lightweight placeholder because we can't
+        // reconstruct the original File object — only its identity
+        // and type. The submit flow detects this placeholder and
+        // skips re-uploading.
+        const docs = Array.isArray(loan.documents) ? loan.documents : [];
+        for (const d of docs) {
+          // Document.document_type from toArray maps to our docType.key
+          const typeKey = d.document_type || d.type || null;
+          if (!typeKey) continue;
+          const known = this.docTypes.find(dt => dt.key === typeKey);
+          if (!known) continue;
+          // Seed uploadedDocs with a synthetic 'existing' marker. The
+          // .file property is undefined; code that reads file.size /
+          // file.type has been updated to tolerate this via the
+          // isExistingDoc() helper.
+          this.uploadedDocs.set(typeKey, {
+            name: d.file_name || (known.label + ' (existing)'),
+            file: undefined as any,
+            existing: true,
+            documentId: d.id,
+          } as any);
+        }
+
+        // Jump past product + staff lookup. Step 2 (product) selection
+        // is still meaningful if the agent wants to switch products,
+        // but default landing spot is Step 3 (amount/tenure/details).
+        // Per session decision, Step 2 (staff) is NOT entered in edit
+        // mode — canProceed / navigation respect this.
+        this.step.set(2);
+
+        this.editLoading.set(false);
+      },
+      error: () => {
+        this.editLoading.set(false);
+        // Error interceptor toasts the reason. Bounce back to the list
+        // so the user has somewhere to go.
+        this.router.navigate(['/loans']);
+      },
     });
   }
 
@@ -2220,14 +2445,28 @@ export class LoanCapturePage implements OnInit, OnDestroy {
    * customer_id comes from the loan creation response; the agent
    * captures it in submit() and threads it through to this method.
    */
-  private uploadDocuments(loanId: string, customerId: string): void {
+  private uploadDocuments(loanId: string, customerId: string, editMode: boolean = false): void {
     const states = new Map(this.uploadStates());
-    this.uploadedDocs.forEach((_, docType) => {
+    this.uploadedDocs.forEach((doc, docType) => {
+      // In edit mode, skip docs that are already uploaded on the
+      // server (the 'existing' marker set by hydrateForEdit). Only
+      // newly-selected File objects get a pending state.
+      if (editMode && (doc as any).existing) {
+        // Mark as 'done' so pollUploadsComplete doesn't wait forever.
+        states.set(docType, { progress: 100, status: 'done' });
+        return;
+      }
       states.set(docType, { progress: 0, status: 'pending' });
     });
     this.uploadStates.set(states);
 
     this.uploadedDocs.forEach((doc, docType) => {
+      // Skip existing docs — they're already on the server.
+      if (editMode && (doc as any).existing) return;
+      // Defensive: a doc without a File object shouldn't happen in
+      // create mode, but guard anyway.
+      if (!doc.file) return;
+
       const formData = new FormData();
       formData.append('file', doc.file);
       formData.append('type', docType);
@@ -2388,6 +2627,13 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     if (this.form['account_statement_id'])        payload.account_statement_id = this.form['account_statement_id'];
     if (this.form['account_statement_password']) payload.account_statement_password = this.form['account_statement_password'];
 
+    // Edit mode: divert to PUT /loans/:id and skip the rest of the
+    // POST flow. submitEdit handles its own toast + navigation.
+    if (this.isEditMode()) {
+      this.submitEdit(payload);
+      return;
+    }
+
     this.api.post('/loans', payload).subscribe({
       next: res => {
         this.submitting.set(false);
@@ -2416,6 +2662,60 @@ export class LoanCapturePage implements OnInit, OnDestroy {
         if (err?.status === 403) {
           this.agentBlocked.set(true);
         }
+      },
+    });
+  }
+
+  /**
+   * Count of newly-uploaded (non-existing) documents staged in the
+   * uploadedDocs Map. Used by edit-mode submit to decide whether to
+   * run the upload phase — if the agent replaced or added no docs,
+   * skip the upload flow entirely.
+   */
+  private newlyStagedDocCount(): number {
+    let n = 0;
+    this.uploadedDocs.forEach(v => {
+      if (!(v as any).existing) n++;
+    });
+    return n;
+  }
+
+  /**
+   * Edit-mode submit handler. PUT /loans/:id with the same payload
+   * shape as create, then navigate back to the detail page. The
+   * backend UpdateLoanAction (commit H1) accepts the nested customer
+   * + next_of_kin blocks and recomputes loan math automatically.
+   *
+   * Uploads any NEWLY-STAGED documents after the PUT succeeds — same
+   * flow as create, but only for docs that aren't marked as existing.
+   */
+  private submitEdit(payload: any): void {
+    this.api.put(`/loans/${this.id}`, payload).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.toast.success('Loan updated successfully');
+
+        // Upload only the newly-staged docs (ones without the
+        // 'existing' marker). If all 4 are existing, nothing to do.
+        if (this.newlyStagedDocCount() > 0) {
+          const customerId = (this.existingCustomer() as any)?.id || '';
+          if (customerId) {
+            this.uploadDocuments(this.id, customerId, /* editMode */ true);
+            this.pollUploadsComplete(this.id);
+            return;
+          }
+        }
+
+        // No new docs to upload — navigate straight back to detail.
+        // Use queryParams cache-bust so the loan-detail page re-fetches
+        // instead of showing stale cached data.
+        this.router.navigate(['/loans', this.id], {
+          queryParams: { _: Date.now() },
+        });
+      },
+      error: () => {
+        this.submitting.set(false);
+        // Error interceptor toasts the reason.
       },
     });
   }
