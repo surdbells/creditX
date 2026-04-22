@@ -2,7 +2,7 @@ import { Component, OnInit, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner, IonFooter } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
   timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
@@ -14,7 +14,7 @@ import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-loan-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner, IonFooter],
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -146,64 +146,56 @@ import { ToastService } from '../../core/services/toast.service';
               </div>
             </div>
           }
+
+          <!--
+            Actions — placed INLINE at the end of page content, not as a
+            floating footer. Previous attempts to use <ion-footer> for
+            this worked in some contexts but not others (failing reliably
+            on mobile — see user reports in prior commits). Inline
+            rendering is bulletproof: buttons are part of the document
+            flow, agents scroll down to them, and the body's bottom
+            padding clears the tab bar.
+
+            The eyebrow above the buttons identifies this as the action
+            area so it doesn't look like a fifth section.
+          -->
+          @if (loan(); as l) {
+            @if (statusBannerText(l.status); as hint) {
+              <div class="cxm-ld-status-banner cxm-ld-status-banner-inline">
+                <ion-icon name="information-circle-outline" style="font-size: 14px"></ion-icon>
+                <span>{{ hint }}</span>
+              </div>
+            }
+            <div class="cxm-ld-actions-inline">
+              @if (canEdit(l.status)) {
+                <button class="cxm-ld-action-btn cxm-ld-action-secondary cxm-ld-action-icon-only"
+                        (click)="editLoan()"
+                        aria-label="Edit loan">
+                  <ion-icon name="create-outline" style="font-size: 18px"></ion-icon>
+                </button>
+              }
+              <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
+                <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
+                <span>Message</span>
+              </button>
+              @if (canSubmit(l.status)) {
+                <button class="cxm-ld-action-btn cxm-ld-action-primary"
+                        [disabled]="submitting()"
+                        (click)="submitLoan()">
+                  @if (submitting()) {
+                    <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+                    <span>Submitting...</span>
+                  } @else {
+                    <ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>
+                    <span>Submit for Approval</span>
+                  }
+                </button>
+              }
+            </div>
+          }
         </div>
       }
     </ion-content>
-
-    <!--
-      Action bar — rendered as an Ionic footer so Ionic's layout
-      manager positions it correctly above the bottom tab bar (which
-      is owned by the parent tabs.page.ts). ion-footer also knows
-      about safe-area insets natively.
-
-      IMPORTANT: <ion-footer> is rendered UNCONDITIONALLY. Wrapping
-      the element itself in @if (loan()) made Ionic unable to pre-
-      compute layout slots — the footer would not reserve space and
-      the content below never appeared on real devices even though
-      it worked in some browser contexts. This matches the pattern
-      used in message-thread.page.ts and channel-thread.page.ts
-      which have always rendered correctly.
-
-      The CONTENTS of the footer (banner + action bar) are still
-      gated on loan() being loaded — during the initial fetch the
-      footer is empty but its slot is reserved.
-    -->
-    <ion-footer class="ion-no-border">
-      @if (loan(); as l) {
-        @if (statusBannerText(l.status); as hint) {
-          <div class="cxm-ld-status-banner">
-            <ion-icon name="information-circle-outline" style="font-size: 14px"></ion-icon>
-            <span>{{ hint }}</span>
-          </div>
-        }
-        <div class="cxm-ld-action-bar">
-          @if (canEdit(l.status)) {
-            <button class="cxm-ld-action-btn cxm-ld-action-secondary cxm-ld-action-icon-only"
-                    (click)="editLoan()"
-                    aria-label="Edit loan">
-              <ion-icon name="create-outline" style="font-size: 18px"></ion-icon>
-            </button>
-          }
-          <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
-            <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
-            <span>Message</span>
-          </button>
-          @if (canSubmit(l.status)) {
-            <button class="cxm-ld-action-btn cxm-ld-action-primary"
-                    [disabled]="submitting()"
-                    (click)="submitLoan()">
-              @if (submitting()) {
-                <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
-                <span>Submitting...</span>
-              } @else {
-                <ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>
-                <span>Submit for Approval</span>
-              }
-            </button>
-          }
-        </div>
-      }
-    </ion-footer>
 
     <!--
       Loan-scoped message sheet. Creating a conversation requires a
@@ -438,63 +430,63 @@ import { ToastService } from '../../core/services/toast.service';
     }
 
     /*
-     * Body wrapper — replaces the old 'px-4 pb-6 flex flex-col gap-3
-     * -mt-4' class.
+     * Body wrapper. The action area is now inline at the bottom of
+     * the body (part of the scrollable content, not an ion-footer
+     * slot). Bottom padding needs to clear the app's bottom tab bar
+     * + safe-area inset so the last action button is reachable above
+     * the tab bar.
      *
-     * Unlike commits pre-G where the action bar was fixed-positioned
-     * (requiring 150px bottom padding to clear it + the tab bar), the
-     * action bar is now inside <ion-footer> which Ionic automatically
-     * accounts for when sizing ion-content. Bottom-padding here only
-     * needs to provide visual breathing room under the last content
-     * card — 24px is plenty.
+     * 80px breakdown:
+     *   56px — ion-tab-bar height (md mode)
+     *   24px — breathing room under the Submit button
+     * + env(safe-area-inset-bottom) — iPhone home indicator on notched
+     *   devices. On devices without a notch this evaluates to 0.
      */
     .cxm-ld-body {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding: 0 16px 24px;
+      padding: 0 16px;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
       margin-top: -16px;
     }
 
     /*
-     * Action bar layout — placement and positioning are now handled by
-     * the parent <ion-footer> which sits above the ion-content and
-     * above the app's bottom tab bar automatically. We only style the
-     * bar's INTERNAL layout here (flex row of buttons + spacing).
-     *
-     * ion-footer has its own background + safe-area handling, so we
-     * inherit both by leaving .cxm-ld-action-bar transparent and
-     * letting the parent do the work.
+     * Inline actions — now a regular block in the page flow, right
+     * after the Activity Trail card. Rendered as a card-like row of
+     * buttons with a subtle surface background + border. Not
+     * fixed-positioned, so it scrolls with the content and is always
+     * visible once the user reaches it.
      */
-    .cxm-ld-action-bar {
+    .cxm-ld-actions-inline {
       display: flex;
       gap: 8px;
-      padding: 10px 12px 12px;
+      padding: 12px;
+      margin-top: 4px;
       background: var(--cx-surface);
-      border-top: 1px solid var(--cx-border);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl, 12px);
     }
 
     /*
-     * Status hint banner — sits above the action bar row inside the
-     * same ion-footer. Appears only for loans in states where Edit
-     * and Submit are locked (under_review, approved, rejected, etc.)
-     * so agents see an explicit reason for the reduced action set
-     * instead of wondering if the app is broken.
-     *
-     * Subtle styling — monochrome with a muted accent, never shouty.
-     * Shares the surface background with the action bar for a single
-     * cohesive footer unit.
+     * Status hint banner — sits above the action row. Inline variant
+     * used when the banner is inside the scrollable body (not a
+     * floating footer). Style matches the surrounding cards.
      */
     .cxm-ld-status-banner {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
-      font-size: 11px;
+      padding: 10px 14px;
+      font-size: 12px;
       line-height: 1.4;
       color: var(--cx-text-secondary);
-      background: var(--cx-surface);
-      border-top: 1px solid var(--cx-border);
+      background: var(--cx-surface-2, #f5f5f4);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+    }
+    .cxm-ld-status-banner-inline {
+      margin-top: 4px;
     }
 
     .cxm-ld-action-btn {
