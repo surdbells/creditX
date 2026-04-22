@@ -53,6 +53,11 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
             ->where('s.role = :roleId')->andWhere('a.status = :status')
+            // See findAllPendingQueue for the rationale — only active
+            // pending steps should surface in the queue. Role-scoped
+            // approvers also need this to avoid seeing future-step
+            // approvals on their queue before earlier steps complete.
+            ->andWhere('a.slaStartedAt IS NOT NULL')
             ->setParameter('roleId', $roleId)->setParameter('status', ApprovalStatus::PENDING->value);
 
         if ($search && $search !== '') {
@@ -88,6 +93,19 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
             ->where('a.status = :status')
+            // Only include 'active' pending approvals — ones where the SLA
+            // clock has started. For sequential workflows this is the
+            // current step the approver must act on (only one per loan at
+            // a time). For parallel workflows, ALL pending steps have the
+            // clock running, so all legitimately appear in the queue (one
+            // row per decision needed).
+            //
+            // Without this filter, sequential workflows with N steps
+            // produced N queue rows per loan — all N were PENDING from
+            // the moment the loan was submitted, but only step #1 was
+            // actually ready for decision. The duplicate rows were the
+            // bug the user reported in this session.
+            ->andWhere('a.slaStartedAt IS NOT NULL')
             ->setParameter('status', ApprovalStatus::PENDING->value);
 
         if ($search && $search !== '') {

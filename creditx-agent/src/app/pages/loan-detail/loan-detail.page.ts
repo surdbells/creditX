@@ -6,7 +6,7 @@ import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons,
 import { addIcons } from 'ionicons';
 import {
   timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
-  chatbubbleEllipsesOutline, paperPlaneOutline, createOutline,
+  chatbubbleEllipsesOutline, paperPlaneOutline, createOutline, informationCircleOutline,
 } from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -169,6 +169,18 @@ import { ToastService } from '../../core/services/toast.service';
     -->
     @if (loan(); as l) {
       <ion-footer class="ion-no-border">
+        @if (statusBannerText(l.status); as hint) {
+          <!--
+            Status-aware hint for loans where editing/submitting is
+            locked (under_review or later). Explains why the action bar
+            is narrower than usual — otherwise agents wonder where Edit
+            went and whether something is broken.
+          -->
+          <div class="cxm-ld-status-banner">
+            <ion-icon name="information-circle-outline" style="font-size: 14px"></ion-icon>
+            <span>{{ hint }}</span>
+          </div>
+        }
         <div class="cxm-ld-action-bar">
           @if (canEdit(l.status)) {
             <button class="cxm-ld-action-btn cxm-ld-action-secondary cxm-ld-action-icon-only"
@@ -467,6 +479,29 @@ import { ToastService } from '../../core/services/toast.service';
       border-top: 1px solid var(--cx-border);
     }
 
+    /*
+     * Status hint banner — sits above the action bar row inside the
+     * same ion-footer. Appears only for loans in states where Edit
+     * and Submit are locked (under_review, approved, rejected, etc.)
+     * so agents see an explicit reason for the reduced action set
+     * instead of wondering if the app is broken.
+     *
+     * Subtle styling — monochrome with a muted accent, never shouty.
+     * Shares the surface background with the action bar for a single
+     * cohesive footer unit.
+     */
+    .cxm-ld-status-banner {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--cx-text-secondary);
+      background: var(--cx-surface);
+      border-top: 1px solid var(--cx-border);
+    }
+
     .cxm-ld-action-btn {
       flex: 1 1 0;
       min-width: 0; /* allow flex to shrink below content width */
@@ -638,7 +673,7 @@ export class LoanDetailPage implements OnInit {
   ) {
     addIcons({
       timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
-      chatbubbleEllipsesOutline, paperPlaneOutline, createOutline,
+      chatbubbleEllipsesOutline, paperPlaneOutline, createOutline, informationCircleOutline,
     });
   }
 
@@ -710,6 +745,34 @@ export class LoanDetailPage implements OnInit {
     if (!status) return false;
     const s = status.toLowerCase();
     return s === 'draft' || s === 'captured' || s === 'submitted';
+  }
+
+  /**
+   * Short hint explaining the current loan state when the action bar
+   * is reduced to just Message. Returns null when the full action set
+   * (Edit + Submit) is available, so the banner doesn't clutter the
+   * common case. Makes it clear to agents why Edit / Submit aren't
+   * visible for in-review or post-review loans.
+   */
+  statusBannerText(status: string | null | undefined): string | null {
+    if (!status) return null;
+    const s = status.toLowerCase();
+    switch (s) {
+      case 'under_review':
+        return 'Loan is under review. Edits and resubmission are locked until a decision is made.';
+      case 'approved':
+        return 'Loan approved. Awaiting disbursement.';
+      case 'rejected':
+        return 'Loan rejected. Message your supervisor for guidance.';
+      case 'disbursed':
+        return 'Loan disbursed and active.';
+      case 'closed':
+        return 'Loan closed.';
+      case 'cancelled':
+        return 'Loan cancelled.';
+      default:
+        return null; // draft / captured / submitted — full action bar
+    }
   }
 
   /**
