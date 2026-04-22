@@ -199,9 +199,41 @@ final class ApprovalEngineService
             $trail->setDetails(['step_id' => $approval->getStep()->getId(), 'comment' => $comment]);
             $loan->addTrail($trail);
 
+            /*
+             * Flush the decision BEFORE evaluating overall loan status.
+             *
+             * evaluateOverallStatus() calls approvalRepo->findByLoan()
+             * which issues a fresh DB query. Without this flush, the
+             * query reads the PRE-decision state from the DB (this
+             * approval still PENDING in storage, even though it's
+             * APPROVED in memory). Depending on Doctrine's identity
+             * map the returned entities may or may not reflect the
+             * in-memory mutation — inconsistent and unreliable.
+             *
+             * With the flush, the UPDATE lands in the DB (still inside
+             * our transaction thanks to beginTransaction above), and
+             * the subsequent repo query sees the just-decided state.
+             * evaluateOverallStatus can then correctly determine
+             * whether this was the final step needed to approve or
+             * reject the loan.
+             *
+             * Without this flush: approval trail on loan detail page
+             * shows the step as 'pending' even after successful
+             * approval, and the loan stays in under_review forever
+             * because evaluateOverallStatus never sees the APPROVED
+             * status it just set.
+             *
+             * The transaction still wraps both flushes so partial
+             * failures roll everything back. The pessimistic lock on
+             * the approval row is also still held until commit.
+             */
+            $this->em->flush();
+
             // Determine overall loan status based on all approvals
             $result = $this->evaluateOverallStatus($loan, $workflow);
 
+            // Second flush: persist any loan status transition +
+            // loan-level trail that evaluateOverallStatus created.
             $this->em->flush();
             $this->em->commit();
         } catch (DomainException $e) {
