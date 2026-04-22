@@ -407,6 +407,68 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
         border-radius: var(--cx-radius-xl, 16px);
       }
     }
+
+    /* ═══ Quick-approve confirmation panel ═══ */
+    .cx-aq-quick-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 8px 0;
+    }
+    .cx-aq-quick-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--cx-success-50, rgba(22, 163, 74, 0.08));
+      color: var(--cx-success, #16a34a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      align-self: flex-start;
+    }
+    .cx-aq-quick-message {
+      font-size: 15px;
+      line-height: 1.4;
+      color: var(--cx-text);
+    }
+    .cx-aq-quick-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 14px;
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+    }
+    /*
+     * Label-value row. justify-content: space-between puts the
+     * label on the left and value on the right with natural
+     * horizontal spacing between them. Without this the two spans
+     * render with no visible gap and the text runs together.
+     */
+    .cx-aq-quick-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      font-size: 13px;
+      padding: 4px 0;
+    }
+    .cx-aq-quick-row > span:first-child {
+      color: var(--cx-text-muted);
+    }
+    .cx-aq-quick-row > span:last-child {
+      color: var(--cx-text);
+      font-weight: 500;
+      text-align: right;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .cx-aq-quick-hint {
+      font-size: 12px;
+      color: var(--cx-text-muted);
+      line-height: 1.4;
+      padding: 0 2px;
+    }
     @media (max-width: 640px) {
       .cx-aq-modal {
         width: 100vw;

@@ -154,28 +154,23 @@ import { ToastService } from '../../core/services/toast.service';
       Action bar — rendered as an Ionic footer so Ionic's layout
       manager positions it correctly above the bottom tab bar (which
       is owned by the parent tabs.page.ts). ion-footer also knows
-      about safe-area insets natively, so notched devices and desktop
-      browsers both land in the right place without manual env() math.
+      about safe-area insets natively.
 
-      Only rendered once the loan has loaded so we don't flash an empty
-      bar during the initial fetch.
+      IMPORTANT: <ion-footer> is rendered UNCONDITIONALLY. Wrapping
+      the element itself in @if (loan()) made Ionic unable to pre-
+      compute layout slots — the footer would not reserve space and
+      the content below never appeared on real devices even though
+      it worked in some browser contexts. This matches the pattern
+      used in message-thread.page.ts and channel-thread.page.ts
+      which have always rendered correctly.
 
-      Button visibility is status-driven:
-        - Message      — always visible when loan is loaded; every loan
-                         needs to be able to start a scoped thread
-        - Submit       — only when status === 'captured' or 'draft'.
-                         'submitted' and everything downstream have
-                         already entered the approval flow.
+      The CONTENTS of the footer (banner + action bar) are still
+      gated on loan() being loaded — during the initial fetch the
+      footer is empty but its slot is reserved.
     -->
-    @if (loan(); as l) {
-      <ion-footer class="ion-no-border">
+    <ion-footer class="ion-no-border">
+      @if (loan(); as l) {
         @if (statusBannerText(l.status); as hint) {
-          <!--
-            Status-aware hint for loans where editing/submitting is
-            locked (under_review or later). Explains why the action bar
-            is narrower than usual — otherwise agents wonder where Edit
-            went and whether something is broken.
-          -->
           <div class="cxm-ld-status-banner">
             <ion-icon name="information-circle-outline" style="font-size: 14px"></ion-icon>
             <span>{{ hint }}</span>
@@ -207,8 +202,8 @@ import { ToastService } from '../../core/services/toast.service';
             </button>
           }
         </div>
-      </ion-footer>
-    }
+      }
+    </ion-footer>
 
     <!--
       Loan-scoped message sheet. Creating a conversation requires a
