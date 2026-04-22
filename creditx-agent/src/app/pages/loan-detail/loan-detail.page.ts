@@ -2,7 +2,7 @@ import { Component, OnInit, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner, IonFooter } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import {
   timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
@@ -14,7 +14,7 @@ import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-loan-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner],
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner, IonFooter],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -151,7 +151,12 @@ import { ToastService } from '../../core/services/toast.service';
     </ion-content>
 
     <!--
-      Sticky action bar — anchors ABOVE the bottom tab bar + safe-area.
+      Action bar — rendered as an Ionic footer so Ionic's layout
+      manager positions it correctly above the bottom tab bar (which
+      is owned by the parent tabs.page.ts). ion-footer also knows
+      about safe-area insets natively, so notched devices and desktop
+      browsers both land in the right place without manual env() math.
+
       Only rendered once the loan has loaded so we don't flash an empty
       bar during the initial fetch.
 
@@ -163,25 +168,27 @@ import { ToastService } from '../../core/services/toast.service';
                          already entered the approval flow.
     -->
     @if (loan(); as l) {
-      <div class="cxm-ld-action-bar">
-        <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
-          <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
-          <span>Message</span>
-        </button>
-        @if (canSubmit(l.status)) {
-          <button class="cxm-ld-action-btn cxm-ld-action-primary"
-                  [disabled]="submitting()"
-                  (click)="submitLoan()">
-            @if (submitting()) {
-              <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
-              <span>Submitting...</span>
-            } @else {
-              <ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>
-              <span>Submit for Approval</span>
-            }
+      <ion-footer class="ion-no-border">
+        <div class="cxm-ld-action-bar">
+          <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
+            <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
+            <span>Message</span>
           </button>
-        }
-      </div>
+          @if (canSubmit(l.status)) {
+            <button class="cxm-ld-action-btn cxm-ld-action-primary"
+                    [disabled]="submitting()"
+                    (click)="submitLoan()">
+              @if (submitting()) {
+                <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+                <span>Submitting...</span>
+              } @else {
+                <ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>
+                <span>Submit for Approval</span>
+              }
+            </button>
+          }
+        </div>
+      </ion-footer>
     }
 
     <!--
@@ -418,48 +425,39 @@ import { ToastService } from '../../core/services/toast.service';
 
     /*
      * Body wrapper — replaces the old 'px-4 pb-6 flex flex-col gap-3
-     * -mt-4' class. Needs padding-bottom that clears BOTH the sticky
-     * action bar (~64px including its own safe-area inset) AND the
-     * app-wide bottom tab bar (~56px) PLUS breathing room. Same pattern
-     * as loan-capture.page.ts .cxm-lc-body (commit 9ca03b3).
+     * -mt-4' class.
      *
-     * Total: ~150px safe + env(safe-area-inset-bottom).
+     * Unlike commits pre-G where the action bar was fixed-positioned
+     * (requiring 150px bottom padding to clear it + the tab bar), the
+     * action bar is now inside <ion-footer> which Ionic automatically
+     * accounts for when sizing ion-content. Bottom-padding here only
+     * needs to provide visual breathing room under the last content
+     * card — 24px is plenty.
      */
     .cxm-ld-body {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding: 0 16px;
-      padding-bottom: calc(150px + env(safe-area-inset-bottom));
+      padding: 0 16px 24px;
       margin-top: -16px;
     }
 
     /*
-     * Sticky action bar — positioned absolutely at the bottom of the
-     * page, flush above the app tab bar.
+     * Action bar layout — placement and positioning are now handled by
+     * the parent <ion-footer> which sits above the ion-content and
+     * above the app's bottom tab bar automatically. We only style the
+     * bar's INTERNAL layout here (flex row of buttons + spacing).
      *
-     * Layout notes:
-     *   - Fixed to viewport. bottom: 56px matches the Ionic md-mode
-     *     tab-bar height. env() safe-area is NOT added here because
-     *     the tab bar beneath already owns the bottom inset; doubling
-     *     it would create a visible gap between the bar and the tabs.
-     *   - Background + shadow make the bar read as a distinct
-     *     interaction layer separate from the page content above.
-     *   - Buttons inside use a tighter border-radius (10px, not the
-     *     design-system's default 14px pill) so they feel like toolbar
-     *     actions rather than floating pills.
+     * ion-footer has its own background + safe-area handling, so we
+     * inherit both by leaving .cxm-ld-action-bar transparent and
+     * letting the parent do the work.
      */
     .cxm-ld-action-bar {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: 56px;
       display: flex;
       gap: 8px;
       padding: 10px 12px 12px;
       background: var(--cx-surface);
       border-top: 1px solid var(--cx-border);
-      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-      z-index: 10;
     }
 
     .cxm-ld-action-btn {

@@ -236,9 +236,37 @@ final class ApprovalEngineService
             $items = array_slice($items, $offset, $limit);
         }
 
-        $output = array_map(fn(LoanApproval $a) => array_merge($a->toArray(), [
-            'loan' => $a->getLoan()->toArray(),
-        ]), $items);
+        /*
+         * Response shape: flatten the most-needed loan fields into the
+         * top-level row so the admin approval-queue DataTable can read
+         * them via column.key without nested-path support. The full
+         * loan object stays accessible under `loan` for any consumer
+         * that wants the whole payload.
+         *
+         * Also exposes a 'current_step' alias for 'step_name' so the
+         * queue's Step column reads naturally — step_name is the
+         * approval step's name (e.g. 'Credit Officer Review') and
+         * that's what the UI surfaces as the 'current step' for the
+         * loan.
+         */
+        $output = array_map(function (LoanApproval $a) {
+            $loanData = $a->getLoan()->toArray();
+            return array_merge($a->toArray(), [
+                'loan'             => $loanData,
+                // Flattened loan fields for flat DataTable rendering
+                'application_id'   => $loanData['application_id'] ?? null,
+                'customer_name'    => $loanData['customer_name'] ?? null,
+                'customer_staff_id' => $loanData['customer_staff_id'] ?? null,
+                'product_name'     => $loanData['product_name'] ?? null,
+                'amount_requested' => $loanData['amount_requested'] ?? null,
+                'loan_status'      => $loanData['status'] ?? null,
+                // Alias for display: 'current_step' reads as the step
+                // the loan is currently at, which is this approval's
+                // step_name for sequential mode or the earliest pending
+                // step name for parallel mode.
+                'current_step'     => $a->getStep()->getName(),
+            ]);
+        }, $items);
 
         return ['items' => $output, 'total' => $total];
     }
