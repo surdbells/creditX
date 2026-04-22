@@ -64,7 +64,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
     -->
     @if (modalOpen()) {
       <div class="cx-aq-backdrop" (click)="closeModal()"></div>
-      <div class="cx-aq-modal cx-animate-in"
+      <div class="cx-aq-modal"
            [class.cx-aq-modal-compact]="mode() === 'quick-approve'"
            role="dialog" aria-labelledby="aq-modal-title">
         <div class="cx-aq-modal-head">
@@ -441,6 +441,20 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       flex-direction: column;
       z-index: 101;
       overflow: hidden;
+      /*
+       * Dedicated centering-safe entrance animation. The global
+       * cx-animate-in keyframe (in styles.scss) animates transform
+       * translateY, which clobbers our translate(-50%, -50%) centering
+       * — during the animation the modal appears in the bottom-right
+       * quadrant (top-left corner at viewport center) then snaps to
+       * center when the animation ends. This keyframe preserves the
+       * centering transform so the modal scales in place.
+       */
+      animation: cx-aq-modal-in 200ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    @keyframes cx-aq-modal-in {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     }
     /*
      * Compact variant for the quick-approve mode — narrower and
@@ -709,6 +723,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      animation: cx-aq-modal-in 200ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
     }
     @media (max-width: 640px) {
       .cx-aq-doc-viewer {

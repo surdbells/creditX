@@ -409,6 +409,11 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      animation: cx-cd-doc-viewer-in 200ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    @keyframes cx-cd-doc-viewer-in {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     }
     @media (max-width: 640px) {
       .cx-cd-doc-viewer { width: 100vw; height: 100vh; border-radius: 0; }

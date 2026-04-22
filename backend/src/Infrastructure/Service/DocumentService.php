@@ -61,8 +61,18 @@ final class DocumentService
         $extension = pathinfo($originalName, PATHINFO_EXTENSION);
         $safeName = bin2hex(random_bytes(16)) . '.' . strtolower($extension);
 
-        // Organize by customer/year/month
-        $subDir = $customer->getId() . '/' . date('Y') . '/' . date('m');
+        // Organize by documents/customer/year/month — the 'documents/'
+        // prefix segregates loan document uploads from other storage
+        // subdirectories (avatars, uploads, exports, firebase). Prior
+        // to this fix, loan docs landed directly under /storage/<uuid>
+        // mixed with other content at the storage root, making backups
+        // and manual inspection harder.
+        //
+        // The existing migration script
+        // (backend/bin/migrate-documents-path.php) moves legacy files
+        // and updates DB file_path columns for docs that were written
+        // before this change.
+        $subDir = 'documents/' . $customer->getId() . '/' . date('Y') . '/' . date('m');
         $fullDir = rtrim($this->storagePath, '/') . '/' . $subDir;
 
         if (!is_dir($fullDir)) {
