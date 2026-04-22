@@ -436,63 +436,79 @@ import { ToastService } from '../../core/services/toast.service';
 
     /*
      * Sticky action bar — positioned absolutely at the bottom of the
-     * page, above the app tab bar. Uses env() safe-area so the bar
-     * itself sits above the iOS home indicator; the tab bar beneath
-     * has its own inset handling.
+     * page, flush above the app tab bar.
      *
-     * bottom: 56px = tab bar height. The bar sits directly on top of
-     * the tab bar with a subtle shadow separating them. This position
-     * makes Submit always reachable even when the page is scrolled.
+     * Layout notes:
+     *   - Fixed to viewport. bottom: 56px matches the Ionic md-mode
+     *     tab-bar height. env() safe-area is NOT added here because
+     *     the tab bar beneath already owns the bottom inset; doubling
+     *     it would create a visible gap between the bar and the tabs.
+     *   - Background + shadow make the bar read as a distinct
+     *     interaction layer separate from the page content above.
+     *   - Buttons inside use a tighter border-radius (10px, not the
+     *     design-system's default 14px pill) so they feel like toolbar
+     *     actions rather than floating pills.
      */
     .cxm-ld-action-bar {
       position: fixed;
       left: 0; right: 0;
-      bottom: calc(56px + env(safe-area-inset-bottom));
+      bottom: 56px;
       display: flex;
-      gap: 10px;
-      padding: 10px 16px;
+      gap: 8px;
+      padding: 10px 12px 12px;
       background: var(--cx-surface);
       border-top: 1px solid var(--cx-border);
-      box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
       z-index: 10;
     }
 
     .cxm-ld-action-btn {
-      flex: 1;
-      padding: 12px 14px;
-      border-radius: var(--cx-radius-md);
-      font-size: var(--cx-text-sm);
+      flex: 1 1 0;
+      min-width: 0; /* allow flex to shrink below content width */
+      padding: 11px 12px;
+      border-radius: 10px;
+      font-size: 14px;
       font-weight: 600;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
       border: 1px solid transparent;
-      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+      transition: transform 100ms cubic-bezier(0.4, 0, 0.2, 1),
+                  background 100ms cubic-bezier(0.4, 0, 0.2, 1);
       min-height: 44px; /* 44px min-tap-target on mobile */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
     }
 
     .cxm-ld-action-secondary {
-      background: var(--cx-surface);
+      background: var(--cx-surface-2, #f5f5f4);
       color: var(--cx-text-secondary);
       border-color: var(--cx-border);
+      /* Secondary stays compact — only as wide as needed for 'Message' */
+      flex: 0 0 auto;
+      min-width: 110px;
     }
     .cxm-ld-action-secondary:active {
-      background: var(--cx-surface-hover, var(--cx-surface-2));
+      background: var(--cx-surface-hover, var(--cx-stone-100, #e7e5e4));
       transform: scale(0.98);
     }
 
     .cxm-ld-action-primary {
+      /* Primary takes all remaining width — THE action */
+      flex: 1 1 auto;
       background: linear-gradient(135deg, var(--cx-primary-700), var(--cx-primary-600));
       color: #fff;
-      box-shadow: 0 4px 12px rgba(10, 79, 42, 0.24);
+      box-shadow: 0 2px 8px rgba(10, 79, 42, 0.22);
     }
     .cxm-ld-action-primary:disabled {
-      opacity: 0.5;
+      opacity: 0.55;
       box-shadow: none;
     }
     .cxm-ld-action-primary:not(:disabled):active {
-      transform: scale(0.99);
+      transform: scale(0.985);
     }
 
     /* ═══ Message sheet (loan-scoped conversation starter) ═══ */
