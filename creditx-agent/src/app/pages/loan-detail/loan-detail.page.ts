@@ -170,6 +170,13 @@ import { ToastService } from '../../core/services/toast.service';
     @if (loan(); as l) {
       <ion-footer class="ion-no-border">
         <div class="cxm-ld-action-bar">
+          @if (canEdit(l.status)) {
+            <button class="cxm-ld-action-btn cxm-ld-action-secondary cxm-ld-action-icon-only"
+                    (click)="editLoan()"
+                    aria-label="Edit loan">
+              <ion-icon name="create-outline" style="font-size: 18px"></ion-icon>
+            </button>
+          }
           <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
             <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
             <span>Message</span>
@@ -494,6 +501,19 @@ import { ToastService } from '../../core/services/toast.service';
       transform: scale(0.98);
     }
 
+    /*
+     * Icon-only variant for the Edit button — square aspect, no text,
+     * narrower than the regular secondary so all three buttons (Edit,
+     * Message, Submit) fit comfortably on even the narrowest mobile
+     * viewport (iPhone SE 375px).
+     */
+    .cxm-ld-action-icon-only {
+      flex: 0 0 auto;
+      min-width: 44px;
+      width: 44px;
+      padding: 11px 0;
+    }
+
     .cxm-ld-action-primary {
       /* Primary takes all remaining width — THE action */
       flex: 1 1 auto;
@@ -645,6 +665,34 @@ export class LoanDetailPage implements OnInit {
     if (!status) return false;
     const s = status.toLowerCase();
     return s === 'captured' || s === 'draft';
+  }
+
+  /**
+   * True when the loan is in a state that permits edits. Matches the
+   * backend's UpdateLoanAction status guard (commit H1) — DRAFT,
+   * CAPTURED, or SUBMITTED. Once the loan enters UNDER_REVIEW or later,
+   * edits are frozen so approvers' decisions aren't undermined.
+   *
+   * SUBMITTED is editable too even though the loan is already in the
+   * queue, because approvers haven't started reviewing yet — agents
+   * sometimes realise they made a typo after submitting. The agent
+   * staying able to fix it before review starts is better UX than
+   * forcing a cancel-and-recreate.
+   */
+  canEdit(status: string | null | undefined): boolean {
+    if (!status) return false;
+    const s = status.toLowerCase();
+    return s === 'draft' || s === 'captured' || s === 'submitted';
+  }
+
+  /**
+   * Navigate to the edit-mode wizard for this loan. The route
+   * /loans/:id/edit lazy-loads LoanCapturePage with the id binding;
+   * the page detects edit mode via the presence of the id @Input
+   * and hydrates itself from GET /loans/:id.
+   */
+  editLoan(): void {
+    this.router.navigate(['/loans', this.id, 'edit']);
   }
 
   /**

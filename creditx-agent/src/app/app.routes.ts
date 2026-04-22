@@ -11,6 +11,7 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard.page').then(m => m.DashboardPage) },
       { path: 'loans', loadComponent: () => import('./pages/loan-list/loan-list.page').then(m => m.LoanListPage) },
       { path: 'loans/new', loadComponent: () => import('./pages/loan-capture/loan-capture.page').then(m => m.LoanCapturePage) },
+      { path: 'loans/:id/edit', loadComponent: () => import('./pages/loan-capture/loan-capture.page').then(m => m.LoanCapturePage) },
       { path: 'loans/:id', loadComponent: () => import('./pages/loan-detail/loan-detail.page').then(m => m.LoanDetailPage) },
       { path: 'lookup', loadComponent: () => import('./pages/lookup/lookup.page').then(m => m.LookupPage) },
       { path: 'calculator', loadComponent: () => import('./pages/calculator/calculator.page').then(m => m.CalculatorPage) },
