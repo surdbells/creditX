@@ -144,8 +144,8 @@ final class OverdueService
                             'customer_phone' => $loan->getCustomer()->getPhone(),
                             'loan_amount' => $loan->getAmountRequested(),
                             'application_id' => $loan->getApplicationId(),
-                            'user_id' => $loan->getAgentId(),
-                        ], $loan->getAgentId(), $loan->getCustomer()->getId());
+                            'user_id' => $loan->getAgent()?->getId(),
+                        ], $loan->getAgent()?->getId(), $loan->getCustomer()->getId());
                     }
                 } catch (\Exception $e) { /* notification failure should not block */ }
             }

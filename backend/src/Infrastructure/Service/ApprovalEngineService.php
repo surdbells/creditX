@@ -240,7 +240,7 @@ final class ApprovalEngineService
                     'application_id' => $loan->getApplicationId(),
                     'step_name' => $approval->getStep()->getName(),
                     'action' => $action,
-                    'user_id' => $loan->getAgentId(),
+                    'user_id' => $loan->getAgent()?->getId(),
                     // Reviewer's comment — drives the rejection-reason
                     // template (see seed-loan-rejected-templates.php).
                     // For approvals, comment is optional and may be null.
@@ -249,7 +249,7 @@ final class ApprovalEngineService
                     'comment' => $comment ?? '',
                     // Reviewer name so the agent knows who decided
                     'reviewer_name' => $user->getFullName(),
-                ], $loan->getAgentId(), $loan->getCustomer()->getId());
+                ], $loan->getAgent()?->getId(), $loan->getCustomer()->getId());
             } catch (\Exception $e) { /* notification failure should not block */ }
         }
 
@@ -271,10 +271,9 @@ final class ApprovalEngineService
         // The conversation is scoped to the loan (loan_id set) so it
         // shows up filterable in the agent's inbox alongside any other
         // messages about the loan.
-        if ($action === 'reject' && $comment && $loan->getAgentId()) {
+        if ($action === 'reject' && $comment && $loan->getAgent() !== null) {
             try {
-                $agent = $this->em->getRepository(\App\Domain\Entity\User::class)
-                    ->find($loan->getAgentId());
+                $agent = $loan->getAgent();
                 if ($agent !== null) {
                     $conv = new \App\Domain\Entity\Conversation();
                     $conv->setAgent($agent);
