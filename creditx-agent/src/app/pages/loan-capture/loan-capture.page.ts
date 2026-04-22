@@ -59,7 +59,7 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
           </div>
         </div>
 
-        <div class="px-4 pb-6">
+        <div class="cxm-lc-body">
           <!-- Step 1: Product Select -->
           @if (step() === 0) {
             <div class="flex flex-col gap-2">
@@ -1622,6 +1622,26 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
     }
 
     /* ─── Navigation ─── */
+    /*
+     * The Loan Capture page lives under the app's bottom tab bar (tabs.page.ts).
+     * Tab bar is ~56px tall, plus the iOS home-indicator safe-area on notched
+     * devices. Without generous bottom padding on the scrollable body, the
+     * Next / Submit button at the end of each step gets hidden behind the
+     * tab bar.
+     *
+     * The padding lives on the step body, not on .cxm-lc-nav directly, so
+     * other trailing content (error messages, upload progress) also clears
+     * the tab bar.
+     *
+     * 96px baseline = 56px tab bar + 24px visual breathing room + 16px slack.
+     * env(safe-area-inset-bottom) adds the home-indicator height on top so
+     * iPhone X and up don't clip.
+     */
+    .cxm-lc-body {
+      padding: 0 16px;
+      padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+
     .cxm-lc-nav {
       display: flex;
       gap: 10px;
