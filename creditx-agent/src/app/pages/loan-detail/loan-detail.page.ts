@@ -1,14 +1,20 @@
 import { Component, OnInit, signal, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon } from '@ionic/angular/standalone';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close } from 'ionicons/icons';
+import {
+  timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
+  chatbubbleEllipsesOutline, paperPlaneOutline, createOutline,
+} from 'ionicons/icons';
 import { ApiService } from '../../core/services/api.service';
+import { ToastService } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-loan-detail',
   standalone: true,
-  imports: [CommonModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon],
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonIcon, IonSpinner],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -36,7 +42,7 @@ import { ApiService } from '../../core/services/api.service';
           </div>
         </div>
 
-        <div class="px-4 pb-6 flex flex-col gap-3 -mt-4">
+        <div class="cxm-ld-body">
           <!-- Summary Cards -->
           <div class="grid grid-cols-2 gap-3">
             <div class="cxm-ld-stat">
@@ -143,6 +149,88 @@ import { ApiService } from '../../core/services/api.service';
         </div>
       }
     </ion-content>
+
+    <!--
+      Sticky action bar — anchors ABOVE the bottom tab bar + safe-area.
+      Only rendered once the loan has loaded so we don't flash an empty
+      bar during the initial fetch.
+
+      Button visibility is status-driven:
+        - Message      — always visible when loan is loaded; every loan
+                         needs to be able to start a scoped thread
+        - Submit       — only when status === 'captured' or 'draft'.
+                         'submitted' and everything downstream have
+                         already entered the approval flow.
+    -->
+    @if (loan(); as l) {
+      <div class="cxm-ld-action-bar">
+        <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="openMessageSheet()">
+          <ion-icon name="chatbubble-ellipses-outline" style="font-size: 18px"></ion-icon>
+          <span>Message</span>
+        </button>
+        @if (canSubmit(l.status)) {
+          <button class="cxm-ld-action-btn cxm-ld-action-primary"
+                  [disabled]="submitting()"
+                  (click)="submitLoan()">
+            @if (submitting()) {
+              <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+              <span>Submitting...</span>
+            } @else {
+              <ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>
+              <span>Submit for Approval</span>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    <!--
+      Loan-scoped message sheet. Creating a conversation requires a
+      subject + body; we auto-prefill subject with 'Re: {app_id}' so
+      backoffice can triage by loan at a glance, and pass loan_id so
+      the conversation is filterable by loan downstream.
+    -->
+    @if (messageSheetOpen()) {
+      <div class="cxm-ld-sheet-backdrop" (click)="closeMessageSheet()"></div>
+      <div class="cxm-ld-sheet cx-animate-in">
+        <div class="cxm-ld-sheet-handle"></div>
+        <div class="cxm-ld-sheet-head">
+          <div>
+            <h3 class="cxm-ld-sheet-title">Start a conversation</h3>
+            <p class="cxm-ld-sheet-sub">About loan {{ loan()?.application_id }}</p>
+          </div>
+          <button class="cxm-ld-sheet-close" (click)="closeMessageSheet()" aria-label="Close">
+            <ion-icon name="close" style="font-size: 18px"></ion-icon>
+          </button>
+        </div>
+        <div class="cxm-ld-sheet-body">
+          <label class="cxm-ld-field-label" style="display: block; margin-bottom: 4px">Subject</label>
+          <input type="text" class="cxm-ld-sheet-input"
+                 [(ngModel)]="messageSubject" maxlength="200"
+                 placeholder="What is this about?" />
+          <label class="cxm-ld-field-label" style="display: block; margin: 12px 0 4px">Message</label>
+          <textarea class="cxm-ld-sheet-textarea" rows="4"
+                    [(ngModel)]="messageBody"
+                    placeholder="Type your message..."></textarea>
+        </div>
+        <div class="cxm-ld-sheet-actions">
+          <button class="cxm-ld-action-btn cxm-ld-action-secondary" (click)="closeMessageSheet()">
+            Cancel
+          </button>
+          <button class="cxm-ld-action-btn cxm-ld-action-primary"
+                  [disabled]="sendingMessage() || !messageSubject.trim() || !messageBody.trim()"
+                  (click)="sendMessage()">
+            @if (sendingMessage()) {
+              <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
+              <span>Sending...</span>
+            } @else {
+              <ion-icon name="paper-plane-outline" style="font-size: 16px"></ion-icon>
+              <span>Send</span>
+            }
+          </button>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     :host { display: block; }
@@ -327,6 +415,171 @@ import { ApiService } from '../../core/services/api.service';
       color: var(--cx-text-muted);
       margin-top: 1px;
     }
+
+    /*
+     * Body wrapper — replaces the old 'px-4 pb-6 flex flex-col gap-3
+     * -mt-4' class. Needs padding-bottom that clears BOTH the sticky
+     * action bar (~64px including its own safe-area inset) AND the
+     * app-wide bottom tab bar (~56px) PLUS breathing room. Same pattern
+     * as loan-capture.page.ts .cxm-lc-body (commit 9ca03b3).
+     *
+     * Total: ~150px safe + env(safe-area-inset-bottom).
+     */
+    .cxm-ld-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 16px;
+      padding-bottom: calc(150px + env(safe-area-inset-bottom));
+      margin-top: -16px;
+    }
+
+    /*
+     * Sticky action bar — positioned absolutely at the bottom of the
+     * page, above the app tab bar. Uses env() safe-area so the bar
+     * itself sits above the iOS home indicator; the tab bar beneath
+     * has its own inset handling.
+     *
+     * bottom: 56px = tab bar height. The bar sits directly on top of
+     * the tab bar with a subtle shadow separating them. This position
+     * makes Submit always reachable even when the page is scrolled.
+     */
+    .cxm-ld-action-bar {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(56px + env(safe-area-inset-bottom));
+      display: flex;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--cx-surface);
+      border-top: 1px solid var(--cx-border);
+      box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+      z-index: 10;
+    }
+
+    .cxm-ld-action-btn {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+      min-height: 44px; /* 44px min-tap-target on mobile */
+    }
+
+    .cxm-ld-action-secondary {
+      background: var(--cx-surface);
+      color: var(--cx-text-secondary);
+      border-color: var(--cx-border);
+    }
+    .cxm-ld-action-secondary:active {
+      background: var(--cx-surface-hover, var(--cx-surface-2));
+      transform: scale(0.98);
+    }
+
+    .cxm-ld-action-primary {
+      background: linear-gradient(135deg, var(--cx-primary-700), var(--cx-primary-600));
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(10, 79, 42, 0.24);
+    }
+    .cxm-ld-action-primary:disabled {
+      opacity: 0.5;
+      box-shadow: none;
+    }
+    .cxm-ld-action-primary:not(:disabled):active {
+      transform: scale(0.99);
+    }
+
+    /* ═══ Message sheet (loan-scoped conversation starter) ═══ */
+    .cxm-ld-sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 100;
+    }
+    .cxm-ld-sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--cx-surface);
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      z-index: 101;
+      padding-bottom: env(safe-area-inset-bottom);
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .cxm-ld-sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--cx-border);
+      border-radius: 2px;
+      margin: 8px auto 4px;
+      flex-shrink: 0;
+    }
+    .cxm-ld-sheet-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px 14px;
+      border-bottom: 1px solid var(--cx-border-subtle);
+    }
+    .cxm-ld-sheet-title {
+      margin: 0;
+      font-size: var(--cx-text-md);
+      font-weight: 600;
+      color: var(--cx-text);
+    }
+    .cxm-ld-sheet-sub {
+      margin: 2px 0 0;
+      font-size: 11px;
+      color: var(--cx-text-muted);
+    }
+    .cxm-ld-sheet-close {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--cx-surface-muted, rgba(0,0,0,0.04));
+      border: none;
+      border-radius: 50%;
+      color: var(--cx-text-secondary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .cxm-ld-sheet-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 20px;
+    }
+    .cxm-ld-sheet-input,
+    .cxm-ld-sheet-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--cx-surface-2);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm);
+      color: var(--cx-text);
+      outline: none;
+      transition: border-color var(--cx-dur-fast) var(--cx-ease-premium);
+      font-family: inherit;
+      resize: none;
+    }
+    .cxm-ld-sheet-input:focus,
+    .cxm-ld-sheet-textarea:focus {
+      border-color: var(--cx-primary-600);
+      background: var(--cx-surface);
+    }
+    .cxm-ld-sheet-actions {
+      display: flex;
+      gap: 10px;
+      padding: 12px 20px 16px;
+      border-top: 1px solid var(--cx-border-subtle);
+    }
   `],
 })
 export class LoanDetailPage implements OnInit {
@@ -335,8 +588,24 @@ export class LoanDetailPage implements OnInit {
   approvals = signal<any[]>([]);
   loading = signal(true);
 
-  constructor(private api: ApiService) {
-    addIcons({ timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close });
+  // Action bar state
+  submitting = signal(false);
+
+  // Message sheet state
+  messageSheetOpen = signal(false);
+  sendingMessage = signal(false);
+  messageSubject = '';
+  messageBody = '';
+
+  constructor(
+    private api: ApiService,
+    private router: Router,
+    private toast: ToastService,
+  ) {
+    addIcons({
+      timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
+      chatbubbleEllipsesOutline, paperPlaneOutline, createOutline,
+    });
   }
 
   ngOnInit(): void {
@@ -350,6 +619,90 @@ export class LoanDetailPage implements OnInit {
         error: () => {},
       });
     }
+  }
+
+  /**
+   * True when the loan is in a state that can be submitted for
+   * approval. Matches the backend's LoanStatus transition map
+   * (DRAFT or CAPTURED → SUBMITTED). Any other status already
+   * passed the gate; showing the button would lead to a 400.
+   */
+  canSubmit(status: string | null | undefined): boolean {
+    if (!status) return false;
+    const s = status.toLowerCase();
+    return s === 'captured' || s === 'draft';
+  }
+
+  /**
+   * Submit the loan for approval. POST /loans/:id/submit transitions
+   * the status CAPTURED → SUBMITTED and kicks off the approval engine.
+   *
+   * On success: refresh the loan payload (status + trails + approvals
+   * will all be new) and toast the user. On error: the error
+   * interceptor already toasts the server message; we just flip
+   * submitting back to false so the button re-enables.
+   */
+  submitLoan(): void {
+    if (this.submitting()) return;
+    this.submitting.set(true);
+    this.api.post(`/loans/${this.id}/submit`, {}).subscribe({
+      next: res => {
+        this.submitting.set(false);
+        this.loan.set(res.data);
+        // Re-fetch approvals since initiate() may have created new rows
+        this.api.get(`/approvals/loan/${this.id}`).subscribe({
+          next: r => this.approvals.set(r.data || []),
+          error: () => {},
+        });
+        this.toast.success('Loan submitted for approval');
+      },
+      error: () => this.submitting.set(false),
+    });
+  }
+
+  /**
+   * Open the compose sheet for a loan-scoped conversation. Pre-fills
+   * a sensible default subject; agent can edit before sending.
+   */
+  openMessageSheet(): void {
+    const appId = this.loan()?.application_id || 'loan';
+    this.messageSubject = `Re: ${appId}`;
+    this.messageBody = '';
+    this.messageSheetOpen.set(true);
+  }
+
+  closeMessageSheet(): void {
+    if (this.sendingMessage()) return; // don't allow close mid-send
+    this.messageSheetOpen.set(false);
+  }
+
+  /**
+   * POST /conversations with subject/body/loan_id. Backend attaches
+   * the calling agent and creates the initial message in one shot.
+   * On success: close sheet, toast, and navigate to the new thread
+   * so the agent can continue the exchange immediately.
+   */
+  sendMessage(): void {
+    const subject = this.messageSubject.trim();
+    const body = this.messageBody.trim();
+    if (!subject || !body || this.sendingMessage()) return;
+    this.sendingMessage.set(true);
+    this.api.post('/conversations', {
+      subject,
+      message: body,
+      loan_id: this.id,
+    }).subscribe({
+      next: res => {
+        this.sendingMessage.set(false);
+        this.messageSheetOpen.set(false);
+        this.toast.success('Conversation started');
+        const conversationId = res.data?.id;
+        if (conversationId) {
+          this.router.navigate(['/messages', conversationId]);
+        }
+      },
+      error: () => this.sendingMessage.set(false),
+    });
   }
 
   infoFields(): {label:string;value:string}[] {
