@@ -150,7 +150,7 @@ export class LoansComponent implements OnInit {
     { key: 'customer_name', label: 'Customer' },
     { key: 'product_name', label: 'Product' },
     { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right' },
-    { key: 'tenor', label: 'Tenor' },
+    { key: 'tenure', label: 'Tenor' },
     { key: 'status', label: 'Status' },
     { key: 'created_at', label: 'Applied', type: 'date' },
   ];
@@ -192,17 +192,17 @@ export class LoansComponent implements OnInit {
         const fn = `CreditX_Loans_${ts}`;
         const h = ['App ID','Customer','Product','Amount','Tenor','Status','Applied'];
         if (format === 'csv') {
-          const rows = [h.join(','), ...data.map((r: any) => [r.application_id, `"${r.customer_name}"`, `"${r.product_name||''}"`, r.amount_requested, r.tenor, r.status, r.created_at].join(','))];
+          const rows = [h.join(','), ...data.map((r: any) => [r.application_id, `"${r.customer_name}"`, `"${r.product_name||''}"`, r.amount_requested, r.tenure, r.status, r.created_at].join(','))];
           this.dl(new Blob([rows.join('\n')], { type: 'text/csv' }), fn + '.csv');
         } else if (format === 'excel') {
           let html = '<html><head><meta charset="UTF-8"></head><body><table border="1"><tr>' + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
-          for (const r of data) html += `<tr><td>${r.application_id}</td><td>${r.customer_name}</td><td>${r.product_name||''}</td><td>${r.amount_requested}</td><td>${r.tenor}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
+          for (const r of data) html += `<tr><td>${r.application_id}</td><td>${r.customer_name}</td><td>${r.product_name||''}</td><td>${r.amount_requested}</td><td>${r.tenure}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
           this.dl(new Blob([html + '</table></body></html>'], { type: 'application/vnd.ms-excel' }), fn + '.xls');
         } else if (format === 'pdf') {
           const w = window.open('', '_blank'); if (!w) return;
           let html = `<html><head><title>Loans</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px;font-size:10px}th{background:#0A4F2A;color:white}.meta{color:#666;font-size:10px}</style></head><body>`;
           html += `<h1>CreditX — Loan Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | ${data.length} loans</p><table><tr>` + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
-          for (const r of data) html += `<tr><td>${r.application_id}</td><td>${r.customer_name}</td><td>${r.product_name||''}</td><td>${r.amount_requested}</td><td>${r.tenor}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
+          for (const r of data) html += `<tr><td>${r.application_id}</td><td>${r.customer_name}</td><td>${r.product_name||''}</td><td>${r.amount_requested}</td><td>${r.tenure}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
           w.document.write(html + '</table></body></html>'); w.document.close(); w.onload = () => w.print();
         }
         this.toast.success(`Exported ${data.length} loans`);

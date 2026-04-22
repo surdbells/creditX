@@ -104,10 +104,15 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                   </tr>
                 </thead>
                 <tbody>
-                  @for (fee of loan().fee_breakdowns; track fee.name) {
+                  @for (fee of loan().fee_breakdowns; track fee.id) {
                     <tr>
-                      <td>{{ fee.name }}</td>
-                      <td class="cx-loan-fee-calc">{{ fee.calculation_type || 'Flat' }} @if (fee.percentage) { · {{ fee.percentage }}% }</td>
+                      <td>{{ fee.fee_type_name || fee.fee_type_code || '—' }}</td>
+                      <td class="cx-loan-fee-calc">
+                        {{ fee.calculation_type | titlecase }}
+                        @if (fee.calculation_type === 'percentage' && fee.base_value) {
+                          · {{ (fee.base_value * 100) | number:'1.0-2' }}%
+                        }
+                      </td>
                       <td class="cx-dash-right tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</td>
                     </tr>
                   }
@@ -227,6 +232,37 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
               </div>
             } @else {
               <div class="py-8 text-center text-sm text-[var(--cx-text-muted)]">No trail records</div>
+            }
+          </div>
+        }
+
+        <!-- DOCUMENTS TAB -->
+        @if (activeTab === 'documents') {
+          <div class="cx-card">
+            @if (documentsLoading()) {
+              <cx-loading size="sm" message="Loading documents..."></cx-loading>
+            } @else if (documents().length === 0) {
+              <div class="py-8 text-center text-sm text-[var(--cx-text-muted)]">No documents attached to this loan</div>
+            } @else {
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                @for (doc of documents(); track doc.id) {
+                  <div class="cx-loan-doc-card">
+                    <div class="cx-loan-doc-icon" [attr.data-mime]="docMimeCategory(doc.mime_type)">
+                      <lucide-icon [name]="docIcon(doc.mime_type)" [size]="20"></lucide-icon>
+                    </div>
+                    <div class="cx-loan-doc-meta">
+                      <div class="cx-loan-doc-name" [title]="doc.file_name">{{ doc.file_name }}</div>
+                      <div class="cx-loan-doc-sub">
+                        <span>{{ prettyDocType(doc.type) }}</span>
+                        @if (doc.file_size) { <span>·</span><span>{{ formatBytes(doc.file_size) }}</span> }
+                      </div>
+                    </div>
+                    <div class="cx-loan-doc-actions">
+                      <cx-status-badge [status]="doc.status"></cx-status-badge>
+                    </div>
+                  </div>
+                }
+              </div>
             }
           </div>
         }
@@ -350,6 +386,66 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
     }
 
     .cx-dash-right { text-align: right; }
+
+    /* ═══ Documents tab — card grid ═══ */
+    .cx-loan-doc-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl, 12px);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cx-loan-doc-card:hover {
+      border-color: var(--cx-border-strong, var(--cx-border));
+      background: var(--cx-surface-hover, var(--cx-surface-2));
+      transform: translateY(-1px);
+      box-shadow: var(--cx-shadow-sm);
+    }
+    .cx-loan-doc-icon {
+      width: 40px; height: 40px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--cx-surface-2);
+      color: var(--cx-text-secondary);
+    }
+    .cx-loan-doc-icon[data-mime="image"] {
+      background: rgba(34, 197, 94, 0.10);
+      color: #16a34a;
+    }
+    .cx-loan-doc-icon[data-mime="pdf"] {
+      background: rgba(239, 68, 68, 0.10);
+      color: #dc2626;
+    }
+    .cx-loan-doc-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .cx-loan-doc-name {
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      color: var(--cx-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-loan-doc-sub {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-top: 3px;
+      white-space: nowrap;
+    }
+    .cx-loan-doc-actions {
+      flex-shrink: 0;
+    }
   `],
 })
 export class LoanDetailComponent implements OnInit {
@@ -360,6 +456,8 @@ export class LoanDetailComponent implements OnInit {
   scheduleLoading = signal(false);
   payments = signal<any[]>([]);
   approvals = signal<any[]>([]);
+  documents = signal<any[]>([]);
+  documentsLoading = signal(false);
   activeTab: string = 'summary';
   showDisburse = signal(false);
   disbursing = signal(false);
@@ -369,6 +467,7 @@ export class LoanDetailComponent implements OnInit {
     { id: 'summary', label: 'Summary' },
     { id: 'schedule', label: 'Repayment Schedule' },
     { id: 'payments', label: 'Payments' },
+    { id: 'documents', label: 'Documents' },
     { id: 'approvals', label: 'Approval Trail' },
     { id: 'trail', label: 'Loan Trail' },
   ];
@@ -398,6 +497,71 @@ export class LoanDetailComponent implements OnInit {
     this.api.get(`/approvals/loan/${this.id}`).subscribe({
       next: r => this.approvals.set(r.data || []),
     });
+    // Documents — fetch eagerly so the tab count / empty-state
+    // reflects reality the moment the user clicks into Documents.
+    // Doc counts are typically <10 per loan so the payload is small.
+    this.documentsLoading.set(true);
+    this.api.get('/documents', { loan_id: this.id }).subscribe({
+      next: r => { this.documents.set(r.data || []); this.documentsLoading.set(false); },
+      error: () => this.documentsLoading.set(false),
+    });
+  }
+
+  // ── Documents tab helpers ─────────────────────────────────────────
+
+  /**
+   * Icon for a document card based on MIME type. Constrained to icons
+   * already registered in admin app.config.ts LucideAngularModule.pick —
+   * 'file-text' for docs/PDFs, 'file-spreadsheet' for Excel, and we use
+   * the generic 'file-text' for anything else including images (no
+   * dedicated 'image' icon is picked).
+   */
+  docIcon(mime: string | null | undefined): string {
+    if (!mime) return 'file-text';
+    if (mime.includes('sheet') || mime.includes('excel')) return 'file-spreadsheet';
+    return 'file-text';
+  }
+
+  /**
+   * Category for tinting the icon well. Keeps images 'photo-green' and
+   * PDFs 'paper-red' etc., consistent with document-viewer conventions.
+   */
+  docMimeCategory(mime: string | null | undefined): string {
+    if (!mime) return 'other';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime === 'application/pdf') return 'pdf';
+    return 'other';
+  }
+
+  /**
+   * Humanise a DocumentType enum value. 'id_card' → 'ID Card',
+   * 'bank_statement' → 'Bank Statement'. Titlecase + underscore swap.
+   */
+  prettyDocType(type: string | null | undefined): string {
+    if (!type) return '—';
+    // Special-case common acronyms where titlecase would look wrong
+    const special: Record<string, string> = {
+      'id_card': 'ID Card',
+      'work_id': 'Work ID',
+    };
+    if (special[type]) return special[type];
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  /**
+   * Human-readable file size. 0 bytes stays '0 B' (not '0 undefined').
+   * 1,024 is 1 KB (binary). Keep one decimal for KB+, zero for bytes.
+   */
+  formatBytes(n: number | null | undefined): string {
+    if (n == null || n <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    return i === 0 ? `${Math.round(v)} B` : `${v.toFixed(1)} ${units[i]}`;
   }
 
   disburse(): void {
