@@ -226,6 +226,38 @@ final class CreateLoanAction
             $agentUser = $agentRepo->find($userId);
             if ($agentUser && $isAgent) {
                 $loan->setAgent($agentUser);
+
+                /*
+                 * Branch auto-assignment for agent-originated loans.
+                 *
+                 * When an agent creates a loan without explicitly supplying
+                 * branch_id (the default case — the agent-mobile capture
+                 * form has no branch picker), we fall back to the agent's
+                 * first assigned Location. This mirrors the business rule
+                 * 'branch is same as location' — an agent can only
+                 * originate loans for the location(s) they're assigned to.
+                 *
+                 * If the agent has NO locations assigned, we reject the
+                 * submission with 400 per product decision. An unassigned
+                 * agent shouldn't be originating loans at all; failing
+                 * loudly here surfaces the misconfigured user to the
+                 * administrator.
+                 *
+                 * If branch_id WAS provided explicitly (and matched an
+                 * existing Location), that wins — the auto-assignment
+                 * only fills the gap, never overrides an explicit value.
+                 */
+                if ($loan->getBranch() === null) {
+                    $agentLocations = $agentUser->getLocations();
+                    if ($agentLocations->isEmpty()) {
+                        $this->em->rollback();
+                        return $this->error(
+                            'Your account has no branch/location assigned. Contact your administrator to assign at least one location before creating loans.',
+                            400,
+                        );
+                    }
+                    $loan->setBranch($agentLocations->first());
+                }
             }
 
             // Create loan transaction

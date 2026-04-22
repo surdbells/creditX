@@ -182,32 +182,63 @@ final class ApprovalEngineService
      */
     public function getQueue(User $user, int $offset, int $limit, ?string $search = null): array
     {
-        $roleIds = $user->getRoles()->map(fn($r) => $r->getId())->toArray();
-        if (empty($roleIds)) {
-            return ['items' => [], 'total' => 0];
-        }
-
-        // Aggregate across all user roles
-        $allItems = [];
-        $total = 0;
-        foreach ($roleIds as $roleId) {
-            $result = $this->approvalRepo->findPendingForRole($roleId, 0, 1000, $search);
-            foreach ($result['items'] as $item) {
-                $allItems[$item->getId()] = $item; // dedupe
+        /*
+         * Two visibility modes:
+         *
+         *   1. Global visibility — user has 'loans.approve' permission via
+         *      ANY role (typically Super Admin, Credit Manager, etc.).
+         *      They see every pending approval in the system, regardless
+         *      of which step role the approval is routed to. This fixes
+         *      the 'queue is empty despite having submitted loans' bug:
+         *      before this change, a Super Admin whose roles didn't
+         *      include the exact workflow step role saw nothing.
+         *
+         *   2. Role-scoped visibility — user does NOT have loans.approve
+         *      but IS assigned to a role that owns workflow steps. They
+         *      see only approvals routed to their specific role(s).
+         *      This is the original behavior, preserved for role-based
+         *      approvers like Branch Manager, Credit Officer, etc. whose
+         *      view should be scoped to their scope of responsibility.
+         *
+         * The global-visibility path is the superset — a user with
+         * loans.approve AND a specific step role still sees everything.
+         * This matches how admins expect approval queues to work:
+         * permissions gate access, roles provide default routing but
+         * don't restrict broad-access users.
+         */
+        if ($user->hasPermission('loans.approve')) {
+            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search);
+            $items = $result['items'];
+            $total = $result['total'];
+        } else {
+            $roleIds = $user->getRoles()->map(fn($r) => $r->getId())->toArray();
+            if (empty($roleIds)) {
+                return ['items' => [], 'total' => 0];
             }
+
+            // Aggregate across all user roles for role-scoped users.
+            // The repo-level query already filters by status=PENDING and
+            // joins the step; we dedupe by approval id in case a user
+            // has multiple roles that match the same step.
+            $allItems = [];
+            foreach ($roleIds as $roleId) {
+                $result = $this->approvalRepo->findPendingForRole($roleId, 0, 1000, $search);
+                foreach ($result['items'] as $item) {
+                    $allItems[$item->getId()] = $item;
+                }
+            }
+
+            $items = array_values($allItems);
+
+            // Sort + paginate in PHP since we aggregated across role queries
+            usort($items, fn(LoanApproval $a, LoanApproval $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
+            $total = count($items);
+            $items = array_slice($items, $offset, $limit);
         }
-
-        $items = array_values($allItems);
-
-        // Sort by creation date
-        usort($items, fn(LoanApproval $a, LoanApproval $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
-
-        $total = count($items);
-        $paged = array_slice($items, $offset, $limit);
 
         $output = array_map(fn(LoanApproval $a) => array_merge($a->toArray(), [
             'loan' => $a->getLoan()->toArray(),
-        ]), $paged);
+        ]), $items);
 
         return ['items' => $output, 'total' => $total];
     }

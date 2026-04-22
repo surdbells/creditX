@@ -102,6 +102,12 @@ class ApprovalWorkflow
             'name'         => $this->name,
             'mode'         => $this->mode->value,
             'is_active'    => $this->isActive,
+            // Cheap scalar counts — always included so list views don't
+            // have to load full relations just to show 'N steps' columns.
+            // This is the fix for the admin workflow-listing STEPS column
+            // which was reading 'steps_count' and getting undefined.
+            'steps_count'      => $this->steps->count(),
+            'conditions_count' => $this->conditions->count(),
             'created_at'   => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'   => $this->updatedAt->format('Y-m-d H:i:s'),
         ];

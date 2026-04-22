@@ -71,6 +71,41 @@ class LoanApprovalRepository extends BaseRepository
     }
 
     /**
+     * Find ALL pending approvals regardless of step/role assignment.
+     * Used by the approval queue when the caller has a global-visibility
+     * permission (e.g. Super Admin) — they need to see every pending
+     * approval across all workflows, not just ones routed to their roles.
+     *
+     * Distinct from findAllPending(loanId) above which filters by a single
+     * loan. This method is the queue-wide counterpart.
+     *
+     * @return array{items: LoanApproval[], total: int}
+     */
+    public function findAllPendingQueue(int $offset, int $limit, ?string $search = null): array
+    {
+        $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
+            ->innerJoin('a.step', 's')
+            ->innerJoin('a.loan', 'l')
+            ->innerJoin('l.customer', 'c')
+            ->where('a.status = :status')
+            ->setParameter('status', ApprovalStatus::PENDING->value);
+
+        if ($search && $search !== '') {
+            $qb->andWhere($qb->expr()->orX(
+                $qb->expr()->like('LOWER(l.applicationId)', ':search'),
+                $qb->expr()->like('LOWER(c.fullName)', ':search'),
+            ))->setParameter('search', '%' . strtolower($search) . '%');
+        }
+
+        $countQb = clone $qb;
+        $countQb->select('COUNT(a.id)')->resetDQLPart('orderBy');
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+
+        $qb->orderBy('a.createdAt', 'ASC')->setFirstResult($offset)->setMaxResults($limit);
+        return ['items' => $qb->getQuery()->getResult(), 'total' => $total];
+    }
+
+    /**
      * Find approvals nearing or past SLA.
      * @return LoanApproval[]
      */
