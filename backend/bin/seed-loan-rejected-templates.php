@@ -87,7 +87,12 @@ $toUpdate = [];
 $unchanged = [];
 
 foreach ($templates as $def) {
-    $existing = $repo->findOneBy(['code' => $def['code']]);
+    // NotificationTemplate::setCode uppercases the stored value, so
+    // look up using the uppercase form to match what's on disk.
+    // Previously this used the raw lowercase key and incorrectly
+    // reported all rows as missing, then hit a unique-constraint
+    // violation on insert.
+    $existing = $repo->findOneBy(['code' => strtoupper($def['code'])]);
     if ($existing === null) {
         $toCreate[] = $def;
     } elseif (!empty($def['upsert'])) {
