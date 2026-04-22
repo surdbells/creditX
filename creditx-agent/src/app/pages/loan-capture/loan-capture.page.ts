@@ -535,7 +535,13 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
           <!-- Step 5: Document Upload -->
           @if (step() === 4) {
             <div class="flex flex-col gap-3">
-              <p class="cxm-lc-doc-hint">Upload required documents (passport, ID, payslip, bank statement). Max 10MB each.</p>
+              <div class="cxm-lc-doc-head-row">
+                <p class="cxm-lc-doc-hint">All documents are required. Max 10MB each.</p>
+                <span class="cxm-lc-doc-counter tabular-nums"
+                      [class.is-complete]="allDocsStaged()">
+                  {{ stagedDocCount() }} of {{ docTypes.length }}
+                </span>
+              </div>
 
               @for (docType of docTypes; track docType.key) {
                 <div class="cxm-lc-doc">
@@ -1397,12 +1403,42 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
     }
 
     /* ─── Documents (step 5) ─── */
+    .cxm-lc-doc-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 2px;
+    }
     .cxm-lc-doc-hint {
       font-size: var(--cx-text-xs);
       color: var(--cx-text-muted);
       margin: 0;
       line-height: 1.5;
-      padding: 0 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    /*
+     * Progress pill: 'N of 4' counter. Neutral when incomplete, flips
+     * to primary-green when allDocsStaged() is true — a visual 'green
+     * light' that mirrors the Next button becoming enabled. The pill
+     * updates reactively via the signal-backed stagedDocCount() count.
+     */
+    .cxm-lc-doc-counter {
+      flex-shrink: 0;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cx-text-muted);
+      background: var(--cx-surface-2);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-pill);
+      transition: all var(--cx-dur-fast) var(--cx-ease-premium);
+    }
+    .cxm-lc-doc-counter.is-complete {
+      color: #fff;
+      background: var(--cx-primary-600);
+      border-color: var(--cx-primary-600);
     }
     .cxm-lc-doc {
       background: var(--cx-surface);
@@ -2066,16 +2102,23 @@ export class LoanCapturePage implements OnInit, OnDestroy {
                   && !!this.form['phone']
                   && !!this.form['bvn']
                   && this.bvnError() === null;
-      case 4: return true; // docs are optional
+      // Step 4: ALL document types must be staged. Previously this was
+      // optional (return true); user testing revealed loans were being
+      // submitted without required docs, blocking downstream approval.
+      // Now the Next button stays disabled until every docTypes entry
+      // has a file in uploadedDocs.
+      case 4: return this.allDocsStaged();
       default: return true;
     }
   }
 
   /**
-   * Additional check for the final submit button. Identical to the
-   * Step 3 gate — we don't let the agent submit without a valid
-   * BVN even if they somehow reached Step 5. Belt + suspenders vs
-   * edge cases where step state and data state drift.
+   * Additional check for the final submit button. Requires:
+   *   - Every form field that Steps 0-3 validated
+   *   - A valid BVN (belt + suspenders vs Step 3's own check)
+   *   - All required documents staged (matches Step 4's canProceed
+   *     gate — if the user reached Step 5 without docs, we still
+   *     refuse to submit)
    */
   canSubmit(): boolean {
     return !!this.form['product_id']
@@ -2085,7 +2128,25 @@ export class LoanCapturePage implements OnInit, OnDestroy {
         && !!this.form['full_name']
         && !!this.form['phone']
         && !!this.form['bvn']
-        && this.bvnError() === null;
+        && this.bvnError() === null
+        && this.allDocsStaged();
+  }
+
+  /**
+   * True when every docType in the required list has a file staged
+   * in uploadedDocs. Used by both step-4's Next gate and the final
+   * submit gate.
+   */
+  allDocsStaged(): boolean {
+    return this.docTypes.every(dt => this.uploadedDocs.has(dt.key));
+  }
+
+  /**
+   * Count of staged docs — for the 'N of M' progress indicator on
+   * the docs step. Keeps the template simple and testable.
+   */
+  stagedDocCount(): number {
+    return this.docTypes.filter(dt => this.uploadedDocs.has(dt.key)).length;
   }
 
   /**
