@@ -8,10 +8,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 
 @Component({
   selector: 'app-loans', standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -69,6 +70,13 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         [searchPlaceholder]="''" [hasActions]="true" (query)="onQuery($event)">
+        <ng-template #cellTemplate let-row let-col="column">
+          @if (col.key === 'status') {
+            <cx-status-badge [status]="row.status"></cx-status-badge>
+          } @else {
+            {{ row[col.key] }}
+          }
+        </ng-template>
         <ng-template #rowActions let-row>
           <a [routerLink]="['/loans', row.id]" class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" title="View">
             <lucide-icon name="eye" [size]="14"></lucide-icon>
@@ -151,7 +159,7 @@ export class LoansComponent implements OnInit {
     { key: 'product_name', label: 'Product' },
     { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right' },
     { key: 'tenure', label: 'Tenor' },
-    { key: 'status', label: 'Status' },
+    { key: 'status', label: 'Status', type: 'custom' },
     { key: 'created_at', label: 'Applied', type: 'date' },
   ];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
