@@ -245,14 +245,52 @@ final class PeriodCloseService
     }
 
     /**
-     * Check if a given date falls inside a CLOSED period. Used by the
-     * prePersist hook on LedgerTransaction to block back-dated postings.
+     * Check if a given date falls inside a CLOSED period. Used by
+     * posting services to block back-dated entries after a close.
+     *
+     * Cheap — one indexed lookup on (year, month). The call sites can
+     * hit this once per transaction (at the top of the service method)
+     * rather than per-entry, since every entry in a single transaction
+     * shares the same effective date.
      */
     public function isDateInClosedPeriod(string $year, string $month): bool
     {
         $repo = $this->em->getRepository(AccountingPeriod::class);
         $period = $repo->findOneBy(['year' => $year, 'month' => str_pad($month, 2, '0', STR_PAD_LEFT)]);
         return $period !== null && $period->isClosed();
+    }
+
+    /**
+     * Assert that a date (YYYY-MM-DD) is not in a closed period. Throws
+     * DomainException with a clear operator-friendly message if it is.
+     *
+     * Use at the top of any service method that posts ledger entries
+     * with a user-supplied effective date. Back-dated postings into a
+     * closed period silently corrupt the closing-journal balance (the
+     * closing journal zeroed out income/expense as of the last day of
+     * the month — a new posting with that same date reintroduces
+     * activity that was never closed).
+     *
+     * Note: the period-close service itself is exempt by construction —
+     * it never calls this method on the period it's closing. The
+     * services that do call it are the regular posting paths
+     * (Disbursement, Repayment, Lifecycle, Reversal, Overdue).
+     */
+    public function assertDateOpen(string $date): void
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $date, $m)) {
+            // If the date is malformed we defer the complaint to the
+            // downstream validation — we're not in the business of
+            // validating date formats here.
+            return;
+        }
+        if ($this->isDateInClosedPeriod($m[1], $m[2])) {
+            throw new DomainException(
+                "Cannot post to closed period {$m[1]}-{$m[2]}. " .
+                "Reopen the period first (Accounting → Period Close → Reopen) " .
+                "if you need to amend it."
+            );
+        }
     }
 
     /**

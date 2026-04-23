@@ -360,6 +360,8 @@ return function (App $app): void {
             ->add(new RbacMiddleware('accounting.view'));
         $api->post('/accounting/budgets', Accounting\UpsertBudgetAction::class)
             ->add(new RbacMiddleware('accounting.budget'));
+        $api->post('/accounting/budgets/rollover', Accounting\BudgetRolloverAction::class)
+            ->add(new RbacMiddleware('accounting.budget'));
         $api->delete('/accounting/budgets/{id}', Accounting\DeleteBudgetAction::class)
             ->add(new RbacMiddleware('accounting.budget'));
 

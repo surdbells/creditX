@@ -25,6 +25,7 @@ final class DisbursementService
         private readonly CustomerLedgerRepository $clRepo,
         private readonly LoanCalculationService $calcService,
         private readonly SettingsCacheService $settings,
+        private readonly PeriodGuardService $periodGuard,
     ) {
     }
 
@@ -54,6 +55,13 @@ final class DisbursementService
         if ($loan->getStatus() !== LoanStatus::APPROVED) {
             throw new DomainException('Loan must be in Approved status to disburse');
         }
+
+        // Back-date guard — effective date must not fall in a closed
+        // period. Disbursement is the only entry path where the user
+        // supplies the effective date directly (other posting paths
+        // default to today()), so a back-dated disbursement is the
+        // most likely way a closed period gets mutated.
+        $this->periodGuard->assertDateOpen($effectiveDate);
 
         $settlementGl = $this->glRepo->find($settlementGlId);
         if ($settlementGl === null) {

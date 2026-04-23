@@ -25,6 +25,7 @@ final class OverdueService
         private readonly CustomerLedgerRepository $clRepo,
         private readonly SettingsCacheService $settings,
         private readonly ?NotificationDispatchService $notifService = null,
+        private readonly ?PeriodGuardService $periodGuard = null,
     ) {
     }
 
@@ -39,6 +40,15 @@ final class OverdueService
         if (!$this->settings->getBool('penalty.overdue_check_enabled', true)) {
             return ['overdue_loans' => 0, 'penalties_applied' => 0, 'details' => [], 'message' => 'Overdue check is disabled'];
         }
+
+        // Back-date guard — penalty postings use today's date. This
+        // only fires if the operator has already closed the current
+        // month, which would be unusual but would make the auto-job
+        // silently start posting into a closed period. Fail loudly
+        // instead. The optional-injection pattern preserves backward
+        // compatibility with any caller that constructs OverdueService
+        // without the guard (older CLI scripts, tests).
+        $this->periodGuard?->assertDateOpen(date('Y-m-d'));
 
         $overdueSchedules = $this->scheduleRepo->findOverdue();
         $processedLoans = [];

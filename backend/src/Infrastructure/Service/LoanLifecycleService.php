@@ -25,6 +25,7 @@ final class LoanLifecycleService
         private readonly CustomerLedgerRepository $clRepo,
         private readonly RepaymentScheduleRepository $scheduleRepo,
         private readonly LoanCalculationService $calcService,
+        private readonly PeriodGuardService $periodGuard,
     ) {
     }
 
@@ -36,6 +37,9 @@ final class LoanLifecycleService
         if (!in_array($loan->getStatus(), [LoanStatus::OVERDUE, LoanStatus::ACTIVE], true)) {
             throw new DomainException('Only Active or Overdue loans can be written off');
         }
+
+        // Back-date guard — write-off posts at today's date.
+        $this->periodGuard->assertDateOpen(date('Y-m-d'));
 
         $customerLedger = $this->clRepo->findByLoan($loan->getId());
         $badDebtGl = $this->glRepo->findByCode('BDE');

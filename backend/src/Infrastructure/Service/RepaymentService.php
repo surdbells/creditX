@@ -29,6 +29,7 @@ final class RepaymentService
         private readonly CustomerLedgerRepository $clRepo,
         private readonly RepaymentScheduleRepository $scheduleRepo,
         private readonly SettingsCacheService $settings,
+        private readonly PeriodGuardService $periodGuard,
     ) {
     }
 
@@ -45,6 +46,13 @@ final class RepaymentService
         if (!in_array($loan->getStatus(), [LoanStatus::ACTIVE, LoanStatus::OVERDUE], true)) {
             throw new DomainException('Loan must be Active or Overdue to accept repayment');
         }
+
+        // Back-date guard — repayments always post at today(), so this
+        // only ever fires if today itself has been closed (highly
+        // unusual — you wouldn't close the current month mid-day).
+        // Kept as a belt-and-braces check in case a future change
+        // adds a user-supplied effective date.
+        $this->periodGuard->assertDateOpen(date('Y-m-d'));
 
         $customerLedger = $this->clRepo->findByLoan($loan->getId());
         if ($customerLedger === null) {

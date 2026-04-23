@@ -33,6 +33,10 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <lucide-icon name="refresh-cw" [size]="14"></lucide-icon>
           <span>{{ loading() ? 'Loading…' : 'Refresh' }}</span>
         </button>
+        <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="openRolloverModal()" [disabled]="busy()">
+          <lucide-icon name="copy" [size]="14"></lucide-icon>
+          <span>Rollover</span>
+        </button>
       </cx-page-header>
 
       <div class="cx-bg-controls">
@@ -163,6 +167,74 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         </div>
       }
     </div>
+
+    <!-- Rollover modal -->
+    @if (rolloverOpen()) {
+      <div class="cx-bg-backdrop" (click)="rolloverOpen.set(false)"></div>
+      <div class="cx-bg-modal" role="dialog">
+        <div class="cx-bg-modal-head">
+          <lucide-icon name="copy" [size]="22"></lucide-icon>
+          <div>
+            <div class="cx-bg-modal-eyebrow">Budget Rollover</div>
+            <h2 class="cx-bg-modal-title">Copy budgets to future month(s)</h2>
+            <div class="cx-bg-modal-sub">
+              Copies every budget row from the source month into the target
+              month(s), optionally applying a multiplier (e.g. 1.05 for 5%
+              growth). Existing target rows are skipped unless 'Overwrite'
+              is ticked.
+            </div>
+          </div>
+        </div>
+        <div class="cx-bg-modal-body">
+          <div class="cx-bg-modal-row">
+            <label>
+              <span>Source month</span>
+              <input type="month" class="cx-input" [(ngModel)]="rollSource" />
+            </label>
+            <label>
+              <span>Multiplier</span>
+              <input type="number" class="cx-input" step="0.01" min="0"
+                     [(ngModel)]="rollMultiplier" style="width:120px" />
+            </label>
+          </div>
+          <div>
+            <label class="cx-bg-modal-label">Target months</label>
+            <div class="cx-bg-targets">
+              @for (t of rollTargets; track $index; let i = $index) {
+                <div class="cx-bg-target-row">
+                  <input type="month" class="cx-input" [(ngModel)]="rollTargets[i]" />
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="removeRollTarget(i)"
+                          [disabled]="rollTargets.length <= 1">
+                    <lucide-icon name="trash-2" [size]="12"></lucide-icon>
+                  </button>
+                </div>
+              }
+              <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="addRollTarget()">
+                <lucide-icon name="plus" [size]="12"></lucide-icon>
+                <span>Add target month</span>
+              </button>
+            </div>
+          </div>
+          <label class="cx-bg-modal-checkbox">
+            <input type="checkbox" [(ngModel)]="rollOverwrite" />
+            <span>Overwrite existing target rows</span>
+          </label>
+        </div>
+        <div class="cx-bg-modal-actions">
+          <button class="cx-btn cx-btn-ghost" (click)="rolloverOpen.set(false)" [disabled]="busy()">
+            Cancel
+          </button>
+          <button class="cx-btn cx-btn-primary" (click)="submitRollover()"
+                  [disabled]="busy() || !rollSource || !validTargets()">
+            @if (busy()) { <span>Rolling over…</span> }
+            @else {
+              <lucide-icon name="copy" [size]="14"></lucide-icon>
+              <span>Roll Over</span>
+            }
+          </button>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .cx-bg-controls {
@@ -272,6 +344,97 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     }
     .cx-bg-spin { animation: cx-bg-spin 1s linear infinite; }
     @keyframes cx-bg-spin { to { transform: rotate(360deg); } }
+
+    /* Rollover modal */
+    .cx-bg-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+    .cx-bg-modal {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(560px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 16px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.25);
+      z-index: 101;
+    }
+    .cx-bg-modal-head {
+      display: flex; gap: 14px;
+      padding: 20px 24px;
+    }
+    .cx-bg-modal-head lucide-icon {
+      margin-top: 2px;
+      color: var(--cx-primary-600);
+    }
+    .cx-bg-modal-eyebrow {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-bg-modal-title {
+      margin: 4px 0 6px;
+      font-size: 18px; font-weight: 600;
+      color: var(--cx-text);
+    }
+    .cx-bg-modal-sub {
+      font-size: 13px;
+      color: var(--cx-text-secondary);
+      line-height: 1.5;
+    }
+    .cx-bg-modal-body {
+      padding: 0 24px 16px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .cx-bg-modal-row {
+      display: flex; gap: 14px; flex-wrap: wrap;
+    }
+    .cx-bg-modal-body label {
+      font-size: 12px;
+      color: var(--cx-text-secondary);
+      font-weight: 500;
+    }
+    .cx-bg-modal-body label > span {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-bg-modal-body input[type="month"],
+    .cx-bg-modal-body input[type="number"] {
+      font-size: 13px; padding: 6px 10px;
+    }
+    .cx-bg-modal-label {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .cx-bg-targets {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .cx-bg-target-row {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .cx-bg-target-row input { flex: 1; }
+    .cx-bg-modal-checkbox {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px;
+      color: var(--cx-text);
+      cursor: pointer;
+    }
+    .cx-bg-modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px;
+      padding: 12px 24px 20px;
+      border-top: 1px solid var(--cx-border);
+    }
   `],
 })
 export class BudgetsComponent implements OnInit {
@@ -430,6 +593,85 @@ export class BudgetsComponent implements OnInit {
       error: e => {
         this.busy.set(false);
         this.toast.error(e.error?.message || 'Add failed');
+      },
+    });
+  }
+
+  // ─── Rollover modal ─────────────────────────────────────────────
+  rolloverOpen = signal(false);
+  rollSource = '';
+  rollTargets: string[] = [];
+  rollMultiplier = 1.0;
+  rollOverwrite = false;
+
+  /**
+   * Open the rollover modal, pre-populating the source as the
+   * currently-filtered month and the first target as the following
+   * month — the 90% case is "copy this month to next month".
+   */
+  openRolloverModal() {
+    const curSource = `${this.year}-${this.month || String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    this.rollSource = curSource;
+    // Next month after source as the default target
+    const [sy, sm] = curSource.split('-').map(Number);
+    const next = new Date(sy, sm, 1); // sm is 1-indexed; Date() expects 0-indexed, so sm lands on next month
+    const nextLabel = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+    this.rollTargets = [nextLabel];
+    this.rollMultiplier = 1.0;
+    this.rollOverwrite = false;
+    this.rolloverOpen.set(true);
+  }
+
+  addRollTarget() {
+    // Default the new target to one month after the last existing one
+    const last = this.rollTargets[this.rollTargets.length - 1];
+    if (last) {
+      const [y, m] = last.split('-').map(Number);
+      const next = new Date(y, m, 1);
+      this.rollTargets.push(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`);
+    } else {
+      this.rollTargets.push('');
+    }
+  }
+
+  removeRollTarget(i: number) {
+    if (this.rollTargets.length <= 1) return;
+    this.rollTargets.splice(i, 1);
+  }
+
+  /**
+   * Targets are valid when all entries are YYYY-MM AND none equals
+   * the source. The backend also validates, but surfacing it client-
+   * side lets us disable the submit button rather than bounce the
+   * user.
+   */
+  validTargets(): boolean {
+    if (this.rollTargets.length === 0) return false;
+    for (const t of this.rollTargets) {
+      if (!/^\d{4}-\d{2}$/.test(t)) return false;
+      if (t === this.rollSource) return false;
+    }
+    return true;
+  }
+
+  submitRollover() {
+    if (!this.rollSource || !this.validTargets()) return;
+    this.busy.set(true);
+    this.api.post('/accounting/budgets/rollover', {
+      source: this.rollSource,
+      targets: this.rollTargets,
+      multiplier: String(this.rollMultiplier),
+      overwrite: this.rollOverwrite,
+    }).subscribe({
+      next: r => {
+        this.busy.set(false);
+        this.rolloverOpen.set(false);
+        this.toast.success(r.message || 'Rollover complete');
+        this.load();
+      },
+      error: e => {
+        this.busy.set(false);
+        this.toast.error(e.error?.message || 'Rollover failed');
       },
     });
   }

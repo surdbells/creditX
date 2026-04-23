@@ -13,6 +13,7 @@ final class JournalReversalService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly LedgerTransactionRepository $txRepo,
+        private readonly PeriodGuardService $periodGuard,
     ) {}
 
     /**
@@ -30,6 +31,15 @@ final class JournalReversalService
             ->where('t.reversalOfId = :oid')->setParameter('oid', $transactionId)
             ->getQuery()->getSingleScalarResult();
         if ((int) $existing > 0) throw new DomainException('Transaction has already been reversed');
+
+        // Back-date guard — the reversal posts at today's date, so this
+        // only blocks the rare case of today itself being in a closed
+        // period. Note: reopening a period legitimately triggers
+        // reversal of the closing journal, and PeriodCloseService's
+        // reopenPeriod is allowed because the reversal date is today
+        // (which won't be in the closed period being reopened — that
+        // period is in the past).
+        $this->periodGuard->assertDateOpen(date('Y-m-d'));
 
         // Also reverse all entries with the same callback (batch)
         $batchEntries = [];
