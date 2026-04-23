@@ -507,6 +507,14 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('accounting.view'));
             $group->get('/balance-sheet', Report\BalanceSheetAction::class)
                 ->add(new RbacMiddleware('accounting.view'));
+
+            // ─── Aged Receivables + PAR (commit AE) ───
+            // Aged Receivables: installment-level buckets for collections.
+            // Portfolio At Risk: loan-level PAR30/60/90 for risk mgmt.
+            $group->get('/aged-receivables', Report\AgedReceivablesAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->get('/portfolio-at-risk', Report\PortfolioAtRiskAction::class)
+                ->add(new RbacMiddleware('reports.par'));
         });
 
         // ─── Reconciliation ───

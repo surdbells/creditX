@@ -55,6 +55,8 @@ export class LayoutComponent {
       { label: 'GL Reconciliation', icon: 'scale', route: '/gl-reconciliation', permission: 'accounting.view' },
       { label: 'Income Statement', icon: 'trending-up', route: '/reports/income-statement', permission: 'accounting.view' },
       { label: 'Balance Sheet', icon: 'file-text', route: '/reports/balance-sheet', permission: 'accounting.view' },
+      { label: 'Aged Receivables', icon: 'clock', route: '/reports/aged-receivables', permission: 'accounting.view' },
+      { label: 'Portfolio At Risk', icon: 'alert-triangle', route: '/reports/portfolio-at-risk', permission: 'reports.par' },
       { label: 'Reports', icon: 'bar-chart-3', route: '/reports', permission: 'reports.portfolio' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
     ]},
