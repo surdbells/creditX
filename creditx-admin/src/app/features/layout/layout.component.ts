@@ -62,7 +62,6 @@ export class LayoutComponent {
       { label: 'Budget vs Actual', icon: 'bar-chart-3', route: '/reports/budget-vs-actual', permission: 'accounting.view' },
       { label: 'Provisions', icon: 'shield-alert', route: '/provisions', permission: 'accounting.provision' },
       { label: 'CBN Returns', icon: 'file-spreadsheet', route: '/reports/cbn-returns', permission: 'reports.cbn' },
-      { label: 'CBN Returns', icon: 'file-spreadsheet', route: '/reports/cbn-returns', permission: 'reports.cbn' },
       { label: 'Reports', icon: 'bar-chart-3', route: '/reports', permission: 'reports.portfolio' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
     ]},

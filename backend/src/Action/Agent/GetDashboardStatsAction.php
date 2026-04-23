@@ -96,30 +96,40 @@ final class GetDashboardStatsAction
             $totalThisMonth += (int) $row['cnt'];
         }
 
-        // ── Disbursed count (count of loans with status=disbursed) ────────
+        // ── Disbursed count (count of loans that have been disbursed) ────
         // Informational only — no longer drives progress.
+        //
+        // Uses disbursed_at IS NOT NULL rather than status = DISBURSED
+        // because DisbursementService transitions loans straight from
+        // DISBURSED → ACTIVE in the same transaction (see
+        // DisbursementService::disburse step 7). A loan that sits in
+        // status=DISBURSED is essentially never observed in production —
+        // filtering on that status gave zero almost always, which hid
+        // the agent's actual progress. disbursed_at captures the moment
+        // of disbursement and stays set through ACTIVE/OVERDUE/CLOSED/
+        // WRITTEN_OFF/RESTRUCTURED — all post-disbursement states count
+        // toward the month's target regardless of what happened after.
         $disbursedCount = (int) $conn->fetchOne(
             "SELECT COUNT(id) FROM loans
              WHERE agent_id = :agent_id
-               AND status = :status
+               AND disbursed_at IS NOT NULL
                AND disbursed_at BETWEEN :start AND :end",
             [
                 'agent_id' => $user->getId(),
-                'status' => LoanStatus::DISBURSED->value,
                 'start' => $monthStart->format('Y-m-d H:i:s'),
                 'end' => $monthEnd->format('Y-m-d H:i:s'),
             ]
         );
 
         // ── Disbursed amount (sum of net_disbursed, fallback amount_requested) ─
+        // Same disbursed_at-based scope — see note on $disbursedCount above.
         $disbursedAmountRaw = $conn->fetchOne(
             "SELECT COALESCE(SUM(COALESCE(net_disbursed, amount_requested)), 0) FROM loans
              WHERE agent_id = :agent_id
-               AND status = :status
+               AND disbursed_at IS NOT NULL
                AND disbursed_at BETWEEN :start AND :end",
             [
                 'agent_id' => $user->getId(),
-                'status' => LoanStatus::DISBURSED->value,
                 'start' => $monthStart->format('Y-m-d H:i:s'),
                 'end' => $monthEnd->format('Y-m-d H:i:s'),
             ]

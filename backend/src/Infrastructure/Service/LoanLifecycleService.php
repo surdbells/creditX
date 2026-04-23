@@ -43,8 +43,9 @@ final class LoanLifecycleService
 
         $customerLedger = $this->clRepo->findByLoan($loan->getId());
         $badDebtGl = $this->glRepo->findByCode('BDE');
-        if ($customerLedger === null || $badDebtGl === null) {
-            throw new DomainException('Required GL accounts not found');
+        $lrGl = $this->glRepo->findByCode('LR');
+        if ($customerLedger === null || $badDebtGl === null || $lrGl === null) {
+            throw new DomainException('Required GL accounts not found (CUBGL, BDE, and LR must all be seeded)');
         }
 
         // Calculate outstanding balance
@@ -70,9 +71,12 @@ final class LoanLifecycleService
             $dr->setPostedBy($userId);
             $this->em->persist($dr);
 
-            // CR Customer Ledger (Loan Receivable)
+            // CR Loan Receivable — write-off reduces the aggregate
+            // receivable asset (moved to Bad Debt Expense). The
+            // customerLedger link is preserved so the per-customer
+            // view still shows the write-off entry in context.
             $cr = new LedgerTransaction();
-            $cr->setGeneralLedger($customerLedger->getGeneralLedger());
+            $cr->setGeneralLedger($lrGl);
             $cr->setCustomerLedger($customerLedger);
             $cr->setTransType(TransactionType::CR);
             $cr->setTransAmount($outstanding);

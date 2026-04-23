@@ -24,7 +24,9 @@
         <!-- Section items -->
         @if (isSectionOpen(group.label) || collapsed()) {
           @for (item of group.items; track item.route) {
-            <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label"
+            <a [routerLink]="item.route" routerLinkActive="active"
+               [routerLinkActiveOptions]="{exact: true}"
+               class="nav-item" [title]="item.label"
                (click)="mobileMenuOpen.set(false)">
               <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
               @if (!collapsed()) { <span class="nav-label">{{ item.label }}</span> }
@@ -72,7 +74,9 @@
           @for (group of filteredGroups; track group.label) {
             <div class="text-xs font-medium text-[var(--cx-text-muted)] px-3 pt-3 pb-1 uppercase tracking-wider">{{ group.label }}</div>
             @for (item of group.items; track item.route) {
-              <a [routerLink]="item.route" routerLinkActive="active" class="mobile-nav-item" (click)="mobileMenuOpen.set(false)">
+              <a [routerLink]="item.route" routerLinkActive="active"
+                 [routerLinkActiveOptions]="{exact: true}"
+                 class="mobile-nav-item" (click)="mobileMenuOpen.set(false)">
                 <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
                 {{ item.label }}
               </a>

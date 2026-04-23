@@ -131,7 +131,33 @@ final class DisbursementService
             $customerLedger->setAccountNumber(CustomerLedger::generateAccountNumber());
             $this->em->persist($customerLedger);
 
-            // ─── 2. CR gross loan to customer ledger ───
+            // Loan Receivable GL — the aggregate asset account that
+            // represents everything we're owed by borrowers. Required
+            // for a balanced trial balance: the CR CUBGL at step 2
+            // creates a credit in the GL total that needs a matching
+            // DR somewhere. Before this fix, that DR was missing and
+            // the trial balance was unbalanced by the sum of every
+            // historical gross loan amount.
+            //
+            // Semantics: LR tracks the portfolio asset; CUBGL is the
+            // per-customer wash account. They move together at
+            // disbursement (DR LR + CR CUBGL for gross) and at
+            // repayment (DR BANK + CR LR; CUBGL stays unchanged on
+            // the repayment side since schedules drive outstanding-
+            // balance display, not CUBGL).
+            $lrGl = $this->glRepo->findByCode('LR');
+            if ($lrGl === null) {
+                throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
+            }
+
+            // ─── 2. DR Loan Receivable + CR gross loan to customer ledger ───
+            // Gross loan = application amount + ADDS_TO_GROSS fees.
+            // This is what the customer owes the business.
+            $this->postEntry(
+                $lrGl, null, TransactionType::DR,
+                $transaction->getGrossLoan(), 'LOAN DISBURSEMENT APPROVED - ' . $customerName,
+                $callback, $effectiveDate, $userId
+            );
             $this->postEntry(
                 $customerGl, $customerLedger, TransactionType::CR,
                 $transaction->getGrossLoan(), 'LOAN DISBURSEMENT APPROVED',

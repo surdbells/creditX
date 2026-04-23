@@ -64,6 +64,13 @@ final class RepaymentService
             throw new DomainException('Bank GL account not found');
         }
 
+        // Loan Receivable — the aggregate asset. Repayments reduce it.
+        // See DisbursementService for the paired DR at disbursement time.
+        $lrGl = $this->glRepo->findByCode('LR');
+        if ($lrGl === null) {
+            throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
+        }
+
         $this->em->beginTransaction();
 
         try {
@@ -145,9 +152,23 @@ final class RepaymentService
             $drEntry->setPostedBy($userId);
             $this->em->persist($drEntry);
 
-            // CR Customer Ledger
+            // CR Loan Receivable — reduce the aggregate receivable
+            // asset as cash comes in. Paired with the DR at disbursement.
+            //
+            // Note: we deliberately do NOT also touch CUBGL here. CUBGL
+            // nets to zero per-customer at disbursement (see
+            // DisbursementService steps 2-5); touching it here would
+            // make it go negative. The UI reads outstanding balances
+            // from repayment_schedules (see loan detail page), not
+            // from CUBGL, so the per-customer ledger view stays
+            // coherent without a repayment-side CUBGL posting.
+            //
+            // The customerLedger ManyToOne on the CR entry is preserved
+            // so per-customer repayment history still threads through
+            // the Journal view filtered by customer, even though the
+            // GL account is now LR rather than CUBGL.
             $crEntry = new LedgerTransaction();
-            $crEntry->setGeneralLedger($customerLedger->getGeneralLedger());
+            $crEntry->setGeneralLedger($lrGl);
             $crEntry->setCustomerLedger($customerLedger);
             $crEntry->setTransType(TransactionType::CR);
             $crEntry->setTransAmount($amount);
