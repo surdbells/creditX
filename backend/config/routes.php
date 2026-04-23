@@ -599,6 +599,13 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.reconciliation'));
             $group->post('/{id}/resolve', Reconciliation\ResolveReconciliationAction::class)
                 ->add(new RbacMiddleware('reports.reconciliation'));
+            // AK — per-item actions + candidate search
+            $group->get('/{id}/available-matches', Reconciliation\GetAvailableMatchesAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
+            $group->post('/{id}/items/{itemId}/manual-match', Reconciliation\ManualMatchItemAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
+            $group->post('/{id}/items/{itemId}/resolve', Reconciliation\ResolveItemAction::class)
+                ->add(new RbacMiddleware('reports.reconciliation'));
         });
 
         // ─── DSA Targets ───

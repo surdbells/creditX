@@ -40,6 +40,31 @@ class ReconciliationItem
     #[ORM\Column(type: 'string', length: 30, enumType: ReconciliationMatchType::class)]
     private ReconciliationMatchType $matchType = ReconciliationMatchType::UNMATCHED_BANK;
 
+    /**
+     * When the item has been manually paired with a system transaction
+     * (match_type=MANUAL), this holds the ledger transaction id for
+     * audit traceability.
+     */
+    #[ORM\Column(type: 'string', length: 36, nullable: true)]
+    private ?string $manualMatchTxId = null;
+
+    /**
+     * When an exception has been dispositioned as a known category
+     * (bank_fee / timing / other), this captures the classification
+     * without forcing a match that doesn't exist.
+     */
+    #[ORM\Column(type: 'string', length: 30, nullable: true)]
+    private ?string $resolutionCategory = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $resolutionNote = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $resolvedAt = null;
+
+    #[ORM\Column(type: 'string', length: 36, nullable: true)]
+    private ?string $resolvedBy = null;
+
     public function __construct() { $this->id = Uuid::uuid4()->toString(); }
 
     public function getId(): string { return $this->id; }
@@ -57,6 +82,16 @@ class ReconciliationItem
     public function setStatus(ReconciliationStatus $v): void { $this->status = $v; }
     public function getMatchType(): ReconciliationMatchType { return $this->matchType; }
     public function setMatchType(ReconciliationMatchType $v): void { $this->matchType = $v; }
+    public function getManualMatchTxId(): ?string { return $this->manualMatchTxId; }
+    public function setManualMatchTxId(?string $v): void { $this->manualMatchTxId = $v; }
+    public function getResolutionCategory(): ?string { return $this->resolutionCategory; }
+    public function setResolutionCategory(?string $v): void { $this->resolutionCategory = $v; }
+    public function getResolutionNote(): ?string { return $this->resolutionNote; }
+    public function setResolutionNote(?string $v): void { $this->resolutionNote = $v; }
+    public function getResolvedAt(): ?\DateTimeImmutable { return $this->resolvedAt; }
+    public function setResolvedAt(?\DateTimeImmutable $v): void { $this->resolvedAt = $v; }
+    public function getResolvedBy(): ?string { return $this->resolvedBy; }
+    public function setResolvedBy(?string $v): void { $this->resolvedBy = $v; }
 
     public function toArray(): array
     {
@@ -65,6 +100,11 @@ class ReconciliationItem
             'bank_amount' => $this->bankAmount, 'system_reference' => $this->systemReference,
             'system_amount' => $this->systemAmount, 'status' => $this->status->value,
             'match_type' => $this->matchType->value,
+            'manual_match_tx_id' => $this->manualMatchTxId,
+            'resolution_category' => $this->resolutionCategory,
+            'resolution_note' => $this->resolutionNote,
+            'resolved_at' => $this->resolvedAt?->format('Y-m-d H:i:s'),
+            'resolved_by' => $this->resolvedBy,
         ];
     }
 }
