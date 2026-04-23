@@ -506,6 +506,28 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.cbn'));
             $group->get('/cbn/aging', Report\CbnAgingReportAction::class)
                 ->add(new RbacMiddleware('reports.cbn'));
+
+            // ─── CBN Regulatory Returns (commit AG) ───
+            // Four production-grade returns suitable for CBN submission:
+            //   - CRMS (Credit Risk Management System) — every live loan
+            //     with borrower BVN/NIN/details.
+            //   - NPL Schedule — non-performing loans (90+ DPD) with
+            //     provisioning category and estimated provision.
+            //   - Insider-Related Credit — loans to directors/employees/
+            //     affiliated parties flagged via Customer.is_insider.
+            //   - Monthly Returns — aggregate portfolio metrics for a
+            //     given month (new disbursements, repayments, PAR, NPL).
+            // The existing /cbn/portfolio, /cbn/npl, /cbn/aging (basic
+            // scaffolds from earlier) are left in place for backward
+            // compatibility.
+            $group->get('/cbn/crms-returns', Report\CrmsReturnsAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/cbn/npl-schedule', Report\NplScheduleAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/cbn/insider-related', Report\InsiderRelatedCreditAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
+            $group->get('/cbn/monthly-returns', Report\MonthlyReturnsAction::class)
+                ->add(new RbacMiddleware('reports.cbn'));
             $group->get('/customer-variance', Report\CustomerVarianceReportAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
 

@@ -73,6 +73,24 @@ class Customer
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $bvn = null;
 
+    #[ORM\Column(type: 'string', length: 20, nullable: true)]
+    private ?string $nin = null;
+
+    // CBN Insider-Related Credit flag. When true, the customer is an
+    // employee, director, or otherwise affiliated party — their loans
+    // must be reported separately in the Insider-Related Credit
+    // regulatory return. Defaults to false (ordinary customer).
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isInsider = false;
+
+    /**
+     * Nature of insider relationship. Free-text field for notes like
+     * 'Director — Chairman', 'Employee — HR', 'Affiliate — Vendor'.
+     * Required by CBN when is_insider = true.
+     */
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $insiderRelationship = null;
+
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $numberOfChildren = null;
 
@@ -180,6 +198,9 @@ class Customer
     public function getMothersMaidenName(): ?string { return $this->mothersMaidenName; }
     public function getReligion(): ?string { return $this->religion; }
     public function getBvn(): ?string { return $this->bvn; }
+    public function getNin(): ?string { return $this->nin; }
+    public function isInsider(): bool { return $this->isInsider; }
+    public function getInsiderRelationship(): ?string { return $this->insiderRelationship; }
     public function getNumberOfChildren(): ?int { return $this->numberOfChildren; }
     public function getBankName(): ?string { return $this->bankName; }
     public function getAccountNumber(): ?string { return $this->accountNumber; }
@@ -219,6 +240,9 @@ class Customer
     public function setMothersMaidenName(?string $v): void { $this->mothersMaidenName = $v; }
     public function setReligion(?string $v): void { $this->religion = $v; }
     public function setBvn(?string $v): void { $this->bvn = $v; }
+    public function setNin(?string $v): void { $this->nin = $v; }
+    public function setIsInsider(bool $v): void { $this->isInsider = $v; }
+    public function setInsiderRelationship(?string $v): void { $this->insiderRelationship = $v; }
     public function setNumberOfChildren(?int $v): void { $this->numberOfChildren = $v; }
     public function setBankName(?string $v): void { $this->bankName = $v; }
     public function setAccountNumber(?string $v): void { $this->accountNumber = $v; }

@@ -121,7 +121,7 @@ final class AgedReceivablesAction
             $dimColumn = $groupBy === 'product' ? 'lp.name' : 'br.name';
             $dimJoin = $groupBy === 'product'
                 ? 'LEFT JOIN loan_products lp ON l.product_id = lp.id'
-                : 'LEFT JOIN branches br ON l.branch_id = br.id';
+                : 'LEFT JOIN locations br ON l.branch_id = br.id';
 
             $breakdownSql = "
                 SELECT
