@@ -83,10 +83,50 @@ class Conversation
 
     public function toArray(bool $includeMessages = false, ?string $forUserId = null): array
     {
+        // Resolve the last message for the inbox preview. Preference
+        // is given to Collection::last(), which is already ordered
+        // ASC by createdAt per the #[ORM\OrderBy] annotation — last()
+        // of an ordered collection is therefore the newest.
+        //
+        // The list-view shows the body truncated; we return the full
+        // body and let the frontend handle the ellipsis. Keeps the
+        // preview sensible if the frontend ever wants to expand the
+        // line-height for a two-row preview.
+        $lastMessage = null;
+        $lastMessageSenderId = null;
+        if ($this->messages->count() > 0) {
+            /** @var Message|false $last */
+            $last = $this->messages->last();
+            if ($last !== false) {
+                $lastMessage = $last->getBody();
+                $lastMessageSenderId = $last->getSenderId();
+            }
+        }
+
+        // 'other_user_name' is the label the caller should show in
+        // their inbox row. From the backoffice user's perspective,
+        // the agent is the 'other' party. From the agent's own
+        // perspective (opening the agent app), the 'other' party is
+        // the backoffice — but we don't have a single 'backoffice
+        // user' field on the conversation (messages can be sent by
+        // any staff member), so for agents we fall back to the
+        // subject as the row label. This matches how the agent
+        // app currently labels rows anyway.
+        $agentId = $this->agent->getId();
+        $otherUserName = $forUserId !== null && $forUserId === $agentId
+            ? $this->subject
+            : $this->agent->getFullName();
+
         $data = [
-            'id' => $this->id, 'loan_id' => $this->loanId,
-            'agent_id' => $this->agent->getId(), 'agent_name' => $this->agent->getFullName(),
-            'subject' => $this->subject, 'status' => $this->status->value,
+            'id' => $this->id,
+            'loan_id' => $this->loanId,
+            'agent_id' => $agentId,
+            'agent_name' => $this->agent->getFullName(),
+            'other_user_name' => $otherUserName,
+            'subject' => $this->subject,
+            'status' => $this->status->value,
+            'last_message' => $lastMessage,
+            'last_message_sender_id' => $lastMessageSenderId,
             'last_message_at' => $this->lastMessageAt?->format('Y-m-d H:i:s'),
             'unread_count' => $forUserId ? $this->getUnreadCount($forUserId) : null,
             'message_count' => $this->messages->count(),

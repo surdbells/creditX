@@ -17,16 +17,25 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  * access gate is the loan's agent + backoffice staff (enforced by
  * ConversationRepository::assertCanView).
  *
- * Why a dedicated endpoint rather than /conversations/{id} embedding
- * the messages: the admin UI polls for new messages every 5s, and
- * hitting the conversation detail endpoint on every poll re-serialises
- * the full conversation (loan preview, agent, subject, unread counts)
- * every time — wasteful. This endpoint returns just the messages.
+ * ## Read-marking is OUT-OF-BAND
  *
- * Side effect: marks any unread messages from the OTHER party as
- * read. Matches the behaviour of GetConversationAction so the unread
- * counter decrements when you open the thread, regardless of which
- * endpoint the UI hits.
+ * This endpoint is PURELY read-only. The admin messaging UI polls it
+ * every 5 seconds; doing auto-mark-read here means the backoffice
+ * user's unread badge drops to 0 as soon as a new message arrives,
+ * even if the user isn't looking at their screen (poll fires
+ * regardless of focus).
+ *
+ * Read-marking is a user-intent action. The UI issues an explicit
+ * POST /conversations/{id}/read when the user opens / focuses the
+ * thread (see MarkConversationReadAction), mirroring how channels
+ * work (MarkChannelReadAction).
+ *
+ * ## Why a dedicated endpoint rather than /conversations/{id}
+ *
+ * The admin UI polls for new messages every 5s. Hitting the
+ * conversation detail endpoint on every poll re-serialises the
+ * full conversation (loan preview, agent, subject, unread counts)
+ * every time — wasteful. This endpoint returns just the messages.
  *
  * Messages are capped at 200 rows, oldest-first. If scrollback
  * becomes necessary, add a `before` cursor param.
@@ -46,18 +55,6 @@ final class GetConversationMessagesAction
     {
         $conv = $this->repo->find($args['id'] ?? '');
         if ($conv === null) return $this->notFound('Conversation not found');
-
-        $userId = $request->getAttribute('user_id');
-
-        // Mark messages from the other party as read. Matches the
-        // behaviour of GetConversationAction — opening the thread
-        // (via either endpoint) clears the unread count.
-        foreach ($conv->getMessages() as $msg) {
-            if (!$msg->isRead() && $msg->getSenderId() !== $userId) {
-                $msg->markRead();
-            }
-        }
-        $this->repo->flush();
 
         // Dedicated query (not $conv->getMessages()) so we can bound
         // result size and control ordering independently of the

@@ -16,16 +16,11 @@ final class GetConversationAction
         $conv = $this->repo->find($args['id'] ?? '');
         if ($conv === null) return $this->notFound('Conversation not found');
 
+        // Read-marking is out-of-band — see MarkConversationReadAction.
+        // This GET stays pure so the admin UI polling it every 5s
+        // doesn't silently clear unread counts for a user who isn't
+        // actually looking at the thread.
         $userId = $request->getAttribute('user_id');
-
-        // Mark messages from the other party as read
-        foreach ($conv->getMessages() as $msg) {
-            if (!$msg->isRead() && $msg->getSenderId() !== $userId) {
-                $msg->markRead();
-            }
-        }
-        $this->repo->flush();
-
         return $this->success($conv->toArray(true, $userId));
     }
 }

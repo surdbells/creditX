@@ -11,10 +11,17 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  * Unread counts for the authenticated user — 1:1 conversations + channels.
  *
  * Conversation unread:
- *   Messages on Conversations where this user is the agent, sent by
- *   someone else, with isRead = false.
+ *   - For AGENTS: messages on Conversations where this user is the
+ *     agent, sent by someone else (backoffice), with isRead = false.
+ *   - For BACKOFFICE (any non-agent role): every unread message on
+ *     every open conversation where sender != self. Backoffice users
+ *     don't have an explicit 'recipient' field on the conversation —
+ *     the conversation is owned by an agent but any staff member
+ *     can participate. Counting all unread messages the user DIDN'T
+ *     send matches the list-view behaviour (ListConversationsAction
+ *     already shows backoffice users every conversation).
  *
- * Channel unread (new in 6.5):
+ * Channel unread:
  *   For each of the user's ChannelMember rows that isn't archived:
  *     - If last_read_at IS NULL: all messages not authored by the user count
  *     - Otherwise: messages with created_at > last_read_at, not authored
@@ -29,21 +36,29 @@ final class UnreadCountAction {
     use ApiResponse;
     public function __construct(private readonly EntityManagerInterface $em) {}
 
-    public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
+    public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args = []): ResponseInterface {
         $userId = $request->getAttribute('user_id');
+        $userRoles = (array) $request->getAttribute('user_roles', []);
+        // Agent scope: only conversations the user OWNS. Backoffice
+        // scope: every conversation's unread.
+        $isAgentOnly = in_array('agent', $userRoles, true)
+            && !in_array('super_admin', $userRoles, true);
 
         $convCount = 0;
         try {
-            $convCount = (int) $this->em->createQueryBuilder()
+            $qb = $this->em->createQueryBuilder()
                 ->select('COUNT(m.id)')
                 ->from(Message::class, 'm')
                 ->innerJoin('m.conversation', 'c')
-                ->where('c.agent = :uid')
-                ->andWhere('m.senderId != :uid')
+                ->where('m.senderId != :uid')
                 ->andWhere('m.isRead = false')
-                ->setParameter('uid', $userId)
-                ->getQuery()
-                ->getSingleScalarResult();
+                ->setParameter('uid', $userId);
+
+            if ($isAgentOnly) {
+                $qb->andWhere('c.agent = :uid');
+            }
+
+            $convCount = (int) $qb->getQuery()->getSingleScalarResult();
         } catch (\Throwable $e) {
             $convCount = 0;
         }

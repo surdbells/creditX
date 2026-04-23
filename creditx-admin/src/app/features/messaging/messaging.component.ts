@@ -50,13 +50,21 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
               @for (c of filteredConversations(); track c.id) {
                 <button class="cx-msg-list-item"
                         [class.is-active]="activeId === c.id"
+                        [class.is-unread]="(c.unread_count || 0) > 0"
                         (click)="selectConversation(c)">
                   <div class="cx-msg-avatar" [style.background]="'linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500))'">
-                    {{ (c.other_user_name || '?').charAt(0).toUpperCase() }}
+                    {{ (c.other_user_name || c.agent_name || c.subject || '?').charAt(0).toUpperCase() }}
                   </div>
                   <div class="cx-msg-item-meta">
-                    <div class="cx-msg-item-name">{{ c.other_user_name }}</div>
-                    <div class="cx-msg-item-preview">{{ c.last_message || 'No messages yet' }}</div>
+                    <div class="cx-msg-item-name">
+                      <span>{{ c.other_user_name || c.agent_name || c.subject }}</span>
+                      @if ((c.unread_count || 0) > 0) {
+                        <span class="cx-msg-item-badge">{{ c.unread_count > 99 ? '99+' : c.unread_count }}</span>
+                      }
+                    </div>
+                    <div class="cx-msg-item-preview">
+                      {{ c.last_message || c.subject || 'No messages yet' }}
+                    </div>
                   </div>
                 </button>
               }
@@ -68,6 +76,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
               @for (ch of filteredChannels(); track ch.id) {
                 <button class="cx-msg-list-item"
                         [class.is-active]="activeId === ch.id"
+                        [class.is-unread]="(ch.unread_count || 0) > 0"
                         (click)="selectChannel(ch)">
                   <div class="cx-msg-avatar cx-msg-avatar-square"
                        [class.is-channel]="ch.type === 'channel'"
@@ -75,7 +84,12 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                     <lucide-icon [name]="ch.type === 'channel' ? 'hash' : 'users'" [size]="14"></lucide-icon>
                   </div>
                   <div class="cx-msg-item-meta">
-                    <div class="cx-msg-item-name">{{ ch.name }}</div>
+                    <div class="cx-msg-item-name">
+                      <span>{{ ch.name }}</span>
+                      @if ((ch.unread_count || 0) > 0) {
+                        <span class="cx-msg-item-badge">{{ ch.unread_count > 99 ? '99+' : ch.unread_count }}</span>
+                      }
+                    </div>
                     <div class="cx-msg-item-preview">{{ ch.type | titlecase }}</div>
                   </div>
                 </button>
@@ -412,6 +426,17 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       background: var(--cx-primary-50);
     }
     .cx-msg-list-item.is-active .cx-msg-item-name { color: var(--cx-primary-700); }
+    /* Unread row: bolder name + subtle tint. The per-row badge carries
+       the actual count; this style is just the 'something new'
+       indicator at a glance. */
+    .cx-msg-list-item.is-unread .cx-msg-item-name span:first-child {
+      font-weight: 700;
+      color: var(--cx-text);
+    }
+    .cx-msg-list-item.is-unread .cx-msg-item-preview {
+      color: var(--cx-text);
+      font-weight: 500;
+    }
     .cx-msg-avatar {
       width: 32px; height: 32px; flex-shrink: 0;
       border-radius: 50%;
@@ -429,6 +454,22 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       font-size: var(--cx-text-sm); font-weight: 500;
       color: var(--cx-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cx-msg-item-name > span:first-child {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      flex: 1;
+    }
+    .cx-msg-item-badge {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px;
+      padding: 0 6px;
+      border-radius: 9px;
+      background: var(--cx-primary-600);
+      color: #fff;
+      font-size: 10px; font-weight: 700;
+      line-height: 1;
     }
     .cx-msg-item-preview {
       font-size: var(--cx-text-xs);
@@ -805,27 +846,69 @@ export class MessagingComponent implements OnInit, OnDestroy {
   addDepts: string[] = []; addTeams: string[] = []; addUserIds: string[] = [];
 
   private pollInterval: any;
+  // Separate interval for the sidebar list so unread counts stay
+  // fresh even when the user has no thread selected. 15s keeps the
+  // request rate reasonable for a background-tab.
+  private listPollInterval: any;
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
   ngOnInit() {
     this.loadConversations();
+    this.loadChannels();
     this.api.get('/departments', { per_page: 100 }).subscribe({ next: r => this.departments.set(r.data || []) });
     this.api.get('/teams', { per_page: 100 }).subscribe({ next: r => this.teams.set(r.data || []) });
     this.api.get('/users', { per_page: 500 }).subscribe({ next: r => this.users.set(r.data || []) });
+
+    // Poll both conversation and channel lists every 15 seconds so
+    // the unread badges in the sidebar update without needing a tab
+    // click. The detail-panel poll (loadMessages, 5s) is separate and
+    // only runs while a thread is active.
+    this.listPollInterval = setInterval(() => {
+      if (this.panel === 'conversations') {
+        this.loadConversations();
+      } else {
+        this.loadChannels();
+      }
+    }, 15000);
   }
 
-  ngOnDestroy() { clearInterval(this.pollInterval); }
+  ngOnDestroy() {
+    clearInterval(this.pollInterval);
+    clearInterval(this.listPollInterval);
+  }
 
   loadConversations() { this.api.get('/conversations').subscribe({ next: r => this.conversations.set(r.data || []) }); }
   loadChannels() { this.api.get('/channels').subscribe({ next: r => this.channels.set(r.data || []) }); }
 
-  filteredConversations() { const s = this.listSearch.toLowerCase(); return this.conversations().filter(c => !s || (c.other_user_name || '').toLowerCase().includes(s)); }
+  // Filter tolerates either name field — agent_name is the canonical
+  // backoffice-facing label, other_user_name is derived per-caller.
+  filteredConversations() {
+    const s = this.listSearch.toLowerCase();
+    return this.conversations().filter(c => !s ||
+      (c.other_user_name || c.agent_name || c.subject || '').toLowerCase().includes(s));
+  }
   filteredChannels() { const s = this.listSearch.toLowerCase(); return this.channels().filter(c => !s || c.name.toLowerCase().includes(s)); }
 
   selectConversation(c: any) {
-    this.activeId = c.id; this.activeName = c.other_user_name; this.activeType = 'conversation';
+    this.activeId = c.id;
+    this.activeName = c.other_user_name || c.agent_name || c.subject;
+    this.activeType = 'conversation';
     this.loadMessages();
+    // Mark the thread as read now that the user has explicitly
+    // opened it. Optimistically clear the unread count in the list
+    // too so the badge disappears immediately — the backend PATCH
+    // confirms it server-side.
+    if ((c.unread_count || 0) > 0) {
+      this.api.post(`/conversations/${c.id}/read`, {}).subscribe({
+        next: () => {
+          this.conversations.set(this.conversations().map(x =>
+            x.id === c.id ? { ...x, unread_count: 0 } : x));
+        },
+        // Silent failure — the unread count will sync on next poll.
+        error: () => {},
+      });
+    }
     clearInterval(this.pollInterval);
     this.pollInterval = setInterval(() => this.loadMessages(), 5000);
   }
@@ -833,6 +916,18 @@ export class MessagingComponent implements OnInit, OnDestroy {
   selectChannel(ch: any) {
     this.activeId = ch.id; this.activeName = ch.name; this.activeType = 'channel';
     this.loadMessages();
+    // Same user-intent mark-read pattern as conversations. The
+    // channel endpoint is mark-read, not read — mirrors the existing
+    // route name (see MarkChannelReadAction).
+    if ((ch.unread_count || 0) > 0) {
+      this.api.post(`/channels/${ch.id}/mark-read`, {}).subscribe({
+        next: () => {
+          this.channels.set(this.channels().map(x =>
+            x.id === ch.id ? { ...x, unread_count: 0 } : x));
+        },
+        error: () => {},
+      });
+    }
     clearInterval(this.pollInterval);
     this.pollInterval = setInterval(() => this.loadMessages(), 5000);
   }

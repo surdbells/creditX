@@ -457,6 +457,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('messaging.view'));
             $group->post('/{id}/messages', Messaging\SendMessageAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
+            $group->post('/{id}/read', Messaging\MarkConversationReadAction::class)
+                ->add(new RbacMiddleware('messaging.view'));
             $group->post('/{id}/resolve', Messaging\ResolveConversationAction::class)
                 ->add(new RbacMiddleware('messaging.send'));
         });
