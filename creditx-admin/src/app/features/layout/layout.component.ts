@@ -38,6 +38,7 @@ export class LayoutComponent {
       { label: 'Loans', icon: 'file-text', route: '/loans', permission: 'loans.view' },
       { label: 'Approval Queue', icon: 'user-check', route: '/approval-queue', permission: 'loans.approve' },
       { label: 'Disbursement Queue', icon: 'banknote', route: '/disbursement-queue', permission: 'loans.disburse' },
+      { label: 'Maker-Checker', icon: 'gavel', route: '/maker-checker', permission: 'maker_checker.check' },
       { label: 'Payments', icon: 'credit-card', route: '/payments', permission: 'payments.view' },
     ]},
     { label: 'Configuration', items: [

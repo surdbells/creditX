@@ -36,6 +36,7 @@ export const routes: Routes = [
       { path: 'loans/:id', loadComponent: () => import('./features/loans/loan-detail.component').then(m => m.LoanDetailComponent) },
       { path: 'approval-queue', loadComponent: () => import('./features/approval-queue/approval-queue.component').then(m => m.ApprovalQueueComponent) },
       { path: 'disbursement-queue', loadComponent: () => import('./features/disbursement-queue/disbursement-queue.component').then(m => m.DisbursementQueueComponent) },
+      { path: 'maker-checker', loadComponent: () => import('./features/maker-checker/maker-checker.component').then(m => m.MakerCheckerComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
       { path: 'reports', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) },

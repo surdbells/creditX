@@ -9,6 +9,7 @@ use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\LoanLifecycleService;
+use App\Infrastructure\Service\MakerCheckerExecutionService;
 use App\Infrastructure\Service\NotificationDispatchService;
 use App\Infrastructure\Service\OverdueService;
 use App\Infrastructure\Service\ReportingService;
@@ -309,6 +310,14 @@ return [
         return new JournalReversalService(
             $c->get(EntityManagerInterface::class),
             $c->get(LedgerTransactionRepository::class)
+        );
+    },
+    MakerCheckerExecutionService::class => function (ContainerInterface $c): MakerCheckerExecutionService {
+        return new MakerCheckerExecutionService(
+            $c->get(DisbursementService::class),
+            $c->get(JournalReversalService::class),
+            $c->get(LoanRepository::class),
+            $c->get(EntityManagerInterface::class),
         );
     },
 ];
