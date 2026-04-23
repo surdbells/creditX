@@ -341,6 +341,17 @@ return function (App $app): void {
         $api->get('/accounting/gl-reconciliation', Accounting\ReconciliationAction::class)
             ->add(new RbacMiddleware('accounting.view'));
 
+        // ─── Accounting — Period Close (commit AF) ───
+        // List periods + close + reopen. accounting.close gates list +
+        // close; reopen uses the same permission (stricter permission
+        // can be added later if role structure demands it).
+        $api->get('/accounting/periods', Accounting\ListPeriodsAction::class)
+            ->add(new RbacMiddleware('accounting.close'));
+        $api->post('/accounting/periods/close', Accounting\ClosePeriodAction::class)
+            ->add(new RbacMiddleware('accounting.close'));
+        $api->post('/accounting/periods/{id}/reopen', Accounting\ReopenPeriodAction::class)
+            ->add(new RbacMiddleware('accounting.close'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));

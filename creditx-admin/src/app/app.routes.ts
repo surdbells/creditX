@@ -43,6 +43,7 @@ export const routes: Routes = [
       { path: 'reports/balance-sheet', loadComponent: () => import('./features/balance-sheet/balance-sheet.component').then(m => m.BalanceSheetComponent) },
       { path: 'reports/aged-receivables', loadComponent: () => import('./features/aged-receivables/aged-receivables.component').then(m => m.AgedReceivablesComponent) },
       { path: 'reports/portfolio-at-risk', loadComponent: () => import('./features/portfolio-at-risk/portfolio-at-risk.component').then(m => m.PortfolioAtRiskComponent) },
+      { path: 'period-close', loadComponent: () => import('./features/period-close/period-close.component').then(m => m.PeriodCloseComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
       { path: 'reports', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) },
