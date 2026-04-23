@@ -365,6 +365,21 @@ return function (App $app): void {
         $api->delete('/accounting/budgets/{id}', Accounting\DeleteBudgetAction::class)
             ->add(new RbacMiddleware('accounting.budget'));
 
+        // ─── Accounting — Provisions (commit AJ) ───
+        // CBN-style loan loss provisioning. Preview is a read-only
+        // sandbox; runs post cumulative deltas into the GL. List,
+        // detail, reverse round out the lifecycle.
+        $api->get('/reports/provisions/preview', Accounting\PreviewProvisionAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->get('/accounting/provisions/runs', Accounting\ListProvisionRunsAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->post('/accounting/provisions/runs', Accounting\RunProvisionAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->get('/accounting/provisions/runs/{id}', Accounting\GetProvisionRunAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->post('/accounting/provisions/runs/{id}/reverse', Accounting\ReverseProvisionRunAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));

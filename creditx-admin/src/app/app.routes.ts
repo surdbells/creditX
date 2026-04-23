@@ -46,6 +46,7 @@ export const routes: Routes = [
       { path: 'period-close', loadComponent: () => import('./features/period-close/period-close.component').then(m => m.PeriodCloseComponent) },
       { path: 'budgets', loadComponent: () => import('./features/budgets/budgets.component').then(m => m.BudgetsComponent) },
       { path: 'reports/budget-vs-actual', loadComponent: () => import('./features/budget-vs-actual/budget-vs-actual.component').then(m => m.BudgetVsActualComponent) },
+      { path: 'provisions', loadComponent: () => import('./features/provisions/provisions.component').then(m => m.ProvisionsComponent) },
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },

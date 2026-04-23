@@ -60,6 +60,7 @@ export class LayoutComponent {
       { label: 'Period Close', icon: 'lock', route: '/period-close', permission: 'accounting.close' },
       { label: 'Budgets', icon: 'dollar-sign', route: '/budgets', permission: 'accounting.view' },
       { label: 'Budget vs Actual', icon: 'bar-chart-3', route: '/reports/budget-vs-actual', permission: 'accounting.view' },
+      { label: 'Provisions', icon: 'shield-alert', route: '/provisions', permission: 'accounting.provision' },
       { label: 'CBN Returns', icon: 'file-spreadsheet', route: '/reports/cbn-returns', permission: 'reports.cbn' },
       { label: 'CBN Returns', icon: 'file-spreadsheet', route: '/reports/cbn-returns', permission: 'reports.cbn' },
       { label: 'Reports', icon: 'bar-chart-3', route: '/reports', permission: 'reports.portfolio' },

@@ -19,6 +19,7 @@ use App\Infrastructure\Service\JournalReversalService;
 use App\Infrastructure\Service\LedgerTransactionEnricher;
 use App\Infrastructure\Service\PeriodCloseService;
 use App\Infrastructure\Service\PeriodGuardService;
+use App\Infrastructure\Service\ProvisionService;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
@@ -236,6 +237,12 @@ return [
     PeriodGuardService::class => function (ContainerInterface $c): PeriodGuardService {
         return new PeriodGuardService(
             $c->get(EntityManagerInterface::class),
+        );
+    },
+    ProvisionService::class => function (ContainerInterface $c): ProvisionService {
+        return new ProvisionService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(PeriodGuardService::class),
         );
     },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
