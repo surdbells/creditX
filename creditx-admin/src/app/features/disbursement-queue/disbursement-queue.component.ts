@@ -81,7 +81,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
             </div>
           } @else if (preview(); as p) {
             <!-- Calculator preview — matches agent's loan calculator -->
-            <div class="cx-dq-calc">
+            <div class="cx-dq-calc" [class.cx-dq-calc-recomputing]="recomputing()">
               <div class="cx-dq-calc-grid">
                 <div class="cx-dq-hero cx-dq-hero-primary">
                   <div class="cx-dq-hero-label">Net Disbursed</div>
@@ -148,9 +148,15 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 
             <!-- Top-up -->
             <div class="cx-dq-section">
-              <label class="cx-label">Top-up Balance</label>
+              <label class="cx-label">
+                Top-up Balance
+                @if (recomputing()) {
+                  <span class="cx-dq-recomputing-tag">recalculating…</span>
+                }
+              </label>
               <input type="number" class="cx-input tabular-nums"
                      [(ngModel)]="topUpBalance"
+                     (ngModelChange)="onTopUpChange()"
                      placeholder="0.00" step="0.01" min="0" />
               <div class="cx-dq-hint"
                    [class.cx-dq-hint-info]="p.top_up?.auto_detected"
@@ -288,6 +294,26 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
     }
     .cx-dq-hero-primary { border-color: var(--cx-success, #16a34a); }
     .cx-dq-hero-gold { border-color: var(--cx-accent-500, #d97706); }
+    .cx-dq-calc-recomputing .cx-dq-hero-value {
+      opacity: 0.55;
+      transition: opacity 200ms;
+    }
+    .cx-dq-recomputing-tag {
+      margin-left: 6px;
+      padding: 1px 6px;
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-radius: 4px;
+      animation: cx-dq-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes cx-dq-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
     .cx-dq-hero-label {
       font-size: 10px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase;
@@ -382,6 +408,10 @@ export class DisbursementQueueComponent implements OnInit {
   preview = signal<any>(null);
   previewLoading = signal(false);
   disbursing = signal(false);
+  // Set while a debounced recompute is in-flight after the user edits
+  // the top-up input. Preview tiles dim to ~55% opacity while true.
+  recomputing = signal(false);
+  private topUpDebounceTimer: any = null;
 
   settlementGlId = '';
   topUpBalance = '';
@@ -441,6 +471,39 @@ export class DisbursementQueueComponent implements OnInit {
     this.modalOpen.set(false);
     this.activeRow.set(null);
     this.preview.set(null);
+  }
+
+  /**
+   * Debounced recompute when the top-up input changes. Same pattern as
+   * loan-detail.component's onTopUpChange: 400ms trailing-edge debounce,
+   * hits /loans/:id/disbursement-preview with the override query param,
+   * preserves the settlement_gls list so the user's GL selection stays.
+   */
+  onTopUpChange() {
+    const loanId = this.activeRow()?.id || this.activeRow()?.loan_id;
+    if (!loanId) return;
+    if (this.topUpDebounceTimer) clearTimeout(this.topUpDebounceTimer);
+    this.topUpDebounceTimer = setTimeout(() => {
+      this.recomputing.set(true);
+      this.api.get(`/loans/${loanId}/disbursement-preview`, {
+        top_up_balance: this.topUpBalance || '0',
+      }).subscribe({
+        next: r => {
+          const current = this.preview();
+          if (current) {
+            this.preview.set({
+              ...current,
+              calculation: r.data?.calculation ?? current.calculation,
+              top_up:      r.data?.top_up ?? current.top_up,
+            });
+          } else {
+            this.preview.set(r.data);
+          }
+          this.recomputing.set(false);
+        },
+        error: () => this.recomputing.set(false),
+      });
+    }, 400);
   }
 
   confirmDisburse() {

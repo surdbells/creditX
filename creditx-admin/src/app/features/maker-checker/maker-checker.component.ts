@@ -1,7 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
+import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -78,6 +80,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 
           <!-- Disbursement preview -->
           @if (activeRow()?.operation_type === 'disbursement' && disbursePreview(); as p) {
+            <!-- Preview calculation -->
             <section class="cx-mc-section">
               <h3 class="cx-mc-section-title">Disbursement Preview</h3>
               <div class="cx-mc-preview">
@@ -97,18 +100,6 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                 </div>
                 <div class="cx-mc-rows">
                   <div class="cx-mc-row">
-                    <span>Loan</span>
-                    <span class="tabular-nums">{{ p.loan?.application_id }}</span>
-                  </div>
-                  <div class="cx-mc-row">
-                    <span>Customer</span>
-                    <span>{{ p.loan?.customer_name }}</span>
-                  </div>
-                  <div class="cx-mc-row">
-                    <span>Product</span>
-                    <span>{{ p.loan?.product_name }}</span>
-                  </div>
-                  <div class="cx-mc-row">
                     <span>Gross Loan</span>
                     <span class="tabular-nums">₦{{ p.calculation?.gross_loan | number:'1.2-2' }}</span>
                   </div>
@@ -116,13 +107,129 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                     <span>Total Fees</span>
                     <span class="tabular-nums">₦{{ p.calculation?.total_fees | number:'1.2-2' }}</span>
                   </div>
+                  @if (p.calculation?.fee_details?.length) {
+                    @for (fee of p.calculation.fee_details; track fee.code) {
+                      <div class="cx-mc-row cx-mc-row-sub">
+                        <span>↳ {{ fee.name || fee.code }}</span>
+                        <span class="tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                      </div>
+                    }
+                  }
                   <div class="cx-mc-row">
-                    <span>Tenure</span>
-                    <span class="tabular-nums">{{ p.loan?.tenure }} months</span>
+                    <span>Monthly Principal</span>
+                    <span class="tabular-nums">₦{{ p.calculation?.mr_principal | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="cx-mc-row">
+                    <span>Monthly Interest</span>
+                    <span class="tabular-nums">₦{{ p.calculation?.mr_interest | number:'1.2-2' }}</span>
                   </div>
                 </div>
               </div>
             </section>
+
+            <!-- Full loan details — customer + loan metadata + employment -->
+            <section class="cx-mc-section">
+              <h3 class="cx-mc-section-title">Loan Details</h3>
+              <div class="cx-mc-rows">
+                <div class="cx-mc-row">
+                  <span>Application ID</span>
+                  <span class="tabular-nums">{{ p.loan?.application_id || '—' }}</span>
+                </div>
+                <div class="cx-mc-row">
+                  <span>Customer</span>
+                  <span>{{ p.loan?.customer_name || '—' }}</span>
+                </div>
+                @if (p.loan?.customer_staff_id) {
+                  <div class="cx-mc-row">
+                    <span>Staff ID</span>
+                    <span class="tabular-nums">{{ p.loan?.customer_staff_id }}</span>
+                  </div>
+                }
+                <div class="cx-mc-row">
+                  <span>Product</span>
+                  <span>{{ p.loan?.product_name || '—' }}</span>
+                </div>
+                <div class="cx-mc-row">
+                  <span>Amount Requested</span>
+                  <span class="tabular-nums">₦{{ p.loan?.amount_requested | number:'1.2-2' }}</span>
+                </div>
+                <div class="cx-mc-row">
+                  <span>Tenure</span>
+                  <span class="tabular-nums">{{ p.loan?.tenure }} months</span>
+                </div>
+                <div class="cx-mc-row">
+                  <span>Interest Rate</span>
+                  <span class="tabular-nums">{{ p.loan?.interest_rate }}% ({{ p.loan?.calculation_method }})</span>
+                </div>
+                @if (p.loan?.loan_type && p.loan?.loan_type !== 'new') {
+                  <div class="cx-mc-row">
+                    <span>Loan Type</span>
+                    <span class="cx-mc-tag-topup">{{ p.loan?.loan_type | titlecase }}</span>
+                  </div>
+                }
+                @if (p.loan?.top_up_balance) {
+                  <div class="cx-mc-row">
+                    <span>Captured Top-up</span>
+                    <span class="tabular-nums">₦{{ p.loan?.top_up_balance | number:'1.2-2' }}</span>
+                  </div>
+                }
+                @if (p.loan?.branch_name) {
+                  <div class="cx-mc-row">
+                    <span>Branch</span>
+                    <span>{{ p.loan?.branch_name }}</span>
+                  </div>
+                }
+                @if (p.loan?.agent_name) {
+                  <div class="cx-mc-row">
+                    <span>Agent</span>
+                    <span>{{ p.loan?.agent_name }}</span>
+                  </div>
+                }
+                @if (p.loan?.purpose) {
+                  <div class="cx-mc-row">
+                    <span>Purpose</span>
+                    <span>{{ p.loan?.purpose }}</span>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <!-- Attachments — documents submitted with the loan -->
+            <section class="cx-mc-section">
+              <h3 class="cx-mc-section-title">
+                Attachments
+                @if (attachments().length) {
+                  <span class="cx-mc-section-count">{{ attachments().length }}</span>
+                }
+              </h3>
+              @if (attachmentsLoading()) {
+                <div class="cx-mc-loading">
+                  <lucide-icon name="loader-2" [size]="16" class="cx-mc-spin"></lucide-icon>
+                  <span>Loading attachments...</span>
+                </div>
+              } @else if (!attachments().length) {
+                <div class="cx-mc-empty">No documents uploaded for this loan.</div>
+              } @else {
+                <div class="cx-mc-attachments">
+                  @for (doc of attachments(); track doc.id) {
+                    <button type="button" class="cx-mc-attachment" (click)="openDocPreview(doc)">
+                      <div class="cx-mc-attachment-icon" [attr.data-mime]="docMimeCategory(doc.mime_type)">
+                        <lucide-icon [name]="docIcon(doc.mime_type)" [size]="18"></lucide-icon>
+                      </div>
+                      <div class="cx-mc-attachment-meta">
+                        <div class="cx-mc-attachment-name" [title]="doc.file_name">{{ doc.file_name }}</div>
+                        <div class="cx-mc-attachment-sub">
+                          <span>{{ prettyDocType(doc.type) }}</span>
+                          @if (doc.file_size) { <span>·</span><span>{{ formatBytes(doc.file_size) }}</span> }
+                        </div>
+                      </div>
+                      <lucide-icon name="eye" [size]="14" class="cx-mc-attachment-eye"></lucide-icon>
+                    </button>
+                  }
+                </div>
+              }
+            </section>
+
           } @else if (activeRow()?.operation_type === 'disbursement' && disbursePreviewLoading()) {
             <section class="cx-mc-section">
               <h3 class="cx-mc-section-title">Disbursement Preview</h3>
@@ -177,6 +284,55 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
               <lucide-icon name="check-circle" [size]="14"></lucide-icon>
               <span>Approve & Execute</span>
             </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!--
+      Document preview overlay — sits above the MC modal backdrop so
+      the checker can click an attachment, inspect it inline, and
+      return to the decision. Uses the same pattern as loan-detail's
+      viewer: image via <img>, PDF via iframe with sanitized URL,
+      everything else via download fallback. z-index bumped above
+      the modal's z-index: 101.
+    -->
+    @if (docPreviewDoc(); as pd) {
+      <div class="cx-mc-doc-backdrop" (click)="closeDocPreview()"></div>
+      <div class="cx-mc-doc-viewer" role="dialog">
+        <div class="cx-mc-doc-viewer-head">
+          <div class="cx-mc-doc-viewer-meta">
+            <div class="cx-mc-doc-viewer-type">{{ prettyDocType(pd.type) }}</div>
+            <div class="cx-mc-doc-viewer-name">{{ pd.file_name }}</div>
+          </div>
+          <div class="cx-mc-doc-viewer-actions">
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" target="_blank" rel="noopener" title="Open in new tab">
+              <lucide-icon name="external-link" [size]="14"></lucide-icon>
+            </a>
+            <a class="cx-btn cx-btn-ghost cx-btn-sm" [href]="docUrl(pd)" [download]="pd.file_name" title="Download">
+              <lucide-icon name="download" [size]="14"></lucide-icon>
+            </a>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="closeDocPreview()" aria-label="Close preview">
+              <lucide-icon name="x" [size]="16"></lucide-icon>
+            </button>
+          </div>
+        </div>
+        <div class="cx-mc-doc-viewer-body">
+          @if (isImage(pd.mime_type)) {
+            <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-mc-doc-img" />
+          } @else if (isPdf(pd.mime_type)) {
+            <iframe [src]="docUrlSafe(pd)" class="cx-mc-doc-frame" frameborder="0"></iframe>
+          } @else {
+            <div class="cx-mc-doc-fallback">
+              <lucide-icon name="file-text" [size]="48"></lucide-icon>
+              <div class="cx-mc-doc-fallback-message">
+                This file type ({{ pd.mime_type || 'unknown' }}) can't be previewed inline.
+              </div>
+              <a class="cx-btn cx-btn-primary" [href]="docUrl(pd)" target="_blank" rel="noopener">
+                <lucide-icon name="download" [size]="14"></lucide-icon>
+                <span>Open file</span>
+              </a>
+            </div>
           }
         </div>
       </div>
@@ -337,6 +493,190 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       border-top: 1px solid var(--cx-border);
       background: var(--cx-surface);
     }
+
+    /* ═══ Section extras ═══ */
+    .cx-mc-row-sub {
+      padding-left: 20px;
+      color: var(--cx-text-muted);
+      font-size: 12px;
+    }
+    .cx-mc-section-count {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 8px;
+      background: var(--cx-primary-50, rgba(59, 130, 246, 0.1));
+      color: var(--cx-primary-600, #2563eb);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .cx-mc-empty {
+      padding: 16px;
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+      text-align: center;
+      color: var(--cx-text-muted);
+      font-size: 13px;
+    }
+    .cx-mc-tag-topup {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ═══ Attachments grid ═══ */
+    .cx-mc-attachments {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    @media (min-width: 500px) {
+      .cx-mc-attachments { grid-template-columns: 1fr 1fr; }
+    }
+    .cx-mc-attachment {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 120ms, background 120ms;
+    }
+    .cx-mc-attachment:hover {
+      border-color: var(--cx-primary-600, #2563eb);
+      background: var(--cx-surface-2);
+    }
+    .cx-mc-attachment-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--cx-surface-2);
+      color: var(--cx-text-secondary);
+      flex-shrink: 0;
+    }
+    .cx-mc-attachment-icon[data-mime="image"] {
+      background: rgba(22, 163, 74, 0.12);
+      color: var(--cx-success, #16a34a);
+    }
+    .cx-mc-attachment-icon[data-mime="pdf"] {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--cx-danger, #dc2626);
+    }
+    .cx-mc-attachment-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .cx-mc-attachment-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--cx-text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cx-mc-attachment-sub {
+      display: flex;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      margin-top: 1px;
+    }
+    .cx-mc-attachment-eye {
+      color: var(--cx-text-muted);
+      flex-shrink: 0;
+    }
+
+    /* ═══ Document preview overlay ═══ */
+    .cx-mc-doc-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 200;
+    }
+    .cx-mc-doc-viewer {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(900px, calc(100vw - 32px));
+      height: min(700px, calc(100vh - 32px));
+      background: #1a1a1a;
+      border-radius: var(--cx-radius-xl, 12px);
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      z-index: 201;
+      overflow: hidden;
+      animation: cx-mc-doc-modal-in 200ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    @keyframes cx-mc-doc-modal-in {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+      to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    .cx-mc-doc-viewer-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 12px 16px;
+      background: #0f0f0f;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .cx-mc-doc-viewer-type {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .cx-mc-doc-viewer-name {
+      font-size: 14px;
+      color: #fff;
+      margin-top: 2px;
+      max-width: 460px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cx-mc-doc-viewer-actions {
+      display: flex; gap: 6px;
+    }
+    .cx-mc-doc-viewer-actions .cx-btn {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .cx-mc-doc-viewer-body {
+      flex: 1;
+      overflow: auto;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cx-mc-doc-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .cx-mc-doc-frame {
+      width: 100%;
+      height: 100%;
+      background: #fff;
+    }
+    .cx-mc-doc-fallback {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      color: #fff;
+      padding: 48px;
+      text-align: center;
+    }
+    .cx-mc-doc-fallback-message {
+      font-size: 14px;
+      max-width: 360px;
+      line-height: 1.5;
+    }
   `],
 })
 export class MakerCheckerComponent implements OnInit {
@@ -360,6 +700,17 @@ export class MakerCheckerComponent implements OnInit {
   deciding = signal(false);
   comment = '';
 
+  // Loan attachments — documents uploaded against the target loan.
+  // Populated in parallel with disbursePreview when the modal opens
+  // for a disbursement request. Empty for non-disbursement operations.
+  attachments = signal<any[]>([]);
+  attachmentsLoading = signal(false);
+
+  // Document preview overlay — sits above the MC modal, same pattern
+  // as loan-detail's viewer. Null = no preview open.
+  docPreviewDoc = signal<any>(null);
+  private sanitizer = inject(DomSanitizer);
+
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
   ngOnInit() { this.load(); }
@@ -382,19 +733,36 @@ export class MakerCheckerComponent implements OnInit {
     this.activeRow.set(row);
     this.comment = '';
     this.disbursePreview.set(null);
+    this.attachments.set([]);
     this.modalOpen.set(true);
 
     // For disbursement operations, fetch the loan's preview so the
     // checker sees the calculator view — same as the disburse dialog
     // shows the maker. Gives both sides identical information.
+    //
+    // In parallel, fetch documents uploaded against the loan so the
+    // checker can visually inspect each attachment before deciding.
+    // Matches the 'Documents' tab on the loan-detail page — same
+    // API, same preview overlay pattern.
     if (row.operation_type === 'disbursement' && row.payload?.loan_id) {
+      const loanId = row.payload.loan_id;
+
       this.disbursePreviewLoading.set(true);
-      this.api.get(`/loans/${row.payload.loan_id}/disbursement-preview`).subscribe({
+      this.api.get(`/loans/${loanId}/disbursement-preview`).subscribe({
         next: r => {
           this.disbursePreview.set(r.data);
           this.disbursePreviewLoading.set(false);
         },
         error: () => this.disbursePreviewLoading.set(false),
+      });
+
+      this.attachmentsLoading.set(true);
+      this.api.get('/documents', { loan_id: loanId }).subscribe({
+        next: r => {
+          this.attachments.set(r.data || []);
+          this.attachmentsLoading.set(false);
+        },
+        error: () => this.attachmentsLoading.set(false),
       });
     }
   }
@@ -404,7 +772,89 @@ export class MakerCheckerComponent implements OnInit {
     this.modalOpen.set(false);
     this.activeRow.set(null);
     this.disbursePreview.set(null);
+    this.attachments.set([]);
     this.comment = '';
+  }
+
+  // ─── Document preview helpers ──────────────────────────────────────
+  //
+  // Mirrors the pattern from loan-detail.component.ts so the two
+  // surfaces behave identically. The checker clicks an attachment →
+  // inline viewer opens. Images render via <img>, PDFs via iframe
+  // with a sanitized URL, anything else shows a download fallback.
+
+  openDocPreview(doc: any): void { this.docPreviewDoc.set(doc); }
+  closeDocPreview(): void { this.docPreviewDoc.set(null); }
+
+  isImage(mime: string | null | undefined): boolean {
+    return !!(mime && mime.startsWith('image/'));
+  }
+
+  isPdf(mime: string | null | undefined): boolean {
+    return mime === 'application/pdf';
+  }
+
+  /**
+   * Icon for a document card based on MIME type. Constrained to icons
+   * registered in admin app.config.ts LucideAngularModule.pick.
+   */
+  docIcon(mime: string | null | undefined): string {
+    if (!mime) return 'file-text';
+    if (mime.includes('sheet') || mime.includes('excel')) return 'file-spreadsheet';
+    return 'file-text';
+  }
+
+  /**
+   * MIME category used to tint the attachment card's icon well.
+   */
+  docMimeCategory(mime: string | null | undefined): string {
+    if (!mime) return 'other';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime === 'application/pdf') return 'pdf';
+    return 'other';
+  }
+
+  /**
+   * Humanise a DocumentType enum value. 'id_card' → 'ID Card',
+   * 'bank_statement' → 'Bank Statement'.
+   */
+  prettyDocType(type: string | null | undefined): string {
+    if (!type) return '—';
+    const special: Record<string, string> = {
+      'id_card': 'ID Card',
+      'work_id': 'Work ID',
+    };
+    if (special[type]) return special[type];
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  /**
+   * Human-readable byte count. '0 B', '4.2 KB', '1.8 MB'.
+   */
+  formatBytes(bytes: number | null | undefined): string {
+    const n = Number(bytes || 0);
+    if (!n) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    return i === 0 ? `${Math.round(v)} B` : `${v.toFixed(1)} ${units[i]}`;
+  }
+
+  /**
+   * Build a serve URL for a document via the backend's unauthenticated
+   * /storage/{path:.*} streaming endpoint.
+   */
+  docUrl(doc: any): string {
+    if (!doc?.file_path) return '';
+    return `${environment.apiUrl}/storage/${doc.file_path}`;
+  }
+
+  docUrlSafe(doc: any): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));
   }
 
   decide(action: 'approve' | 'reject') {

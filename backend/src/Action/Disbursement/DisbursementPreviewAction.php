@@ -62,15 +62,48 @@ final class DisbursementPreviewAction
         $loan = $this->loanRepo->find($args['id'] ?? '');
         if ($loan === null) return $this->notFound('Loan not found');
 
-        // Re-detect top-up balance from the customer's prior loans. We
-        // consider a loan 'still owing' if it's in DISBURSED / ACTIVE /
-        // OVERDUE / RESTRUCTURED state — any status where the repayment
-        // schedule has unpaid rows.
-        $topUp = $this->detectTopUpBalance($loan);
+        /*
+         * Optional top-up override passed as a query param. When the
+         * user edits the top-up input on the disbursement dialog, the
+         * client re-fetches this endpoint with ?top_up_balance=X to get
+         * a fresh calculation with the new value, so the preview panel
+         * reflects the actual net_disbursed that will be committed.
+         *
+         * Without the override, we auto-detect from the customer's
+         * prior active loan (the default flow on modal open).
+         *
+         * Empty string or missing → auto-detect.
+         * Numeric (including '0') → use as-is, flag override_applied.
+         *
+         * Security note: the query param is numeric only; we strip any
+         * non-numeric characters and clamp negatives to 0 to avoid a
+         * crafted URL producing a negative-net disbursement preview.
+         * The actual disbursement still requires this value via POST
+         * body, which is separately validated by DisburseLoanAction.
+         */
+        $overrideRaw = (string) ($request->getQueryParams()['top_up_balance'] ?? '');
+        $overrideApplied = false;
+        if ($overrideRaw !== '') {
+            $cleaned = preg_replace('/[^0-9.]/', '', $overrideRaw);
+            $overrideNum = max(0.0, (float) ($cleaned ?? '0'));
+            $topUp = [
+                'auto_detected'    => false,
+                'balance'          => number_format($overrideNum, 2, '.', ''),
+                'source_loan'      => null,
+                'message'          => 'Using your manual top-up entry.',
+                'override_applied' => true,
+            ];
+            $overrideApplied = true;
+        } else {
+            // Re-detect top-up balance from the customer's prior loans.
+            // We consider a loan 'still owing' if it's in DISBURSED /
+            // ACTIVE / OVERDUE / RESTRUCTURED state — any status where
+            // the repayment schedule has unpaid rows.
+            $topUp = $this->detectTopUpBalance($loan);
+            $topUp['override_applied'] = false;
+        }
 
-        // Re-run the calculation with the fresh top-up balance. This
-        // is the same calculation the capture form ran — we just pass
-        // the newly-detected balance instead of the stale captured one.
+        // Re-run the calculation with the chosen top-up balance.
         $calc = $this->calcService->calculate(
             $loan->getProduct(),
             $loan->getAmountRequested(),

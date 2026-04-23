@@ -392,10 +392,15 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
         </div>
 
         <!-- Calculator preview — matches agent app's loan calculator -->
-        <div class="cx-dis-calc">
+        <div class="cx-dis-calc" [class.cx-dis-calc-recomputing]="disburseRecomputing()">
           <div class="cx-dis-calc-grid">
             <div class="cx-dis-hero cx-dis-hero-primary">
-              <div class="cx-dis-hero-label">Net Disbursed</div>
+              <div class="cx-dis-hero-label">
+                Net Disbursed
+                @if (disburseRecomputing()) {
+                  <span class="cx-dis-recomputing-tag">recalculating…</span>
+                }
+              </div>
               <div class="cx-dis-hero-value tabular-nums">
                 ₦{{ p.calculation?.net_disbursed | number:'1.0-0' }}
               </div>
@@ -885,6 +890,27 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
     }
     .cx-dis-hero-primary { border-color: var(--cx-success, #16a34a); }
     .cx-dis-hero-gold { border-color: var(--cx-accent-500, #d97706); }
+    .cx-dis-calc-recomputing { position: relative; }
+    .cx-dis-calc-recomputing .cx-dis-hero-value {
+      opacity: 0.55;
+      transition: opacity 200ms;
+    }
+    .cx-dis-recomputing-tag {
+      margin-left: 6px;
+      padding: 1px 6px;
+      background: rgba(245, 158, 11, 0.14);
+      color: #b45309;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-radius: 4px;
+      animation: cx-dis-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes cx-dis-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
     .cx-dis-hero-label {
       font-size: 10px;
       font-weight: 600;
@@ -1296,22 +1322,56 @@ export class LoanDetailComponent implements OnInit {
 
   /**
    * Re-fetch the preview when top-up changes so the calculator reflects
-   * the new net_disbursed. Throttled via a simple trailing-edge debounce
-   * using setTimeout — the user is typing into a number input so we
-   * don't want to hit the backend on every keystroke.
+   * the new net_disbursed. Debounced at 400ms — user is typing into a
+   * number input and we don't want a fetch per keystroke.
+   *
+   * The endpoint accepts ?top_up_balance=X as a query param; when set,
+   * the backend skips auto-detection and recomputes against the
+   * override. The response shape is identical to the initial fetch,
+   * plus top_up.override_applied = true so the UI can show a
+   * 'Using your manual entry' hint.
+   *
+   * While the fetch is in flight, we set a lightweight 'recomputing'
+   * signal so the preview tiles show subtle loading state instead of
+   * stale numbers. The tiles don't clear — the old numbers stay
+   * visible until the new ones land, which avoids the flicker of
+   * collapsing to skeletons and back.
    */
   private topUpDebounceTimer: any = null;
+  disburseRecomputing = signal(false);
+
   onTopUpChange(): void {
     if (this.topUpDebounceTimer) clearTimeout(this.topUpDebounceTimer);
     this.topUpDebounceTimer = setTimeout(() => {
-      // Optimistically update the calculation client-side for instant
-      // feedback. The backend source of truth recomputes on submit.
-      // For now just keep the value as-is — a full client-side recalc
-      // would duplicate LoanCalculationService logic. Acceptable
-      // tradeoff: user sees the original preview's net_disbursed,
-      // final posting uses the updated top-up. Add a hint if we want
-      // to surface this.
-    }, 300);
+      const topUpValue = this.disburseTopUpBalance ?? '';
+      this.disburseRecomputing.set(true);
+      this.api.get(`/loans/${this.id}/disbursement-preview`, {
+        top_up_balance: topUpValue || '0',
+      }).subscribe({
+        next: r => {
+          // Merge only the calculation + top_up fields — keep the
+          // previously-loaded settlement_gls list intact so the user's
+          // selected GL dropdown value isn't reset on every recompute.
+          const current = this.disbursePreview();
+          if (current) {
+            this.disbursePreview.set({
+              ...current,
+              calculation: r.data?.calculation ?? current.calculation,
+              top_up:      r.data?.top_up ?? current.top_up,
+            });
+          } else {
+            this.disbursePreview.set(r.data);
+          }
+          this.disburseRecomputing.set(false);
+        },
+        error: () => {
+          this.disburseRecomputing.set(false);
+          // Silent fail — preview remains at the last-good state.
+          // The user's typed value is still sent on final submit;
+          // the backend will recompute server-side regardless.
+        },
+      });
+    }, 400);
   }
 
   /**
