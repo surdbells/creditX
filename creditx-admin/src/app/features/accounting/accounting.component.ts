@@ -404,10 +404,46 @@ export class AccountingComponent implements OnInit {
     this.trialLoading.set(true);
     this.api.get('/gl-accounts/reports/trial-balance').subscribe({
       next: r => {
-        const data = r.data || [];
-        this.trialRows.set(data);
-        this.trialTotalDebit = data.reduce((s: number, r: any) => s + (r.debit || 0), 0);
-        this.trialTotalCredit = data.reduce((s: number, r: any) => s + (r.credit || 0), 0);
+        /*
+         * Response shape:
+         *   data: {
+         *     accounts: [{account_code, account_name, total_dr, total_cr, balance}, ...],
+         *     total_dr: '500000.00',
+         *     total_cr: '1012000.00',
+         *     difference: '-512000.00',
+         *     is_balanced: false,
+         *     period: '2026'
+         *   }
+         *
+         * A prior revision read r.data as the rows array directly and
+         * called .reduce on it, which threw synchronously inside the
+         * observable's next() handler. rxjs does NOT route sync errors
+         * from next() to the error channel — they just bubble. So
+         * trialLoading never flipped to false and the spinner stuck.
+         * Now we pull data.accounts explicitly and coerce-guard so a
+         * missing field falls back to [] instead of throwing.
+         *
+         * We also normalise the field names: backend sends total_dr /
+         * total_cr per row, but the template reads row.debit / row.credit.
+         * Mapping at load time keeps the template untouched.
+         */
+        const data = r?.data ?? {};
+        const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+        const rows = accounts.map((a: any) => ({
+          ...a,
+          debit:  parseFloat(a.total_dr ?? a.debit ?? '0'),
+          credit: parseFloat(a.total_cr ?? a.credit ?? '0'),
+        }));
+        this.trialRows.set(rows);
+        // Use the backend-computed totals when present (they've already
+        // summed across all accounts), but recompute from rows as a
+        // fallback for older responses.
+        this.trialTotalDebit = data.total_dr != null
+          ? parseFloat(data.total_dr)
+          : rows.reduce((s: number, row: any) => s + row.debit, 0);
+        this.trialTotalCredit = data.total_cr != null
+          ? parseFloat(data.total_cr)
+          : rows.reduce((s: number, row: any) => s + row.credit, 0);
         this.trialLoading.set(false);
       },
       error: () => this.trialLoading.set(false),

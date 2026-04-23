@@ -327,6 +327,14 @@ return function (App $app): void {
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));
 
+        // ─── Loan Customer Ledger ───
+        // Returns the CustomerLedger + all LedgerTransactions for a loan.
+        // Used by the loan-detail 'Ledger' tab to show the full accounting
+        // trail (gross CR, fee DRs, net DR, repayments, reversals).
+        // Gated by accounting.view since this exposes financial postings.
+        $api->get('/loans/{id}/customer-ledger', Loan\LoanCustomerLedgerAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Disbursement ───
         $api->get('/loans/{id}/disbursement-preview', Disbursement\DisbursementPreviewAction::class)
             ->add(new RbacMiddleware('loans.disburse'));

@@ -37,12 +37,45 @@ final class DisbursementQueueAction
         $limit = $p['per_page'];
         $search = $p['search'];
 
+        /*
+         * Base filter: loans that are APPROVED but not yet disbursed.
+         *
+         * Second filter: EXCLUDE loans that already have a pending
+         * maker-checker disbursement request. Without this, a maker
+         * who submits through the two-eyes flow would see the same
+         * loan still sitting in their disbursement queue and could
+         * submit again, producing duplicate MC requests. The UI
+         * response to that race looks like success on each submit,
+         * even though only one will ever actually fire — and the
+         * checker would see a queue of duplicates to sift through.
+         *
+         * We use a NOT EXISTS subquery rather than a LEFT JOIN so
+         * the count query stays on a single table and the execution
+         * plan remains index-friendly (idx_mc_status + idx_mc_operation
+         * already exist on maker_checker_requests).
+         *
+         * The subquery filters on:
+         *   - operation_type = 'disbursement' (not reversals etc)
+         *   - entity_id = loan id (the loan itself, not loan_id
+         *     because MC stores entity_id generically)
+         *   - status = 'pending' (approved/rejected MCs are OK —
+         *     approved ones already completed the disbursement,
+         *     rejected ones can be resubmitted by the maker)
+         */
         $qb = $this->em->createQueryBuilder()
             ->select('l')
             ->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c')
             ->innerJoin('l.product', 'p')
             ->where('l.status = :status')
+            ->andWhere(
+                'NOT EXISTS ('
+                . 'SELECT 1 FROM App\\Domain\\Entity\\MakerCheckerRequest mc '
+                . 'WHERE mc.entityId = l.id '
+                . "AND mc.operationType = 'disbursement' "
+                . "AND mc.status = 'pending'"
+                . ')'
+            )
             ->setParameter('status', LoanStatus::APPROVED->value);
 
         if ($search !== null && $search !== '') {

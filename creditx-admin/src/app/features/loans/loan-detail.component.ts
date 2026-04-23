@@ -198,17 +198,28 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             } @else {
               <div class="space-y-3">
                 @for (a of approvals(); track a.id) {
+                  <!--
+                    Backend serializes LoanApproval.status (enum value:
+                    pending | approved | rejected | auto_approved | escalated).
+                    A prior revision of this template read a.decision — a
+                    field that does not exist in the response — so the
+                    ternary fell through to the 'pending' branch on every
+                    row, making even fully-approved trails render with the
+                    clock icon + warning color. Using a.status matches the
+                    actual payload. auto_approved maps to the approved
+                    styling since it represents a committed decision.
+                  -->
                   <div class="flex items-start gap-3 p-3 rounded-xl border border-[var(--cx-border)]">
                     <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                         [class]="a.decision === 'approved' ? 'bg-[var(--cx-success)]/10 text-[var(--cx-success)]' : a.decision === 'rejected' ? 'bg-[var(--cx-danger)]/10 text-[var(--cx-danger)]' : 'bg-[var(--cx-warning)]/10 text-[var(--cx-warning)]'">
-                      <lucide-icon [name]="a.decision === 'approved' ? 'check' : a.decision === 'rejected' ? 'x' : 'clock'" [size]="16"></lucide-icon>
+                         [class]="(a.status === 'approved' || a.status === 'auto_approved') ? 'bg-[var(--cx-success)]/10 text-[var(--cx-success)]' : a.status === 'rejected' ? 'bg-[var(--cx-danger)]/10 text-[var(--cx-danger)]' : 'bg-[var(--cx-warning)]/10 text-[var(--cx-warning)]'">
+                      <lucide-icon [name]="(a.status === 'approved' || a.status === 'auto_approved') ? 'check' : a.status === 'rejected' ? 'x' : 'clock'" [size]="16"></lucide-icon>
                     </div>
                     <div class="flex-1">
                       <div class="text-sm font-medium text-[var(--cx-text)]">{{ a.step_name || 'Step ' + a.step_order }}</div>
                       <div class="text-xs text-[var(--cx-text-muted)]">{{ a.approver_name || 'Pending' }} &bull; {{ a.decided_at | date:'medium' }}</div>
                       @if (a.comment) { <div class="text-xs text-[var(--cx-text-secondary)] mt-1 italic">"{{ a.comment }}"</div> }
                     </div>
-                    <cx-status-badge [status]="a.decision || 'pending'"></cx-status-badge>
+                    <cx-status-badge [status]="a.status || 'pending'"></cx-status-badge>
                   </div>
                 }
               </div>
@@ -234,6 +245,94 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
               </div>
             } @else {
               <div class="py-8 text-center text-sm text-[var(--cx-text-muted)]">No trail records</div>
+            }
+          </div>
+        }
+
+        <!-- LEDGER TAB -->
+        <!--
+          Shows the CustomerLedger (one per disbursed loan) + all its
+          LedgerTransaction entries. Pre-disbursement loans have no
+          ledger yet, so we show a friendly message from the backend's
+          response instead of an error. Disbursed loans show header +
+          posting list grouped by callback reference.
+        -->
+        @if (activeTab === 'ledger') {
+          <div class="cx-card">
+            @if (ledgerLoading()) {
+              <cx-loading size="sm" message="Loading ledger..."></cx-loading>
+            } @else if (!customerLedger()) {
+              <div class="py-8 text-center text-sm text-[var(--cx-text-muted)]">
+                {{ ledgerMessage() || 'No ledger for this loan.' }}
+              </div>
+            } @else {
+              <!-- Ledger header -->
+              <div class="cx-ld-ledger-head">
+                <div>
+                  <div class="cx-ld-ledger-eyebrow">Customer Ledger</div>
+                  <div class="cx-ld-ledger-acc tabular-nums">{{ customerLedger()?.account_number }}</div>
+                  <div class="cx-ld-ledger-sub">
+                    Rolls up to: <span class="tabular-nums">{{ customerLedger()?.gl_name }}</span>
+                  </div>
+                </div>
+                <cx-status-badge [status]="customerLedger()?.status || 'active'"></cx-status-badge>
+              </div>
+
+              <!-- Transactions table -->
+              @if (ledgerTransactions().length === 0) {
+                <div class="py-8 text-center text-sm text-[var(--cx-text-muted)]">
+                  No transactions posted yet.
+                </div>
+              } @else {
+                <div class="cx-ld-txn-wrap">
+                  <table class="cx-ld-txn-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Narration</th>
+                        <th>Reference</th>
+                        <th class="cx-ld-right">Debit (₦)</th>
+                        <th class="cx-ld-right">Credit (₦)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (t of ledgerTransactions(); track t.id) {
+                        <tr [class.cx-ld-row-reversal]="!!t.reversal_of_id">
+                          <td class="tabular-nums">{{ t.trans_date }}</td>
+                          <td>
+                            <div class="cx-ld-narration">{{ t.trans_narration }}</div>
+                            @if (t.reversal_of_id) {
+                              <div class="cx-ld-reversal-tag">REVERSAL</div>
+                            }
+                          </td>
+                          <td class="tabular-nums cx-ld-ref">{{ t.trans_callback || t.trans_reference }}</td>
+                          <td class="cx-ld-right tabular-nums">
+                            @if (t.trans_type === 'DR') {
+                              {{ (t.trans_amount || 0) | number:'1.2-2' }}
+                            }
+                          </td>
+                          <td class="cx-ld-right tabular-nums">
+                            @if (t.trans_type === 'CR') {
+                              {{ (t.trans_amount || 0) | number:'1.2-2' }}
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr class="cx-ld-txn-total-row">
+                        <td colspan="3">Total</td>
+                        <td class="cx-ld-right tabular-nums">₦{{ ledgerTotalDr() | number:'1.2-2' }}</td>
+                        <td class="cx-ld-right tabular-nums">₦{{ ledgerTotalCr() | number:'1.2-2' }}</td>
+                      </tr>
+                      <tr class="cx-ld-txn-balance-row">
+                        <td colspan="4">Outstanding Balance</td>
+                        <td class="cx-ld-right tabular-nums">₦{{ ledgerBalance() | number:'1.2-2' }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              }
             }
           </div>
         }
@@ -882,6 +981,103 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
       color: var(--cx-text-muted);
     }
     .cx-required { color: var(--cx-danger, #dc2626); }
+
+    /* ═══ Ledger tab ═══ */
+    .cx-ld-ledger-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--cx-surface-2, #f5f5f4);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl, 12px);
+      margin-bottom: 16px;
+    }
+    .cx-ld-ledger-eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-ld-ledger-acc {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--cx-text);
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+    }
+    .cx-ld-ledger-sub {
+      font-size: 12px;
+      color: var(--cx-text-secondary);
+      margin-top: 2px;
+    }
+
+    .cx-ld-txn-wrap {
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      overflow: hidden;
+    }
+    .cx-ld-txn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .cx-ld-txn-table thead th {
+      background: var(--cx-surface-2);
+      padding: 10px 12px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--cx-text-muted);
+      text-align: left;
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-ld-txn-table tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--cx-border-subtle, var(--cx-border));
+      color: var(--cx-text);
+      vertical-align: top;
+    }
+    .cx-ld-txn-table tbody tr:last-child td { border-bottom: none; }
+    .cx-ld-right { text-align: right; }
+    .cx-ld-narration {
+      font-size: 13px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cx-ld-ref {
+      font-size: 11px;
+      color: var(--cx-text-muted);
+      font-family: var(--cx-font-mono, monospace);
+    }
+    .cx-ld-reversal-tag {
+      display: inline-block;
+      margin-top: 2px;
+      padding: 1px 6px;
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--cx-danger, #dc2626);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border-radius: 3px;
+    }
+    .cx-ld-row-reversal {
+      background: rgba(239, 68, 68, 0.03);
+    }
+    .cx-ld-txn-total-row td,
+    .cx-ld-txn-balance-row td {
+      background: var(--cx-surface-2);
+      font-weight: 600;
+      border-top: 1px solid var(--cx-border);
+    }
+    .cx-ld-txn-balance-row td {
+      border-top: 2px solid var(--cx-border);
+      color: var(--cx-success, #16a34a);
+    }
   `],
 })
 export class LoanDetailComponent implements OnInit {
@@ -894,6 +1090,13 @@ export class LoanDetailComponent implements OnInit {
   approvals = signal<any[]>([]);
   documents = signal<any[]>([]);
   documentsLoading = signal(false);
+  // Ledger tab — CustomerLedger + all LedgerTransactions for this loan.
+  // Populated by /loans/:id/customer-ledger, which returns null ledger
+  // for pre-disbursement loans (empty state, not error).
+  customerLedger = signal<any>(null);
+  ledgerTransactions = signal<any[]>([]);
+  ledgerLoading = signal(false);
+  ledgerMessage = signal<string>('');
   activeTab: string = 'summary';
   showDisburse = signal(false);
   disbursing = signal(false);
@@ -910,6 +1113,7 @@ export class LoanDetailComponent implements OnInit {
     { id: 'summary', label: 'Summary' },
     { id: 'schedule', label: 'Repayment Schedule' },
     { id: 'payments', label: 'Payments' },
+    { id: 'ledger', label: 'Ledger' },
     { id: 'documents', label: 'Documents' },
     { id: 'approvals', label: 'Approval Trail' },
     { id: 'trail', label: 'Loan Trail' },
@@ -947,6 +1151,20 @@ export class LoanDetailComponent implements OnInit {
     this.api.get('/documents', { loan_id: this.id }).subscribe({
       next: r => { this.documents.set(r.data || []); this.documentsLoading.set(false); },
       error: () => this.documentsLoading.set(false),
+    });
+
+    // Customer ledger — the GL sub-ledger created at disbursement time.
+    // Pre-disbursement loans return null ledger + a friendly message;
+    // we surface that as the empty-state text.
+    this.ledgerLoading.set(true);
+    this.api.get(`/loans/${this.id}/customer-ledger`).subscribe({
+      next: r => {
+        this.customerLedger.set(r.data?.ledger ?? null);
+        this.ledgerTransactions.set(r.data?.transactions ?? []);
+        this.ledgerMessage.set(r.data?.message ?? '');
+        this.ledgerLoading.set(false);
+      },
+      error: () => this.ledgerLoading.set(false),
     });
   }
 
@@ -1005,6 +1223,37 @@ export class LoanDetailComponent implements OnInit {
       i++;
     }
     return i === 0 ? `${Math.round(v)} B` : `${v.toFixed(1)} ${units[i]}`;
+  }
+
+  // ─── Ledger helpers ────────────────────────────────────────────────
+
+  /**
+   * Totals computed from the transactions signal. Reading them as
+   * methods (not computed signals) is fine here — the arrays are
+   * small (typically <20 entries per loan through its full lifecycle)
+   * and the template already re-evaluates on signal changes.
+   *
+   * Outstanding balance = total CR (what's owed to customer / lent)
+   *                     - total DR (what's been paid down)
+   * Positive = customer still owes money. Negative = bank owes
+   * customer (overpayment scenario). Zero = fully settled.
+   */
+  ledgerTotalDr(): number {
+    return this.ledgerTransactions().reduce(
+      (s, t) => s + (t.trans_type === 'DR' ? parseFloat(t.trans_amount || '0') : 0),
+      0,
+    );
+  }
+
+  ledgerTotalCr(): number {
+    return this.ledgerTransactions().reduce(
+      (s, t) => s + (t.trans_type === 'CR' ? parseFloat(t.trans_amount || '0') : 0),
+      0,
+    );
+  }
+
+  ledgerBalance(): number {
+    return this.ledgerTotalCr() - this.ledgerTotalDr();
   }
 
   /**
