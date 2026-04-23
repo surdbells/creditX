@@ -156,15 +156,18 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                 <tbody>
                   @for (t of txnRows(); track t.id) {
                     <tr>
-                      <td class="cx-acc-date">{{ t.created_at | date:'MMM d, y' }}</td>
-                      <td><span class="cx-acc-code">{{ t.reference || t.trans_callback || '—' }}</span></td>
-                      <td class="cx-acc-desc">{{ t.description || t.narration || '—' }}</td>
-                      <td class="cx-acc-ledger">{{ t.account_name || '—' }}</td>
+                      <td class="cx-acc-date">{{ t.trans_date || (t.created_at | date:'MMM d, y') }}</td>
+                      <td><span class="cx-acc-code">{{ t.trans_reference || t.trans_callback || '—' }}</span></td>
+                      <td class="cx-acc-desc">{{ t.trans_narration || '—' }}</td>
+                      <td class="cx-acc-ledger">
+                        <span class="cx-acc-code">{{ t.gl_code }}</span>
+                        <span>{{ t.gl_name || '—' }}</span>
+                      </td>
                       <td class="cx-acc-right tabular-nums cx-acc-debit">
-                        @if (t.debit_amount > 0) { ₦{{ t.debit_amount | number:'1.2-2' }} } @else { — }
+                        @if (t.trans_type === 'DR') { ₦{{ t.trans_amount | number:'1.2-2' }} } @else { — }
                       </td>
                       <td class="cx-acc-right tabular-nums cx-acc-credit">
-                        @if (t.credit_amount > 0) { ₦{{ t.credit_amount | number:'1.2-2' }} } @else { — }
+                        @if (t.trans_type === 'CR') { ₦{{ t.trans_amount | number:'1.2-2' }} } @else { — }
                       </td>
                     </tr>
                   }
@@ -451,24 +454,22 @@ export class AccountingComponent implements OnInit {
   }
 
   // ── Transactions ──
+  // Hits the global /journal-entries endpoint which returns every
+  // LedgerTransaction across the whole ledger, filtered by date,
+  // amount, type etc. The old implementation fetched the first GL
+  // account's transactions as a 'sample' — placeholder from early
+  // development that got left in. It showed whichever account
+  // happened to sort first alphabetically and missed 99% of the
+  // actual ledger activity, which is why this tab looked empty.
   loadTxns() {
     this.txnLoading.set(true);
-    const params: any = { per_page: 100 };
+    const params: any = { per_page: 100, sort_by: 'createdAt', sort_dir: 'DESC' };
     if (this.txnSearch) params.search = this.txnSearch;
     if (this.txnFrom) params.date_from = this.txnFrom;
     if (this.txnTo) params.date_to = this.txnTo;
-    // Try first GL account's transactions as a sample, or use a general endpoint
-    this.api.get('/gl-accounts', { per_page: 1 }).subscribe({
-      next: r => {
-        const first = (r.data || [])[0];
-        if (first) {
-          this.api.get('/gl-accounts/' + first.id + '/transactions', params).subscribe({
-            next: tr => { this.txnRows.set(tr.data || []); this.txnLoading.set(false); },
-            error: () => { this.txnRows.set([]); this.txnLoading.set(false); },
-          });
-        } else { this.txnRows.set([]); this.txnLoading.set(false); }
-      },
-      error: () => this.txnLoading.set(false),
+    this.api.get('/journal-entries', params).subscribe({
+      next: r => { this.txnRows.set(r.data || []); this.txnLoading.set(false); },
+      error: () => { this.txnRows.set([]); this.txnLoading.set(false); },
     });
   }
 

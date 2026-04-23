@@ -237,6 +237,37 @@ final class DisbursementService
             }
 
             // ─── 4. DR top-up balance if applicable ───
+            // Top-up mechanics: when a customer takes a new loan while
+            // an old one is outstanding, the old loan's remaining
+            // balance (top-up) gets rolled into the new loan's gross.
+            //
+            // The NEW customer ledger has already been CR'd for the
+            // gross (step 2). We now DR it for the top-up (reducing
+            // what the new loan 'owes') and CR the OLD customer ledger
+            // by the same amount — which zeroes out the old ledger's
+            // outstanding position. Net effect: old loan's debt is
+            // transferred into the new loan's gross, accounted for
+            // via the sub-ledgers.
+            //
+            // ## Previous bug (pre-fix)
+            //
+            // The CR used to post to the parent GL with
+            // customer_ledger_id=NULL. This produced an 'orphan
+            // posting' — a direct hit on CUBGL that bypassed any
+            // sub-ledger. The GL reconciliation report flagged
+            // this as a discrepancy on every top-up disbursement.
+            //
+            // Now the CR is scoped to the previous loan's customer
+            // ledger, so the parent CUBGL has no direct postings and
+            // the sub-ledger aggregate is authoritative.
+            //
+            // Fallback: if we can't resolve the previous loan's
+            // customer ledger (data inconsistency, or top-up entered
+            // without a previous_loan_id — which shouldn't happen but
+            // did in some legacy data), skip the CR entirely. Better
+            // to under-account than to leak an orphan. Operators will
+            // see the extra balance on the new customer ledger and
+            // can investigate.
             $topUpBalance = $transaction->getTopUpBalance();
             if (bccomp($topUpBalance, '0.00', 2) > 0) {
                 $this->postEntry(
@@ -245,12 +276,32 @@ final class DisbursementService
                     $callback, $effectiveDate, $userId
                 );
 
-                // CR to customer balance GL
-                $this->postEntry(
-                    $customerGl, null, TransactionType::CR,
-                    $topUpBalance, 'CUSTOMER PREVIOUS BALANCE - ' . $customerName,
-                    $callback, $effectiveDate, $userId
-                );
+                // Resolve the previous loan's ledger so we can close
+                // out its balance via the sub-ledger.
+                $previousLedger = null;
+                if ($loan->getPreviousLoanId()) {
+                    $previousLedger = $this->clRepo->findByLoan($loan->getPreviousLoanId());
+                }
+
+                if ($previousLedger !== null) {
+                    $this->postEntry(
+                        $customerGl, $previousLedger, TransactionType::CR,
+                        $topUpBalance, 'PREVIOUS LOAN CLOSED VIA TOP-UP - ' . $customerName,
+                        $callback, $effectiveDate, $userId
+                    );
+                } else {
+                    // No previous ledger resolvable — log for
+                    // operator attention. This path used to post an
+                    // orphan to the parent GL; now we skip the CR
+                    // and the operator sees the imbalance on the
+                    // NEW customer ledger (a DR with no matching CR)
+                    // rather than on the parent account.
+                    error_log(sprintf(
+                        'DisbursementService: top-up CR skipped — no previous ledger for loan %s (previous_loan_id=%s)',
+                        $loan->getId(),
+                        $loan->getPreviousLoanId() ?? 'NULL',
+                    ));
+                }
             }
 
             // ─── 5. DR net disbursed from customer ledger ───

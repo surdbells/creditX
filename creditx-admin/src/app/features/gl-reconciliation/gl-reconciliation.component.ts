@@ -1,5 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -31,7 +32,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-gl-reconciliation',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -116,6 +117,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                 <th class="cx-glr-right">Sub-ledger</th>
                 <th class="cx-glr-right">Combined</th>
                 <th class="cx-glr-center">Status</th>
+                <th class="cx-glr-right"></th>
               </tr>
             </thead>
             <tbody>
@@ -152,6 +154,15 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       </span>
                     }
                   </td>
+                  <td class="cx-glr-right">
+                    @if (a.has_discrepancy) {
+                      <button class="cx-btn cx-btn-outline cx-btn-sm"
+                              (click)="openOrphanModal(a)">
+                        <lucide-icon name="search" [size]="12"></lucide-icon>
+                        <span>Inspect</span>
+                      </button>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
@@ -178,13 +189,137 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </li>
             <li>
               A non-zero parent-only balance (orphan) means a journal entry
-              bypassed the sub-ledger. Investigate via Journal Entries
-              filtered to that GL account.
+              bypassed the sub-ledger. Use <strong>Inspect</strong> to
+              see the orphan postings and either reassign each one to a
+              customer ledger on the same GL, or drill through via
+              Journal Entries for deeper investigation.
             </li>
           </ul>
         </div>
       }
     </div>
+
+    <!-- ═══ Orphan Inspector Modal ═══ -->
+    @if (orphanModal()) {
+      <div class="cx-glr-backdrop" (click)="orphanModal.set(null)"></div>
+      <div class="cx-glr-modal" role="dialog">
+        <div class="cx-glr-modal-head">
+          <lucide-icon name="search" [size]="22"></lucide-icon>
+          <div>
+            <div class="cx-glr-modal-eyebrow">Orphan Postings</div>
+            <h2 class="cx-glr-modal-title">
+              {{ orphanModal()?.gl?.code }} · {{ orphanModal()?.gl?.name }}
+            </h2>
+            <div class="cx-glr-modal-sub">
+              Postings on this GL with no customer ledger linkage. Each
+              one can be reassigned to a sub-ledger on the same GL, or
+              left alone if it represents a genuine parent-level entry.
+            </div>
+          </div>
+        </div>
+        <div class="cx-glr-modal-body">
+          @if (orphanLoading()) {
+            <div class="cx-glr-modal-loading">
+              <lucide-icon name="loader-2" [size]="16" class="cx-glr-spin"></lucide-icon>
+              <span>Loading…</span>
+            </div>
+          } @else if ((orphanModal()?.orphan_postings || []).length === 0) {
+            <div class="cx-glr-modal-empty">No orphan postings remain on this GL.</div>
+          } @else {
+            <table class="cx-glr-modal-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Reference</th>
+                  <th>Narration</th>
+                  <th class="cx-glr-right">DR</th>
+                  <th class="cx-glr-right">CR</th>
+                  <th class="cx-glr-right"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of orphanModal()?.orphan_postings || []; track p.id) {
+                  <tr>
+                    <td class="cx-glr-mono">{{ p.trans_date }}</td>
+                    <td class="cx-glr-mono">{{ p.trans_reference || p.trans_callback || '—' }}</td>
+                    <td class="cx-glr-narration">{{ p.trans_narration }}</td>
+                    <td class="cx-glr-right tabular-nums">
+                      @if (p.trans_type === 'DR') { ₦{{ p.trans_amount | number:'1.2-2' }} } @else { — }
+                    </td>
+                    <td class="cx-glr-right tabular-nums">
+                      @if (p.trans_type === 'CR') { ₦{{ p.trans_amount | number:'1.2-2' }} } @else { — }
+                    </td>
+                    <td class="cx-glr-right">
+                      <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openReassign(p)">
+                        <lucide-icon name="link" [size]="11"></lucide-icon>
+                        <span>Reassign</span>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+        <div class="cx-glr-modal-actions">
+          <button class="cx-btn cx-btn-ghost" (click)="orphanModal.set(null)">Close</button>
+        </div>
+      </div>
+    }
+
+    <!-- ═══ Reassign sub-modal ═══ -->
+    @if (reassignTarget()) {
+      <div class="cx-glr-backdrop cx-glr-backdrop-stack" (click)="reassignTarget.set(null)"></div>
+      <div class="cx-glr-modal cx-glr-modal-stack" role="dialog">
+        <div class="cx-glr-modal-head">
+          <lucide-icon name="link" [size]="22"></lucide-icon>
+          <div>
+            <div class="cx-glr-modal-eyebrow">Reassign Posting</div>
+            <h2 class="cx-glr-modal-title">Pick a destination sub-ledger</h2>
+            <div class="cx-glr-modal-sub">
+              Moving
+              <strong>{{ reassignTarget()?.trans_type }} ₦{{ reassignTarget()?.trans_amount | number:'1.2-2' }}</strong>
+              from the parent GL to a specific customer ledger on the
+              same GL. The trial balance does not change — this is a
+              linkage fix, not a value change. The narration will be
+              suffixed with a reassignment note for audit.
+            </div>
+          </div>
+        </div>
+        <div class="cx-glr-modal-body">
+          <label class="cx-glr-label">Destination sub-ledger</label>
+          <select class="cx-input" [(ngModel)]="reassignLedgerId">
+            <option [ngValue]="''">— Select a sub-ledger —</option>
+            @for (c of orphanModal()?.candidate_ledgers || []; track c.id) {
+              <option [ngValue]="c.id">
+                {{ c.account_number }} · {{ c.customer_name || '—' }}{{ c.loan_ref ? ' · ' + c.loan_ref : '' }}
+              </option>
+            }
+          </select>
+          @if ((orphanModal()?.candidate_ledgers || []).length === 0) {
+            <div class="cx-glr-modal-empty">
+              No sub-ledgers exist yet on this GL. Create one by
+              disbursing a loan first, or reverse + re-post this
+              entry via Journal Entries.
+            </div>
+          }
+        </div>
+        <div class="cx-glr-modal-actions">
+          <button class="cx-btn cx-btn-ghost" (click)="reassignTarget.set(null)"
+                  [disabled]="reassignBusy()">
+            Cancel
+          </button>
+          <button class="cx-btn cx-btn-primary" (click)="submitReassign()"
+                  [disabled]="reassignBusy() || !reassignLedgerId">
+            @if (reassignBusy()) { <span>Reassigning…</span> }
+            @else {
+              <lucide-icon name="link" [size]="14"></lucide-icon>
+              <span>Reassign</span>
+            }
+          </button>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     /* ═══ Summary strip ═══ */
@@ -341,12 +476,129 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .cx-glr-empty { flex-direction: column; }
     .cx-glr-spin { animation: cx-glr-spin 1s linear infinite; }
     @keyframes cx-glr-spin { to { transform: rotate(360deg); } }
+
+    /* ═══ Orphan inspector + reassign modals ═══ */
+    .cx-glr-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      z-index: 100;
+      backdrop-filter: blur(4px);
+    }
+    /* The reassign sub-modal stacks ON TOP of the inspector. Two
+       backdrops render — this one sits higher so clicking outside
+       closes only the sub-modal, leaving the inspector open. */
+    .cx-glr-backdrop-stack { z-index: 102; background: rgba(15, 23, 42, 0.35); }
+    .cx-glr-modal {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(900px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 16px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.25);
+      z-index: 101;
+    }
+    .cx-glr-modal-stack { width: min(520px, calc(100vw - 32px)); z-index: 103; }
+    .cx-glr-modal-head { display: flex; gap: 14px; padding: 20px 24px; }
+    .cx-glr-modal-head lucide-icon { margin-top: 2px; color: var(--cx-primary-600); }
+    .cx-glr-modal-eyebrow {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-glr-modal-title {
+      margin: 4px 0 6px;
+      font-size: 18px; font-weight: 600;
+      color: var(--cx-text);
+    }
+    .cx-glr-modal-sub { font-size: 13px; color: var(--cx-text-secondary); line-height: 1.5; }
+    .cx-glr-modal-body {
+      padding: 0 24px 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .cx-glr-modal-loading {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      padding: 32px 16px;
+      color: var(--cx-text-secondary);
+      font-size: 13px;
+    }
+    .cx-glr-modal-empty {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--cx-text-muted);
+      font-size: 13px;
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+    }
+    .cx-glr-modal-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 12px;
+    }
+    .cx-glr-modal-table th {
+      position: sticky; top: 0;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+      background: var(--cx-surface);
+      border-bottom: 1px solid var(--cx-border);
+      white-space: nowrap;
+    }
+    .cx-glr-modal-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--cx-border);
+      color: var(--cx-text);
+      white-space: nowrap;
+    }
+    .cx-glr-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .cx-glr-narration {
+      max-width: 320px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: var(--cx-text-secondary);
+    }
+    .cx-glr-modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px;
+      padding: 12px 24px 20px;
+      border-top: 1px solid var(--cx-border);
+    }
+    .cx-glr-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+    }
+    .cx-glr-modal-body select {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
   `],
 })
 export class GlReconciliationComponent implements OnInit {
   accounts = signal<any[]>([]);
   summary = signal<any>(null);
   loading = signal(true);
+
+  // ── Orphan inspector modal state ─────────────────────────────
+  // orphanModal holds the whole GL's payload (orphan_postings +
+  // candidate_ledgers); null when closed. Opening fetches fresh data
+  // so operators see the current state, not a stale snapshot.
+  orphanModal = signal<any>(null);
+  orphanLoading = signal(false);
+
+  // ── Reassign sub-modal state ─────────────────────────────────
+  // reassignTarget is the single orphan posting being re-homed;
+  // reassignLedgerId is the user's chosen destination sub-ledger.
+  reassignTarget = signal<any>(null);
+  reassignLedgerId = '';
+  reassignBusy = signal(false);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
@@ -363,6 +615,63 @@ export class GlReconciliationComponent implements OnInit {
       error: e => {
         this.loading.set(false);
         this.toast.error(e.error?.message || 'Failed to load reconciliation');
+      },
+    });
+  }
+
+  /**
+   * Open the inspector for one GL account. Fetches its orphan
+   * postings + candidate destination ledgers.
+   */
+  openOrphanModal(account: any) {
+    this.orphanLoading.set(true);
+    // Open with a stub so the modal header renders immediately; the
+    // body swaps to the real payload when the fetch resolves.
+    this.orphanModal.set({ gl: { code: account.code, name: account.name }, orphan_postings: [], candidate_ledgers: [] });
+    this.api.get(`/accounting/gl-accounts/${account.id}/orphan-postings`).subscribe({
+      next: r => {
+        this.orphanModal.set(r.data);
+        this.orphanLoading.set(false);
+      },
+      error: e => {
+        this.orphanLoading.set(false);
+        this.orphanModal.set(null);
+        this.toast.error(e.error?.message || 'Failed to load orphan postings');
+      },
+    });
+  }
+
+  /** Launch the sub-modal to pick a destination sub-ledger. */
+  openReassign(posting: any) {
+    this.reassignTarget.set(posting);
+    this.reassignLedgerId = '';
+  }
+
+  submitReassign() {
+    const target = this.reassignTarget();
+    if (!target || !this.reassignLedgerId) return;
+    this.reassignBusy.set(true);
+    this.api.post(`/accounting/transactions/${target.id}/reassign-ledger`, {
+      customer_ledger_id: this.reassignLedgerId,
+    }).subscribe({
+      next: r => {
+        this.reassignBusy.set(false);
+        this.reassignTarget.set(null);
+        this.toast.success(r.message || 'Reassigned');
+        // Refresh the inspector payload so the reassigned row
+        // disappears from the orphan list. Also refresh the main
+        // table's summary counts — a reassign may have cleared
+        // this GL's discrepancy entirely.
+        const current = this.orphanModal();
+        if (current?.gl?.id) {
+          const stub = { id: current.gl.id, code: current.gl.code, name: current.gl.name };
+          this.openOrphanModal(stub);
+        }
+        this.load();
+      },
+      error: e => {
+        this.reassignBusy.set(false);
+        this.toast.error(e.error?.message || 'Reassign failed');
       },
     });
   }

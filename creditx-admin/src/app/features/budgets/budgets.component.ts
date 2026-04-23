@@ -503,11 +503,13 @@ export class BudgetsComponent implements OnInit {
   }
 
   /**
-   * Fetch GL accounts for the 'Add budget' dropdown. Uses the
-   * existing /accounting endpoint — picks off the tree-flat list.
+   * Fetch GL accounts for the 'Add budget' dropdown. The correct
+   * endpoint is /gl-accounts (the GL Chart of Accounts route group);
+   * an older version of this component called /accounting which
+   * doesn't exist, 404-ing silently and leaving the dropdown empty.
    */
   loadGlAccounts() {
-    this.api.get('/accounting', { ledger_type: 'general' }).subscribe({
+    this.api.get('/gl-accounts', { ledger_type: 'general', per_page: 200 }).subscribe({
       next: r => {
         const raw = r.data?.accounts || r.data?.items || r.data || [];
         this.glAccounts.set(raw.map((gl: any) => ({

@@ -340,6 +340,12 @@ return function (App $app): void {
         // Distinct from /reconciliations (transaction-matching workflow).
         $api->get('/accounting/gl-reconciliation', Accounting\ReconciliationAction::class)
             ->add(new RbacMiddleware('accounting.view'));
+        // Drill-in + reassign for orphan postings flagged by the
+        // GL Reconciliation report.
+        $api->get('/accounting/gl-accounts/{id}/orphan-postings', Accounting\GetOrphanPostingsAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/transactions/{id}/reassign-ledger', Accounting\ReassignOrphanPostingAction::class)
+            ->add(new RbacMiddleware('accounting.edit'));
 
         // ─── Accounting — Period Close (commit AF) ───
         // List periods + close + reopen. accounting.close gates list +
