@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -9,6 +9,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
+import { BatchConfirmDialogComponent } from '../../shared/components/batch-confirm-dialog/batch-confirm-dialog.component';
 
 /**
  * Approval queue + inline review modal.
@@ -30,7 +32,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
  */
 @Component({
   selector: 'app-approval-queue', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -38,7 +40,12 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
         subtitle="Loans awaiting your decision at this approval step"
         eyebrow="Workflow"></cx-page-header>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-        searchPlaceholder="Search pending approvals..." [hasActions]="true" (query)="onQuery($event)">
+        searchPlaceholder="Search pending approvals..." [hasActions]="true"
+        [selectable]="true"
+        [selectedIds]="selectedIds()"
+        (selectedIdsChange)="onSelectionChange($event)"
+        trackBy="loan_id"
+        (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <div class="flex items-center gap-1 justify-end">
             <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openReview(row)" title="Review">
@@ -54,6 +61,30 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
         </ng-template>
       </cx-data-table>
     </div>
+
+    <!-- Floating bulk action bar — appears when rows are selected -->
+    <cx-bulk-action-bar
+      [count]="selectedIds().size"
+      primaryLabel="Approve"
+      dangerLabel="Reject"
+      [busy]="batchSubmitting()"
+      (primary)="openBatchConfirm('approve')"
+      (danger)="openBatchConfirm('reject')"
+      (clear)="clearSelection()">
+    </cx-bulk-action-bar>
+
+    <!-- Batch confirm dialog — shared across the three queues -->
+    <cx-batch-confirm
+      [open]="batchConfirmOpen()"
+      [count]="selectedIds().size"
+      [action]="batchAction()"
+      [itemNoun]="'loan'"
+      [busy]="batchSubmitting()"
+      [comment]="batchComment"
+      (commentChange)="batchComment = $event"
+      (confirm)="submitBatch()"
+      (cancel)="batchConfirmOpen.set(false)">
+    </cx-batch-confirm>
 
     <!--
       Review modal. Full-height on mobile, centered card on desktop.
@@ -902,6 +933,15 @@ export class ApprovalQueueComponent implements OnInit {
   pagination = signal<TablePagination | null>(null);
   q: any = {};
 
+  // Selection + batch state — persisted across pagination so the user
+  // can queue up selections from multiple pages before firing a batch.
+  // Keys are loan_id strings (matches the DataTable's trackBy="loan_id").
+  selectedIds = signal<Set<string>>(new Set());
+  batchConfirmOpen = signal(false);
+  batchAction = signal<'approve' | 'reject'>('approve');
+  batchSubmitting = signal(false);
+  batchComment = '';
+
   // Modal state
   modalOpen = signal(false);
   mode = signal<'review' | 'reject' | 'quick-approve'>('review');
@@ -920,6 +960,85 @@ export class ApprovalQueueComponent implements OnInit {
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
   ngOnInit() { this.load(); }
+
+  // ─── Selection + batch helpers ─────────────────────────────────────
+
+  /**
+   * Callback from DataTable when selection changes (header toggle,
+   * individual row toggle). We replace the signal's value with the
+   * new Set so the template re-renders with the updated count.
+   */
+  onSelectionChange(next: Set<string>): void {
+    this.selectedIds.set(new Set(next));
+  }
+
+  /**
+   * Clear all selections. Called from the floating bar's Clear button
+   * and after a successful batch submission.
+   */
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  /**
+   * Open the batch confirm dialog for the given action. Pre-fills
+   * batchComment from nothing (each batch starts blank).
+   */
+  openBatchConfirm(action: 'approve' | 'reject'): void {
+    if (this.selectedIds().size === 0) return;
+    this.batchAction.set(action);
+    this.batchComment = '';
+    this.batchConfirmOpen.set(true);
+  }
+
+  /**
+   * Submit the batch to /approvals/batch-decide. Response is
+   * { success: [...], failed: [...], total }. Toasts with counts,
+   * clears selection on full success, keeps failed IDs selected
+   * on partial failure so the user can retry / inspect.
+   */
+  submitBatch(): void {
+    const ids = Array.from(this.selectedIds());
+    const action = this.batchAction();
+    if (ids.length === 0) return;
+    if (action === 'reject' && !this.batchComment.trim()) {
+      this.toast.error('A rejection reason is required');
+      return;
+    }
+
+    this.batchSubmitting.set(true);
+    this.api.post('/approvals/batch-decide', {
+      loan_ids: ids,
+      action,
+      comment: this.batchComment.trim() || null,
+    }).subscribe({
+      next: r => {
+        this.batchSubmitting.set(false);
+        this.batchConfirmOpen.set(false);
+        const success = r.data?.success ?? [];
+        const failed  = r.data?.failed ?? [];
+        if (failed.length === 0) {
+          this.toast.success(r.message || `All ${success.length} processed`);
+          this.clearSelection();
+        } else {
+          // Partial — keep failed loan_ids selected so the user can
+          // see what didn't go through and retry. Dialog closes so
+          // they can inspect the queue.
+          const failedIds = new Set<string>(failed.map((f: any) => String(f.loan_id)));
+          this.selectedIds.set(failedIds);
+          this.toast.error(
+            `${success.length} ${action}d, ${failed.length} failed — ${failed[0]?.error || 'see details'}`
+          );
+        }
+        this.batchComment = '';
+        this.load(this.q);
+      },
+      error: e => {
+        this.batchSubmitting.set(false);
+        this.toast.error(e.error?.message || 'Batch operation failed');
+      },
+    });
+  }
 
   load(p?: any) {
     this.loading.set(true);

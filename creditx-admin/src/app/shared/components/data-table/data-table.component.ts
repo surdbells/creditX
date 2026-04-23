@@ -81,6 +81,15 @@ export interface TableQueryEvent {
         <table class="cx-dtable-table">
           <thead>
             <tr>
+              @if (selectable) {
+                <th class="cx-dtable-select-col">
+                  <input type="checkbox"
+                         [checked]="allVisibleSelected()"
+                         [indeterminate]="someVisibleSelected()"
+                         (change)="toggleAllVisible($event)"
+                         aria-label="Select all on this page" />
+                </th>
+              }
               @for (col of visibleColumns(); track col.key) {
                 <th [class.is-sortable]="col.sortable !== false"
                   [class.is-sorted]="currentSort() === col.key"
@@ -107,7 +116,7 @@ export interface TableQueryEvent {
           <tbody>
             @if (loading) {
               <tr>
-                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="cx-dtable-state">
+                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)" class="cx-dtable-state">
                   <div class="cx-dtable-loading">
                     <div class="cx-dtable-loading-dots"><span></span><span></span><span></span></div>
                     <span>Loading...</span>
@@ -116,7 +125,7 @@ export interface TableQueryEvent {
               </tr>
             } @else if (!rows || rows.length === 0) {
               <tr>
-                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0)" class="cx-dtable-state">
+                <td [attr.colspan]="visibleColumns().length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)" class="cx-dtable-state">
                   <div class="cx-dtable-empty">
                     <lucide-icon name="database" [size]="28"></lucide-icon>
                     <span>{{ emptyMessage }}</span>
@@ -125,7 +134,15 @@ export interface TableQueryEvent {
               </tr>
             } @else {
               @for (row of rows; track trackByFn(row)) {
-                <tr>
+                <tr [class.cx-dtable-row-selected]="selectable && isRowSelected(row)">
+                  @if (selectable) {
+                    <td class="cx-dtable-select-col" (click)="$event.stopPropagation()">
+                      <input type="checkbox"
+                             [checked]="isRowSelected(row)"
+                             (change)="toggleRow(row, $event)"
+                             aria-label="Select row" />
+                    </td>
+                  }
                   @for (col of visibleColumns(); track col.key) {
                     <td [style.text-align]="col.align || 'left'">
                       @if (col.type === 'badge' && col.badgeMap) {
@@ -301,6 +318,25 @@ export interface TableQueryEvent {
     }
     .cx-dtable-row-actions { text-align: right; }
 
+    /* Selection column — narrow, centered checkbox */
+    .cx-dtable-select-col {
+      width: 40px;
+      text-align: center !important;
+      padding: 0 !important;
+    }
+    .cx-dtable-select-col input[type="checkbox"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--cx-primary-600, #2563eb);
+    }
+    .cx-dtable-row-selected {
+      background: rgba(59, 130, 246, 0.06) !important;
+    }
+    .cx-dtable-row-selected td {
+      border-left: 2px solid var(--cx-primary-600, #2563eb);
+    }
+
     .cx-dtable-currency { font-weight: 500; color: var(--cx-text); }
     .cx-dtable-date { font-size: var(--cx-text-xs); color: var(--cx-text-muted); }
 
@@ -374,9 +410,21 @@ export class DataTableComponent {
   @Input() hasActions = false;
   @Input() exportable = false;
   @Input() trackBy = 'id';
+  // Selection — opt-in checkbox column for batch actions on the queues
+  // (approval-queue, disbursement-queue, maker-checker). When true:
+  //   - A checkbox column renders leftmost
+  //   - Header checkbox toggles all visible rows
+  //   - selectedIds is a Set<string> owned by the parent component
+  //     (persisted across pagination there), passed in + emitted out.
+  //
+  // When false (default), no checkbox column renders, preserving all
+  // existing tables without change.
+  @Input() selectable = false;
+  @Input() selectedIds: Set<string> = new Set();
 
   @Output() query = new EventEmitter<TableQueryEvent>();
   @Output() onExport = new EventEmitter<void>();
+  @Output() selectedIdsChange = new EventEmitter<Set<string>>();
 
   @ContentChild('rowActions') rowActionsTemplate?: TemplateRef<any>;
   @ContentChild('cellTemplate') cellTemplate?: TemplateRef<any>;
@@ -433,6 +481,89 @@ export class DataTableComponent {
 
   trackByFn(row: any): any {
     return row[this.trackBy] ?? row;
+  }
+
+  // ─── Selection ────────────────────────────────────────────────────
+  //
+  // Selection state is owned by the parent component and passed in as
+  // selectedIds (a Set for O(1) membership checks + unique guarantees).
+  // We mutate the passed-in Set in place and emit the same reference
+  // back. Parent also tracks a separate Set so pagination navigation
+  // preserves selections across pages — we only toggle what's visible
+  // on the current page.
+
+  /**
+   * Is the given row's ID in the current selection?
+   * Used for both the row's checkbox state and the selected-row style.
+   */
+  isRowSelected(row: any): boolean {
+    const id = row?.[this.trackBy];
+    return id != null && this.selectedIds.has(String(id));
+  }
+
+  /**
+   * True when every CURRENTLY VISIBLE row is selected. The page-level
+   * 'select all' header checkbox uses this to show the full-tick state.
+   * Distinct from 'all across pagination selected', which would require
+   * knowing the total count — we scope to the visible page for sanity.
+   */
+  allVisibleSelected(): boolean {
+    if (!this.rows || this.rows.length === 0) return false;
+    return this.rows.every(r => this.isRowSelected(r));
+  }
+
+  /**
+   * True when some but not all visible rows are selected. Renders the
+   * indeterminate tri-state on the header checkbox so the user knows
+   * they have a partial selection on this page.
+   */
+  someVisibleSelected(): boolean {
+    if (!this.rows || this.rows.length === 0) return false;
+    const selectedCount = this.rows.filter(r => this.isRowSelected(r)).length;
+    return selectedCount > 0 && selectedCount < this.rows.length;
+  }
+
+  /**
+   * Toggle an individual row's selection. Stops propagation at the
+   * click handler (on the <td>) to avoid triggering row-click effects.
+   */
+  toggleRow(row: any, ev: Event): void {
+    const id = row?.[this.trackBy];
+    if (id == null) return;
+    const next = new Set(this.selectedIds);
+    const key = String(id);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    this.selectedIds = next;
+    this.selectedIdsChange.emit(next);
+  }
+
+  /**
+   * Toggle all visible rows. When the header checkbox is checked
+   * (transitioning to true), add every visible row's ID. When it's
+   * unchecked (transitioning to false), remove every visible row's ID.
+   * Either way, rows NOT on this page keep their selection state — the
+   * header checkbox only operates on what's rendered.
+   */
+  toggleAllVisible(ev: Event): void {
+    const target = ev.target as HTMLInputElement;
+    const shouldSelect = target.checked;
+    const next = new Set(this.selectedIds);
+    for (const row of this.rows) {
+      const id = row?.[this.trackBy];
+      if (id == null) continue;
+      const key = String(id);
+      if (shouldSelect) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+    }
+    this.selectedIds = next;
+    this.selectedIdsChange.emit(next);
   }
 
   private emitQuery(page?: number, perPage?: number): void {

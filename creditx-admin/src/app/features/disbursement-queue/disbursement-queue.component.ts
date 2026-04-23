@@ -8,6 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
 
 /**
  * Disbursement queue — dedicated page for users with loans.disburse.
@@ -31,7 +32,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 @Component({
   selector: 'app-disbursement-queue',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -42,7 +43,12 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [pagination]="pagination()"
                      searchPlaceholder="Search by application ID or customer..."
-                     [hasActions]="true" (query)="onQuery($event)">
+                     [hasActions]="true"
+                     [selectable]="true"
+                     [selectedIds]="selectedIds()"
+                     (selectedIdsChange)="onSelectionChange($event)"
+                     trackBy="id"
+                     (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <div class="flex items-center gap-1 justify-end">
             <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="openDisburse(row)" title="Disburse">
@@ -203,6 +209,84 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
             } @else {
               <lucide-icon name="banknote" [size]="14"></lucide-icon>
               <span>Confirm Disbursement</span>
+            }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Floating bulk action bar — selection-driven -->
+    <cx-bulk-action-bar
+      [count]="selectedIds().size"
+      primaryLabel="Batch Disburse"
+      primaryIcon="banknote"
+      [busy]="batchSubmitting()"
+      (primary)="openBatchModal()"
+      (clear)="clearSelection()">
+    </cx-bulk-action-bar>
+
+    <!-- Batch disburse modal — collects settlement GL + effective date -->
+    @if (batchModalOpen()) {
+      <div class="cx-dq-backdrop" (click)="closeBatchModal()"></div>
+      <div class="cx-dq-modal" role="dialog" aria-labelledby="batch-title">
+        <div class="cx-dq-modal-head">
+          <div>
+            <div class="cx-dq-modal-eyebrow">Batch Disburse</div>
+            <h2 id="batch-title" class="cx-dq-modal-title">
+              Disburse <strong class="tabular-nums">{{ selectedIds().size }}</strong> loans
+            </h2>
+            <div class="cx-dq-modal-sub">
+              All loans will be funded from the same settlement GL on the
+              same effective date. Top-up balances auto-detect per loan.
+            </div>
+          </div>
+          <button class="cx-dq-modal-close" (click)="closeBatchModal()" aria-label="Close">
+            <lucide-icon name="x" [size]="18"></lucide-icon>
+          </button>
+        </div>
+
+        <div class="cx-dq-modal-body">
+          @if (batchGlsLoading()) {
+            <div class="cx-dq-loading">
+              <lucide-icon name="loader-2" [size]="16" class="cx-dq-spin"></lucide-icon>
+              <span>Loading settlement accounts…</span>
+            </div>
+          } @else {
+            <div class="cx-dq-section">
+              <label class="cx-label">Settlement GL Account <span class="cx-dq-required">*</span></label>
+              <select class="cx-input" [(ngModel)]="batchSettlementGlId">
+                <option value="">— Select settlement account —</option>
+                @for (gl of batchGls(); track gl.id) {
+                  <option [value]="gl.id">{{ gl.code }} — {{ gl.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="cx-dq-section">
+              <label class="cx-label">Effective Date</label>
+              <input type="date" class="cx-input" [(ngModel)]="batchEffectiveDate" />
+            </div>
+
+            <div class="cx-dq-section">
+              <label class="cx-label">Notes (optional)</label>
+              <textarea class="cx-input" rows="2" [(ngModel)]="batchNotes"
+                        placeholder="Batch disbursement notes for the audit log..."></textarea>
+            </div>
+          }
+        </div>
+
+        <div class="cx-dq-modal-actions">
+          <button class="cx-btn cx-btn-ghost" (click)="closeBatchModal()" [disabled]="batchSubmitting()">
+            Cancel
+          </button>
+          <button class="cx-btn cx-btn-primary"
+                  (click)="submitBatch()"
+                  [disabled]="batchSubmitting() || !batchSettlementGlId || batchGlsLoading()">
+            @if (batchSubmitting()) {
+              <span>Disbursing…</span>
+            } @else {
+              <lucide-icon name="banknote" [size]="14"></lucide-icon>
+              <span>Disburse {{ selectedIds().size }} loans</span>
             }
           </button>
         </div>
@@ -418,6 +502,18 @@ export class DisbursementQueueComponent implements OnInit {
   effectiveDate = '';
   notes = '';
 
+  // ─── Batch state ────────────────────────────────────────────────────
+  // Selection tracked across pagination via a Set<string> of loan IDs.
+  // Keys are row.id strings (matches the DataTable's trackBy="id").
+  selectedIds = signal<Set<string>>(new Set());
+  batchModalOpen = signal(false);
+  batchSubmitting = signal(false);
+  batchGls = signal<any[]>([]);
+  batchGlsLoading = signal(false);
+  batchSettlementGlId = '';
+  batchEffectiveDate = '';
+  batchNotes = '';
+
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
   ngOnInit() { this.load(); }
@@ -525,6 +621,92 @@ export class DisbursementQueueComponent implements OnInit {
       error: e => {
         this.disbursing.set(false);
         this.toast.error(e.error?.message || 'Disbursement failed');
+      },
+    });
+  }
+
+  // ─── Batch disburse ─────────────────────────────────────────────────
+
+  onSelectionChange(next: Set<string>): void {
+    this.selectedIds.set(new Set(next));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  /**
+   * Open the batch disburse modal. Fetches the settlement-GL list
+   * once via a preview call against the first selected loan (any
+   * loan works — the list is global, not per-loan). Cached across
+   * opens within the session.
+   */
+  openBatchModal(): void {
+    if (this.selectedIds().size === 0) return;
+    this.batchSettlementGlId = '';
+    this.batchEffectiveDate = new Date().toISOString().slice(0, 10);
+    this.batchNotes = '';
+    this.batchModalOpen.set(true);
+
+    // Only fetch the GL list if we don't already have it cached.
+    if (this.batchGls().length > 0) return;
+
+    const firstId = Array.from(this.selectedIds())[0];
+    if (!firstId) return;
+    this.batchGlsLoading.set(true);
+    this.api.get(`/loans/${firstId}/disbursement-preview`).subscribe({
+      next: r => {
+        this.batchGls.set(r.data?.settlement_gls ?? []);
+        this.batchGlsLoading.set(false);
+      },
+      error: () => this.batchGlsLoading.set(false),
+    });
+  }
+
+  closeBatchModal(): void {
+    if (this.batchSubmitting()) return;
+    this.batchModalOpen.set(false);
+  }
+
+  /**
+   * Submit the batch. Same settlement GL + effective date for every
+   * loan; top-up auto-detected per loan server-side. Response has
+   * success[] and failed[] arrays.
+   */
+  submitBatch(): void {
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0 || !this.batchSettlementGlId) return;
+    this.batchSubmitting.set(true);
+    this.api.post('/disbursement/batch', {
+      loan_ids: ids,
+      settlement_gl_id: this.batchSettlementGlId,
+      effective_date: this.batchEffectiveDate,
+      notes: this.batchNotes,
+    }).subscribe({
+      next: r => {
+        this.batchSubmitting.set(false);
+        this.batchModalOpen.set(false);
+        const success = r.data?.success ?? [];
+        const failed  = r.data?.failed ?? [];
+        if (failed.length === 0) {
+          this.toast.success(r.message || `All ${success.length} processed`);
+          this.clearSelection();
+        } else {
+          // Keep failed loan_ids selected so the user can retry
+          // (e.g. after bumping a permission or checking the loan
+          // status). Successful ones drop out of the queue naturally
+          // on the next load.
+          const failedIds = new Set<string>(failed.map((f: any) => String(f.loan_id)));
+          this.selectedIds.set(failedIds);
+          this.toast.error(
+            `${success.length} disbursed, ${failed.length} failed — ${failed[0]?.error || 'see details'}`
+          );
+        }
+        this.load(this.q);
+      },
+      error: e => {
+        this.batchSubmitting.set(false);
+        this.toast.error(e.error?.message || 'Batch disbursement failed');
       },
     });
   }

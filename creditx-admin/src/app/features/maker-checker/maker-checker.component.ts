@@ -9,6 +9,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
+import { BatchConfirmDialogComponent } from '../../shared/components/batch-confirm-dialog/batch-confirm-dialog.component';
 
 /**
  * Maker-Checker queue — dedicated page for users with maker_checker.check.
@@ -28,7 +30,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 @Component({
   selector: 'app-maker-checker',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -39,7 +41,12 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [pagination]="pagination()"
                      searchPlaceholder="Search by operation or entity..."
-                     [hasActions]="true" (query)="onQuery($event)">
+                     [hasActions]="true"
+                     [selectable]="batchEligible()"
+                     [selectedIds]="selectedIds()"
+                     (selectedIdsChange)="onSelectionChange($event)"
+                     trackBy="id"
+                     (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <div class="flex items-center gap-1 justify-end">
             <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openReview(row)" title="Review">
@@ -49,6 +56,36 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
         </ng-template>
       </cx-data-table>
     </div>
+
+    <!--
+      Floating bulk action bar — visible only when viewing the 'pending'
+      status tab AND at least one row is selected. On the approved/
+      rejected tabs there's nothing to decide in bulk, so we gate
+      visibility via batchEligible() which returns true only when the
+      active status filter is 'pending'.
+    -->
+    <cx-bulk-action-bar
+      [count]="selectedIds().size"
+      primaryLabel="Approve & Execute"
+      dangerLabel="Reject"
+      [busy]="batchSubmitting()"
+      (primary)="openBatchConfirm('approve')"
+      (danger)="openBatchConfirm('reject')"
+      (clear)="clearSelection()">
+    </cx-bulk-action-bar>
+
+    <cx-batch-confirm
+      [open]="batchConfirmOpen()"
+      [count]="selectedIds().size"
+      [action]="batchAction()"
+      [itemNoun]="'request'"
+      [executorWarning]="true"
+      [busy]="batchSubmitting()"
+      [comment]="batchComment"
+      (commentChange)="batchComment = $event"
+      (confirm)="submitBatch()"
+      (cancel)="batchConfirmOpen.set(false)">
+    </cx-batch-confirm>
 
     @if (modalOpen()) {
       <div class="cx-mc-backdrop" (click)="closeModal()"></div>
@@ -692,6 +729,18 @@ export class MakerCheckerComponent implements OnInit {
   pagination = signal<TablePagination | null>(null);
   q: any = { status: 'pending' };  // default filter: pending only
 
+  // ─── Batch state ────────────────────────────────────────────────────
+  // Selection only makes sense on the 'pending' tab — approved and
+  // rejected requests can't be re-decided. batchEligible() gates the
+  // checkbox column and bulk bar visibility off the current status
+  // filter. When the user switches tabs away from 'pending', we also
+  // clear the selection so stale IDs don't linger.
+  selectedIds = signal<Set<string>>(new Set());
+  batchConfirmOpen = signal(false);
+  batchAction = signal<'approve' | 'reject'>('approve');
+  batchSubmitting = signal(false);
+  batchComment = '';
+
   // Modal state
   modalOpen = signal(false);
   activeRow = signal<any>(null);
@@ -712,6 +761,78 @@ export class MakerCheckerComponent implements OnInit {
   private sanitizer = inject(DomSanitizer);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+
+  /**
+   * Whether batch actions apply to the current view. Only pending
+   * requests can be approved/rejected in bulk — approved/rejected
+   * ones are terminal states. This drives the checkbox column
+   * visibility on the DataTable.
+   */
+  batchEligible(): boolean {
+    return this.q?.status === 'pending';
+  }
+
+  onSelectionChange(next: Set<string>): void {
+    this.selectedIds.set(new Set(next));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  openBatchConfirm(action: 'approve' | 'reject'): void {
+    if (this.selectedIds().size === 0) return;
+    this.batchAction.set(action);
+    this.batchComment = '';
+    this.batchConfirmOpen.set(true);
+  }
+
+  /**
+   * Submit batch decide. Note: the backend enforces maker !== checker
+   * per-item — if the current user is the maker on any selected
+   * request, that row shows up in failed[] with a clear error message.
+   * Same for any request that raced to 'approved' state between
+   * selection and submission.
+   */
+  submitBatch(): void {
+    const ids = Array.from(this.selectedIds());
+    const action = this.batchAction();
+    if (ids.length === 0) return;
+    if (action === 'reject' && !this.batchComment.trim()) {
+      this.toast.error('A rejection reason is required');
+      return;
+    }
+
+    this.batchSubmitting.set(true);
+    this.api.post('/maker-checker/batch-decide', {
+      request_ids: ids,
+      action,
+      comment: this.batchComment.trim() || null,
+    }).subscribe({
+      next: r => {
+        this.batchSubmitting.set(false);
+        this.batchConfirmOpen.set(false);
+        const success = r.data?.success ?? [];
+        const failed  = r.data?.failed ?? [];
+        if (failed.length === 0) {
+          this.toast.success(r.message || `All ${success.length} processed`);
+          this.clearSelection();
+        } else {
+          const failedIds = new Set<string>(failed.map((f: any) => String(f.request_id)));
+          this.selectedIds.set(failedIds);
+          this.toast.error(
+            `${success.length} ${action}d, ${failed.length} failed — ${failed[0]?.error || 'see details'}`
+          );
+        }
+        this.batchComment = '';
+        this.load(this.q);
+      },
+      error: e => {
+        this.batchSubmitting.set(false);
+        this.toast.error(e.error?.message || 'Batch operation failed');
+      },
+    });
+  }
 
   ngOnInit() { this.load(); }
 

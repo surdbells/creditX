@@ -297,6 +297,10 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('loans.view'));
             $group->post('/loan/{id}/decide', Approval\DecideApprovalAction::class)
                 ->add(new RbacMiddleware('loans.approve'));
+            // Batch: approve/reject many loans in one call. Per-item
+            // try/catch; response has success[] + failed[] arrays.
+            $group->post('/batch-decide', Approval\BatchDecideApprovalAction::class)
+                ->add(new RbacMiddleware('loans.approve'));
         });
 
         // ─── GL Accounts (Chart of Accounts) ───
@@ -342,12 +346,20 @@ return function (App $app): void {
             ->add(new RbacMiddleware('loans.disburse'));
         $api->post('/loans/{id}/disburse', Disbursement\DisburseLoanAction::class)
             ->add(new RbacMiddleware('loans.disburse'));
+        // Batch disburse: all loans funded from same settlement GL on
+        // same effective date. Top-up auto-detected per loan.
+        $api->post('/disbursement/batch', Disbursement\BatchDisburseAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
 
         // ─── Maker-Checker ───
         $api->group('/maker-checker', function (RouteCollectorProxy $group) {
             $group->get('', MakerChecker\ListMcRequestsAction::class)
                 ->add(new RbacMiddleware('maker_checker.check'));
             $group->post('/{id}/decide', MakerChecker\DecideMcAction::class)
+                ->add(new RbacMiddleware('maker_checker.check'));
+            // Batch: approve/reject many MC requests in one call.
+            // Per-item transaction for approve path (matches single).
+            $group->post('/batch-decide', MakerChecker\BatchDecideMcAction::class)
                 ->add(new RbacMiddleware('maker_checker.check'));
         });
 
