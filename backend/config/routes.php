@@ -497,6 +497,16 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.cbn'));
             $group->get('/customer-variance', Report\CustomerVarianceReportAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
+
+            // ─── Financial Statements ───
+            // Income Statement (P&L) — revenue - expenses over a period.
+            // Balance Sheet — Assets / Liabilities / Equity snapshot.
+            // Gated by accounting.view to match the other accounting
+            // reports (Chart of Accounts, Journal Entries, GL Reconciliation).
+            $group->get('/income-statement', Report\IncomeStatementAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->get('/balance-sheet', Report\BalanceSheetAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
         });
 
         // ─── Reconciliation ───
