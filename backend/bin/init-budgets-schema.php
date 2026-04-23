@@ -53,9 +53,13 @@ $conn->executeStatement("
         month VARCHAR(2) NOT NULL,
         amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
         notes TEXT NULL,
-        created_by VARCHAR(36) NULL,
+        -- TimestampsTrait audit columns (all four required — see
+        -- init-audit-columns-repair.php for background on the 42703
+        -- class of errors this prevents).
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(36) NULL,
+        updated_by VARCHAR(36) NULL,
         CONSTRAINT uq_budget_gl_year_month UNIQUE (gl_id, year, month)
     );
     CREATE INDEX idx_budget_year_month ON budgets(year, month);

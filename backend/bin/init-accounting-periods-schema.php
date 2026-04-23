@@ -51,8 +51,14 @@ $sql = "
         closed_at TIMESTAMP NULL,
         closed_by VARCHAR(36) NULL,
         notes TEXT NULL,
+        -- TimestampsTrait audit columns. The trait maps all four of
+        -- created_at/updated_at/created_by/updated_by; missing any of
+        -- them on the physical table causes a 42703 error on every
+        -- Doctrine query against this entity.
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(36) NULL,
+        updated_by VARCHAR(36) NULL,
         CONSTRAINT uq_ap_year_month UNIQUE (year, month)
     );
     CREATE INDEX idx_ap_status ON accounting_periods(status);

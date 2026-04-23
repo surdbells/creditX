@@ -48,12 +48,14 @@ if (!$runsExists) {
             total_delta_posted NUMERIC(15, 2) NOT NULL DEFAULT 0,
             loan_count INTEGER NOT NULL DEFAULT 0,
             notes TEXT NULL,
-            created_by VARCHAR(36) NULL,
             reversed_at TIMESTAMP NULL,
             reversed_by VARCHAR(36) NULL,
             reversal_reason TEXT NULL,
+            -- TimestampsTrait audit columns (all four required)
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_by VARCHAR(36) NULL,
+            updated_by VARCHAR(36) NULL
         );
         CREATE INDEX idx_provrun_status_as_of ON provision_runs(status, as_of);
     ");
@@ -74,8 +76,11 @@ if (!$linesExists) {
             provision_amount_required NUMERIC(15, 2) NOT NULL DEFAULT 0,
             prior_provision_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
             delta_amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
+            -- TimestampsTrait audit columns (all four required)
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_by VARCHAR(36) NULL,
+            updated_by VARCHAR(36) NULL
         );
         CREATE INDEX idx_provline_loan ON provision_run_lines(loan_id);
         CREATE INDEX idx_provline_run ON provision_run_lines(run_id);
