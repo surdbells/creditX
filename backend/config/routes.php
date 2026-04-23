@@ -334,6 +334,13 @@ return function (App $app): void {
         $api->get('/journal-entries', Accounting\ListJournalEntriesAction::class)
             ->add(new RbacMiddleware('accounting.view'));
 
+        // ─── Accounting — GL Reconciliation Report ───
+        // For every CUSTOMER-type parent GL, compares parent-only
+        // balance vs sub-ledger aggregate and flags discrepancies.
+        // Distinct from /reconciliations (transaction-matching workflow).
+        $api->get('/accounting/gl-reconciliation', Accounting\ReconciliationAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));

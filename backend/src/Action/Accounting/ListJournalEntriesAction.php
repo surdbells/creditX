@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace App\Action\Accounting;
 
 use App\Domain\Entity\LedgerTransaction;
-use App\Infrastructure\Service\ApiResponse;
+use App\Infrastructure\Service\{ApiResponse, LedgerTransactionEnricher};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -55,6 +55,7 @@ final class ListJournalEntriesAction
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly LedgerTransactionEnricher $enricher,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -163,6 +164,10 @@ final class ListJournalEntriesAction
         /** @var LedgerTransaction[] $txs */
         $txs = $qb->getQuery()->getResult();
         $items = array_map(fn(LedgerTransaction $t) => $t->toArray(), $txs);
+
+        // Enrich with posted_by_name + reversal fields. Batched lookup
+        // so N rows = 1 user query + 1 reversal query, not N of each.
+        $items = $this->enricher->enrich($items);
 
         return $this->paginated($items, $total, $p['page'], $limit);
     }

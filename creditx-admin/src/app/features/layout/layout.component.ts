@@ -52,6 +52,7 @@ export class LayoutComponent {
     { label: 'Accounting', items: [
       { label: 'Chart of Accounts', icon: 'landmark', route: '/accounting', permission: 'accounting.view' },
       { label: 'Journal Entries', icon: 'scroll-text', route: '/journal-entries', permission: 'accounting.view' },
+      { label: 'GL Reconciliation', icon: 'scale', route: '/gl-reconciliation', permission: 'accounting.view' },
       { label: 'Reports', icon: 'bar-chart-3', route: '/reports', permission: 'reports.portfolio' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
     ]},

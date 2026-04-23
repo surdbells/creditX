@@ -130,6 +130,19 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                      [hasActions]="true"
                      trackBy="id"
                      (query)="onQuery($event)">
+        <ng-template #cellTemplate let-row let-col="column">
+          @if (col.key === 'posted_by') {
+            @if (row.posted_by_name) {
+              {{ row.posted_by_name }}
+            } @else if (row.posted_by) {
+              <span class="cx-je-posted-id">{{ row.posted_by }}</span>
+            } @else {
+              —
+            }
+          } @else {
+            {{ row[col.key] }}
+          }
+        </ng-template>
         <ng-template #rowActions let-row>
           <div class="flex items-center gap-1 justify-end">
             <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openDetail(row)" title="View details">
@@ -200,13 +213,38 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
               }
               @if (activeRow()?.reversal_of_id) {
                 <div class="cx-je-meta-row">
-                  <span>Reversal of</span>
-                  <span class="cx-je-reversal-tag">REVERSAL</span>
+                  <span>Status</span>
+                  <span class="cx-je-reversal-tag">REVERSAL ENTRY</span>
                 </div>
+              } @else if (activeRow()?.reversal_status === 'reversed') {
+                <div class="cx-je-meta-row">
+                  <span>Status</span>
+                  <span class="cx-je-reversed-tag">REVERSED</span>
+                </div>
+                @if (activeRow()?.reversed_by_name) {
+                  <div class="cx-je-meta-row">
+                    <span>Reversed by</span>
+                    <span>{{ activeRow()?.reversed_by_name }}</span>
+                  </div>
+                }
+                @if (activeRow()?.reversed_at) {
+                  <div class="cx-je-meta-row">
+                    <span>Reversed at</span>
+                    <span>{{ activeRow()?.reversed_at }}</span>
+                  </div>
+                }
               }
               <div class="cx-je-meta-row">
                 <span>Posted by</span>
-                <span>{{ activeRow()?.posted_by || '—' }}</span>
+                <span>
+                  @if (activeRow()?.posted_by_name) {
+                    {{ activeRow()?.posted_by_name }}
+                  } @else if (activeRow()?.posted_by) {
+                    <span class="cx-je-posted-id">{{ activeRow()?.posted_by }}</span>
+                  } @else {
+                    —
+                  }
+                </span>
               </div>
             </div>
           </section>
@@ -497,6 +535,26 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
       letter-spacing: 0.05em;
       border-radius: 4px;
     }
+    /* 'Reversed' = an entry that has been reversed (original row).
+       Distinct tone from the reversal entry itself to avoid confusion. */
+    .cx-je-reversed-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #b45309;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      border-radius: 4px;
+    }
+    /* Fallback when posted_by_name resolution failed — still show the
+       raw user ID so it's traceable, but subdued to indicate it's not
+       a display name. */
+    .cx-je-posted-id {
+      font-family: var(--cx-font-mono, monospace);
+      font-size: 11px;
+      color: var(--cx-text-muted);
+    }
 
     /* Siblings table */
     .cx-je-siblings-table {
@@ -577,7 +635,7 @@ export class JournalEntriesComponent implements OnInit {
     { key: 'trans_amount', label: 'Amount', type: 'currency', align: 'right' },
     { key: 'trans_narration', label: 'Narration' },
     { key: 'trans_callback', label: 'Reference' },
-    { key: 'posted_by', label: 'Posted By' },
+    { key: 'posted_by', label: 'Posted By', type: 'custom' },
   ];
 
   rows = signal<any[]>([]);
@@ -780,7 +838,7 @@ export class JournalEntriesComponent implements OnInit {
         const rows = items.map((t: any) => [
           t.trans_date, t.gl_code, t.gl_name, t.trans_type,
           t.trans_amount, t.trans_narration, t.trans_reference,
-          t.trans_callback, t.customer_ledger_no, t.posted_by,
+          t.trans_callback, t.customer_ledger_no, t.posted_by_name || t.posted_by,
         ].map(escape).join(','));
         const csv = [headers.join(','), ...rows].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

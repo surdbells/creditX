@@ -16,6 +16,7 @@ use App\Infrastructure\Service\ReportingService;
 use App\Infrastructure\Service\ReconciliationService;
 use App\Infrastructure\Service\ExportService;
 use App\Infrastructure\Service\JournalReversalService;
+use App\Infrastructure\Service\LedgerTransactionEnricher;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
@@ -310,6 +311,11 @@ return [
         return new JournalReversalService(
             $c->get(EntityManagerInterface::class),
             $c->get(LedgerTransactionRepository::class)
+        );
+    },
+    LedgerTransactionEnricher::class => function (ContainerInterface $c): LedgerTransactionEnricher {
+        return new LedgerTransactionEnricher(
+            $c->get(EntityManagerInterface::class)
         );
     },
     MakerCheckerExecutionService::class => function (ContainerInterface $c): MakerCheckerExecutionService {

@@ -636,6 +636,30 @@ final class ApprovalEngineService
                 $trail = new LoanTrail();
                 $trail->setAction('Loan approved — all mandatory approval steps completed');
                 $loan->addTrail($trail);
+
+                // Auto-verify attached documents. An approved loan means
+                // the reviewers have looked at the supporting docs and
+                // found them acceptable — we shouldn't leave the docs
+                // showing 'Pending' in the UI. Flip every PENDING doc
+                // on this loan to VERIFIED, attributing the verification
+                // to the user who triggered the final approval.
+                //
+                // Closes clarification item from commit V.6: documents
+                // were showing 'Pending' status even on approved loans
+                // because no one ever explicitly verified them.
+                //
+                // Safe if the loan has no documents (no-op).
+                // Does not override already-VERIFIED or REJECTED docs
+                // — those are terminal states set by explicit action.
+                $docRepo = $this->em->getRepository(\App\Domain\Entity\Document::class);
+                $pendingDocs = $docRepo->findBy([
+                    'loanId' => $loan->getId(),
+                    'status' => \App\Domain\Enum\DocumentStatus::PENDING,
+                ]);
+                foreach ($pendingDocs as $doc) {
+                    $doc->verify($user->getId());
+                }
+
                 return ['loan_status' => LoanStatus::APPROVED->value, 'approval_status' => 'approved', 'message' => 'Loan has been approved'];
             }
         }
