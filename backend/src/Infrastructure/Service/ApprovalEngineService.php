@@ -229,8 +229,11 @@ final class ApprovalEngineService
              */
             $this->em->flush();
 
-            // Determine overall loan status based on all approvals
-            $result = $this->evaluateOverallStatus($loan, $workflow);
+            // Determine overall loan status based on all approvals.
+            // Pass $user through so document auto-verification (on full
+            // approval) attributes the verification to the approving
+            // user rather than failing on an undefined variable.
+            $result = $this->evaluateOverallStatus($loan, $workflow, $user);
 
             // Second flush: persist any loan status transition +
             // loan-level trail that evaluateOverallStatus created.
@@ -575,7 +578,15 @@ final class ApprovalEngineService
         return null;
     }
 
-    private function evaluateOverallStatus(Loan $loan, ApprovalWorkflow $workflow): array
+    /**
+     * Evaluate the loan's overall approval status after a step decision.
+     *
+     * $user may be null in the SLA-breach auto-approval path — no human
+     * triggered the decision. We attribute auto-verified docs to
+     * 'system:sla_breach' so the audit trail is clear rather than
+     * falsely claiming a real user signed off.
+     */
+    private function evaluateOverallStatus(Loan $loan, ApprovalWorkflow $workflow, ?User $user = null): array
     {
         $approvals = $this->approvalRepo->findByLoan($loan->getId());
 
@@ -656,8 +667,12 @@ final class ApprovalEngineService
                     'loanId' => $loan->getId(),
                     'status' => \App\Domain\Enum\DocumentStatus::PENDING,
                 ]);
+                // Attribute the auto-verification to the approving user
+                // when we have one; fall back to a synthetic marker on
+                // the SLA-breach path so the audit trail is honest.
+                $verifiedBy = $user !== null ? $user->getId() : 'system:sla_breach';
                 foreach ($pendingDocs as $doc) {
-                    $doc->verify($user->getId());
+                    $doc->verify($verifiedBy);
                 }
 
                 return ['loan_status' => LoanStatus::APPROVED->value, 'approval_status' => 'approved', 'message' => 'Loan has been approved'];
