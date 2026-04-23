@@ -66,7 +66,6 @@ use App\Domain\Entity\LedgerTransaction;
 use App\Domain\Entity\LoanFeeBreakdown;
 use App\Domain\Entity\Loan;
 use App\Domain\Entity\CustomerLedger;
-use App\Domain\Enum\FeeEffect;
 use App\Domain\Enum\TransactionType;
 
 echo "=== CreditX Fee Ledger Imbalance Repair ===\n\n";
@@ -166,10 +165,19 @@ foreach ($loans as $loan) {
         /** @var LoanFeeBreakdown $fb */
         if (bccomp($fb->getAmount(), '0.00', 2) <= 0) continue;
 
+        // Only repair ADDS_TO_GROSS fees — identified via isDeducted()
+        // being false on the LoanFeeBreakdown. DEDUCTED fees were
+        // posted correctly under the old code, so skip them.
+        //
+        // Note: FeeEffect lives on ProductFee (product-fee mapping),
+        // not FeeType (catalog). The LoanFeeBreakdown captures the
+        // effect-at-time-of-origination via the isDeducted boolean,
+        // which is inverse of ADDS_TO_GROSS. That's our authoritative
+        // source — it reflects the effect the loan was captured with,
+        // even if the product-fee mapping has changed since.
+        if ($fb->isDeducted()) continue;
+
         $feeType = $fb->getFeeType();
-        // Only repair ADDS_TO_GROSS fees — DEDUCTED fees were posted
-        // correctly under the old code.
-        if ($feeType->getEffect() !== FeeEffect::ADDS_TO_GROSS) continue;
 
         $narration = strtoupper($feeType->getName());
         $amount = $fb->getAmount();
