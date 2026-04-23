@@ -107,7 +107,7 @@ final class PeriodCloseService
                 gl.id, gl.account_code, gl.account_type,
                 COALESCE(SUM(CASE WHEN t.trans_type = 'DR' THEN t.trans_amount ELSE 0 END), 0) AS dr,
                 COALESCE(SUM(CASE WHEN t.trans_type = 'CR' THEN t.trans_amount ELSE 0 END), 0) AS cr
-            FROM general_ledger gl
+            FROM general_ledgers gl
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type IN (:incomeT, :expenseT)
               AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) >= :fromDate

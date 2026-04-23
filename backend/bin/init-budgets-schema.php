@@ -13,7 +13,7 @@ declare(strict_types=1);
  *
  * Schema mirrors the Doctrine-annotated entity (App\Domain\Entity\Budget):
  *   - id                VARCHAR(36) PRIMARY KEY
- *   - gl_id             VARCHAR(36) FK to general_ledger
+ *   - gl_id             VARCHAR(36) FK to general_ledgers
  *   - year              VARCHAR(4)
  *   - month             VARCHAR(2)
  *   - amount            NUMERIC(15,2)
@@ -48,7 +48,7 @@ if ($exists) {
 $conn->executeStatement("
     CREATE TABLE budgets (
         id VARCHAR(36) NOT NULL PRIMARY KEY,
-        gl_id VARCHAR(36) NOT NULL REFERENCES general_ledger(id),
+        gl_id VARCHAR(36) NOT NULL REFERENCES general_ledgers(id),
         year VARCHAR(4) NOT NULL,
         month VARCHAR(2) NOT NULL,
         amount NUMERIC(15, 2) NOT NULL DEFAULT 0,

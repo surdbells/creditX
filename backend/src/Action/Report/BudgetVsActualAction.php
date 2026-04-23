@@ -100,7 +100,7 @@ final class BudgetVsActualAction
         $budgetSql = "
             SELECT b.gl_id, CAST(b.amount AS NUMERIC) AS budget
             FROM budgets b
-            INNER JOIN general_ledger gl ON gl.id = b.gl_id
+            INNER JOIN general_ledgers gl ON gl.id = b.gl_id
             WHERE gl.account_type = :type AND b.year = :year AND b.month = :month
         ";
         $budgetRows = $conn->executeQuery($budgetSql, [
@@ -119,7 +119,7 @@ final class BudgetVsActualAction
                 gl.account_name,
                 COALESCE(SUM(CASE WHEN t.trans_type = 'DR' THEN t.trans_amount ELSE 0 END), 0) AS dr,
                 COALESCE(SUM(CASE WHEN t.trans_type = 'CR' THEN t.trans_amount ELSE 0 END), 0) AS cr
-            FROM general_ledger gl
+            FROM general_ledgers gl
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type = :type
               AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) >= :fromDate
@@ -149,7 +149,7 @@ final class BudgetVsActualAction
         if (!empty($missing)) {
             $placeholders = implode(',', array_fill(0, count($missing), '?'));
             $rows = $conn->executeQuery(
-                "SELECT id, account_code, account_name FROM general_ledger WHERE id IN ($placeholders)",
+                "SELECT id, account_code, account_name FROM general_ledgers WHERE id IN ($placeholders)",
                 array_values($missing),
             )->fetchAllAssociative();
             foreach ($rows as $r) {
