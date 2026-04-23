@@ -327,6 +327,13 @@ return function (App $app): void {
         $api->get('/customer-ledgers/{id}/transactions', Accounting\CustomerLedgerTransactionsAction::class)
             ->add(new RbacMiddleware('accounting.view'));
 
+        // ─── Journal Entries ───
+        // Global list of every LedgerTransaction with date/account/
+        // amount/type filters. Gated by accounting.view since this
+        // exposes the full accounting history.
+        $api->get('/journal-entries', Accounting\ListJournalEntriesAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));
