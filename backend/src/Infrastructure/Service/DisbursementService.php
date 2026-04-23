@@ -130,21 +130,62 @@ final class DisbursementService
                 $callback, $effectiveDate, $userId
             );
 
-            // ─── 3. DR each fee from customer ledger ───
+            // ─── 3. DR each fee from customer ledger + CR fee GL ───
+            //
+            // Both ADDS_TO_GROSS fees (admin, insurance) and
+            // DEDUCTED_FROM_DISBURSEMENT fees (management, bank statement)
+            // are DR'd from the customer ledger here, and CR'd to their
+            // respective fee GLs as income recognition.
+            //
+            // Why both types post the same way:
+            //
+            //   Model A (Customer ledger must balance to zero at disbursement
+            //   — standard loan accounting):
+            //
+            //     Step 2 CR'd gross_loan = app_amount + ADDS_TO_GROSS fees.
+            //     To balance, every fee amount baked into gross_loan must be
+            //     DR'd out. Combined with the DR of net_disbursed (which is
+            //     app_amount minus DEDUCTED fees), the customer ledger nets
+            //     to zero:
+            //
+            //       CR gross_loan (500 + 2 admin + 10 insurance = 512)
+            //       DR admin fee  (2)
+            //       DR insurance  (10)
+            //       DR mgmt fee   (10)   — was DEDUCTED, still posts here
+            //       DR net_disb   (490)  — 500 - 10 mgmt
+            //       ─────────────
+            //       net balance = 0
+            //
+            //     Fee GL accounts (admin, insurance, mgmt, etc.) each get
+            //     a CR for their fee amount, recognising them as income at
+            //     disbursement time. This matches standard Nigerian loan
+            //     accounting: fees are front-loaded income, while interest
+            //     is amortised as it accrues.
+            //
+            // Regression fix: a prior revision of this method filtered
+            //   with `if (!\$fb->isDeducted() || ...) continue;` which
+            //   skipped ADDS_TO_GROSS fees entirely, leaving them as a
+            //   permanent CR on the customer ledger (never DR'd out).
+            //   Customers looked like they owed the full ADDS_TO_GROSS
+            //   total the moment the loan disbursed — before any
+            //   repayments came due.
+            //
+            // Amount guard kept: fees with zero amount are still skipped
+            //   to avoid no-op journal rows cluttering the ledger.
             $feeBreakdowns = $loan->getFeeBreakdowns();
             foreach ($feeBreakdowns as $fb) {
-                if (!$fb->isDeducted() || bccomp($fb->getAmount(), '0.00', 2) <= 0) {
+                if (bccomp($fb->getAmount(), '0.00', 2) <= 0) {
                     continue;
                 }
 
-                // DR from customer ledger
+                // DR from customer ledger (reduces gross_loan credit)
                 $this->postEntry(
                     $customerGl, $customerLedger, TransactionType::DR,
                     $fb->getAmount(), strtoupper($fb->getFeeType()->getName()),
                     $callback, $effectiveDate, $userId
                 );
 
-                // CR to fee type's GL
+                // CR to fee type's GL (recognises income)
                 $feeGl = null;
                 if ($fb->getFeeType()->getGlAccountId()) {
                     $feeGl = $this->glRepo->find($fb->getFeeType()->getGlAccountId());
