@@ -65,7 +65,24 @@ import { NIGERIA_STATES } from '../../core/data/nigeria-states';
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">BVN</label><input class="cx-input" [(ngModel)]="form.bvn" /></div>
+          <div><label class="cx-label">NIN</label><input class="cx-input" [(ngModel)]="form.nin" placeholder="National ID Number" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">Religion</label><input class="cx-input" [(ngModel)]="form.religion" /></div>
+          <div>
+            <!-- CBN Insider-Related Credit flag. When checked, the
+                 customer's loans show up in the CBN Insider-Related
+                 Credit return and get flagged in CRMS returns. -->
+            <label class="cx-label flex items-center gap-2" style="cursor:pointer">
+              <input type="checkbox" [(ngModel)]="form.is_insider" style="margin-top:4px" />
+              <span>Insider-Related (Director / Employee / Affiliate)</span>
+            </label>
+            @if (form.is_insider) {
+              <input class="cx-input" [(ngModel)]="form.insider_relationship"
+                     placeholder="Nature of relationship (Director, Employee, etc.)"
+                     style="margin-top:6px" />
+            }
+          </div>
         </div>
 
         <h4 class="text-xs font-bold text-[var(--cx-text-muted)] uppercase tracking-wider pt-2">Address & Origin</h4>
@@ -191,7 +208,9 @@ export class CustomersComponent implements OnInit {
       this.form = {
         full_name: row.full_name, staff_id: row.staff_id, phone: row.phone, alt_phone: row.alt_phone,
         email: row.email, date_of_birth: row.date_of_birth, gender: row.gender || '', marital_status: row.marital_status || '',
-        bvn: row.bvn, religion: row.religion, home_address: row.home_address, permanent_address: row.permanent_address,
+        bvn: row.bvn, nin: row.nin, is_insider: !!row.is_insider,
+        insider_relationship: row.insider_relationship,
+        religion: row.religion, home_address: row.home_address, permanent_address: row.permanent_address,
         state_of_origin: row.state_of_origin || '', lga: row.lga || '', hometown: row.hometown,
         mothers_maiden_name: row.mothers_maiden_name, number_of_children: row.number_of_children,
         bank_name: row.bank_name, account_number: row.account_number,
@@ -204,7 +223,8 @@ export class CustomersComponent implements OnInit {
       this.editId = null;
       this.form = {
         full_name: '', staff_id: '', phone: '', alt_phone: '', email: '', date_of_birth: '',
-        gender: '', marital_status: '', bvn: '', religion: '', home_address: '', permanent_address: '',
+        gender: '', marital_status: '', bvn: '', nin: '', is_insider: false, insider_relationship: '',
+        religion: '', home_address: '', permanent_address: '',
         state_of_origin: '', lga: '', hometown: '', mothers_maiden_name: '', number_of_children: null,
         bank_name: '', account_number: '', alt_bank_name: '', alt_account_number: '',
         next_of_kins: [],

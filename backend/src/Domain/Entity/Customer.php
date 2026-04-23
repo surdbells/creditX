@@ -312,6 +312,9 @@ class Customer
         if (isset($data['marital_status'])) $this->setMaritalStatus($data['marital_status']);
         if (isset($data['gender'])) $this->setGender($data['gender']);
         if (isset($data['bvn'])) $this->setBvn($data['bvn']);
+        if (isset($data['nin'])) $this->setNin($data['nin']);
+        if (array_key_exists('is_insider', $data)) $this->setIsInsider((bool) $data['is_insider']);
+        if (isset($data['insider_relationship'])) $this->setInsiderRelationship($data['insider_relationship']);
         if (isset($data['number_of_children'])) $this->setNumberOfChildren((int) $data['number_of_children']);
         if (isset($data['bank_name'])) $this->setBankName($data['bank_name']);
         if (isset($data['account_number'])) $this->setAccountNumber($data['account_number']);
@@ -369,6 +372,9 @@ class Customer
             'mothers_maiden_name' => $this->mothersMaidenName,
             'religion'           => $this->religion,
             'bvn'                => $this->bvn,
+            'nin'                => $this->nin,
+            'is_insider'         => $this->isInsider,
+            'insider_relationship' => $this->insiderRelationship,
             'number_of_children' => $this->numberOfChildren,
             'bank_name'          => $this->bankName,
             'account_number'     => $this->accountNumber,

@@ -352,6 +352,17 @@ return function (App $app): void {
         $api->post('/accounting/periods/{id}/reopen', Accounting\ReopenPeriodAction::class)
             ->add(new RbacMiddleware('accounting.close'));
 
+        // ─── Accounting — Budgets (commit AH) ───
+        // Monthly budget targets per GL account. View gated by
+        // accounting.view (all accountants read); create/update/delete
+        // gated by accounting.budget (tighter — budget owner only).
+        $api->get('/accounting/budgets', Accounting\ListBudgetsAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/budgets', Accounting\UpsertBudgetAction::class)
+            ->add(new RbacMiddleware('accounting.budget'));
+        $api->delete('/accounting/budgets/{id}', Accounting\DeleteBudgetAction::class)
+            ->add(new RbacMiddleware('accounting.budget'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));
@@ -548,6 +559,13 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('accounting.view'));
             $group->get('/portfolio-at-risk', Report\PortfolioAtRiskAction::class)
                 ->add(new RbacMiddleware('reports.par'));
+
+            // ─── Budget vs Actual (commit AH) ───
+            // Compares budgeted amounts (from budgets table) against
+            // actual posted activity for a given month. Income and
+            // expense shown separately with per-account variance.
+            $group->get('/budget-vs-actual', Report\BudgetVsActualAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
         });
 
         // ─── Reconciliation ───
