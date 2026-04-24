@@ -81,6 +81,17 @@ interface DrillLevel { label: string; key: string; value?: string; }
                 }
               </select>
             </div>
+            @if (isApproverTab()) {
+              <div class="cx-rpt-filter-group">
+                <label class="cx-rpt-filter-label">Granularity</label>
+                <select class="cx-select cx-input-sm"
+                  [(ngModel)]="filterGranularity" (change)="onFilterChange()">
+                  <option value="day">Daily</option>
+                  <option value="week">Weekly</option>
+                  <option value="month">Monthly</option>
+                </select>
+              </div>
+            }
             @if (hasActiveFilters()) {
               <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="resetFilters()">
                 <lucide-icon name="x" [size]="14"></lucide-icon>
@@ -228,6 +239,53 @@ interface DrillLevel { label: string; key: string; value?: string; }
           </div>
         } @else if (!loading() && kpis().length === 0 && chartData().length === 0) {
           <cx-empty-state title="No data available" description="Once activity happens on the platform, reports will populate here." icon="bar-chart-3"></cx-empty-state>
+        }
+
+        <!-- Approver time-series table — BB1 submissions + decisions per bucket -->
+        @if (isApproverTab() && approverTimeSeries().length && drillPath().length === 0) {
+          <div class="cx-rpt-card" style="margin-top: 1.25rem;">
+            <div class="cx-rpt-card-header">
+              <div>
+                <h3 class="cx-rpt-card-title">Approval Timeline</h3>
+                <p class="cx-rpt-card-sub">
+                  {{ filterGranularity === 'day' ? 'Daily' : filterGranularity === 'week' ? 'Weekly' : 'Monthly' }}
+                  submissions vs. decisions
+                </p>
+              </div>
+              <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="exportTimeSeries()">
+                <lucide-icon name="download" [size]="14"></lucide-icon>
+                <span>Export CSV</span>
+              </button>
+            </div>
+            <div class="cx-rpt-table-wrap">
+              <table class="cx-rpt-table">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th class="cx-rpt-num">Submissions</th>
+                    <th class="cx-rpt-num">Approvals</th>
+                    <th class="cx-rpt-num">Rejections</th>
+                    <th class="cx-rpt-num">Approval %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of approverTimeSeries(); track r.period) {
+                    <tr>
+                      <td>{{ r.period }}</td>
+                      <td class="cx-rpt-num tabular-nums">{{ r.submissions }}</td>
+                      <td class="cx-rpt-num tabular-nums">{{ r.approvals }}</td>
+                      <td class="cx-rpt-num tabular-nums">{{ r.rejections }}</td>
+                      <td class="cx-rpt-num tabular-nums">
+                        {{ (r.approvals + r.rejections) > 0
+                           ? ((r.approvals / (r.approvals + r.rejections)) * 100 | number:'1.1-1') + '%'
+                           : '—' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
         }
       }
     </div>
@@ -460,15 +518,17 @@ export class ReportsComponent implements OnInit {
     'agent-performance',
     'branch-performance',
     'product-performance',
+    'approver-performance',
   ]);
 
   // Permission slug required for each performance tab. Aligns with the
   // granular permissions introduced in Phase 2.1 (see migrate-performance-
   // permissions.php and seed-lite.php).
   private readonly TAB_PERMISSION_MAP: Record<string, string> = {
-    'agent-performance':   'reports.performance.agents',
-    'branch-performance':  'reports.performance.branches',
-    'product-performance': 'reports.performance.products',
+    'agent-performance':    'reports.performance.agents',
+    'branch-performance':   'reports.performance.branches',
+    'product-performance':  'reports.performance.products',
+    'approver-performance': 'reports.performance.approvers',
   };
 
   // Friendly status buckets for the performance filter dropdown. These
@@ -490,6 +550,7 @@ export class ReportsComponent implements OnInit {
     { key: 'agent-performance', label: 'Agent Performance' },
     { key: 'branch-performance', label: 'Branch Performance' },
     { key: 'product-performance', label: 'Product Performance' },
+    { key: 'approver-performance', label: 'Approver Performance' },
     { key: 'receivables', label: 'Receivables' },
     { key: 'closed-loans', label: 'Closed Loans' },
     { key: 'repayment', label: 'Repayment Performance' },
@@ -523,15 +584,27 @@ export class ReportsComponent implements OnInit {
   filterDateTo = '';
   filterStatus = '';
   filterBranch = '';
+  // Granularity control — only surfaced on approver-performance tab.
+  // Backend defaults to 'day' when unset, so omit from query params
+  // while the default is selected to keep URLs cleaner.
+  filterGranularity: 'day' | 'week' | 'month' = 'day';
   branches = signal<Array<{ id: string; name: string }>>([]);
 
   isPerformanceTab = computed(() => this.PERFORMANCE_TABS.has(this.activeReport()));
+  // Approver tab has bespoke UI affordances (granularity selector, time-
+  // series table) that don't apply to the other performance reports.
+  isApproverTab = computed(() => this.activeReport() === 'approver-performance');
+
+  // Approver time-series data — populated from data.time_series on load.
+  // Rendered as a small table under the main content when on approver tab.
+  approverTimeSeries = signal<Array<{ period: string; submissions: number; approvals: number; rejections: number }>>([]);
 
   hasActiveFilters = () =>
     this.filterDateFrom !== '' ||
     this.filterDateTo !== '' ||
     this.filterStatus !== '' ||
-    this.filterBranch !== '';
+    this.filterBranch !== '' ||
+    (this.isApproverTab() && this.filterGranularity !== 'day');
 
   kpis = signal<any[]>([]);
   chartData = signal<any[]>([]);
@@ -599,6 +672,8 @@ export class ReportsComponent implements OnInit {
       this.filterDateTo   = q.get('date_to')   || '';
       this.filterStatus   = q.get('status')    || '';
       this.filterBranch   = q.get('branch_id') || '';
+      const g = q.get('granularity');
+      if (g === 'day' || g === 'week' || g === 'month') this.filterGranularity = g;
     }
 
     // Drill path: which drill key is present decides the shape. For
@@ -609,6 +684,8 @@ export class ReportsComponent implements OnInit {
       path.push({ label: 'Agent', key: 'agent_id', value: q.get('agent_id')! });
     } else if (report === 'product-performance' && q.get('product_id')) {
       path.push({ label: 'Product', key: 'product_id', value: q.get('product_id')! });
+    } else if (report === 'approver-performance' && q.get('approver_id')) {
+      path.push({ label: 'Approver', key: 'approver_id', value: q.get('approver_id')! });
     } else if (report === 'branch-performance') {
       if (q.get('branch_id')) path.push({ label: 'Branch', key: 'branch_id', value: q.get('branch_id')! });
       if (q.get('branch_id') && q.get('agent_id')) path.push({ label: 'Agent', key: 'agent_id', value: q.get('agent_id')! });
@@ -637,14 +714,22 @@ export class ReportsComponent implements OnInit {
       params['date_to']   = this.filterDateTo   || null;
       params['status']    = this.filterStatus   || null;
       params['branch_id'] = this.filterBranch   || null;
+      // Granularity persists only on the approver tab. When default ('day')
+      // or on a non-approver perf tab, omit from URL so the querystring
+      // stays compact and doesn't falsely suggest granularity affects the
+      // other reports.
+      params['granularity'] = (this.isApproverTab() && this.filterGranularity !== 'day')
+        ? this.filterGranularity
+        : null;
     } else {
       // Clear any performance-only params from the URL when leaving
       // the performance group so the URL accurately represents what
       // the page is showing.
-      params['date_from'] = null;
-      params['date_to']   = null;
-      params['status']    = null;
-      params['branch_id'] = this.filterBranch ? this.filterBranch : null;
+      params['date_from']   = null;
+      params['date_to']     = null;
+      params['status']      = null;
+      params['branch_id']   = this.filterBranch ? this.filterBranch : null;
+      params['granularity'] = null;
     }
 
     // Drill keys — only emit ones applicable to the current report
@@ -653,11 +738,14 @@ export class ReportsComponent implements OnInit {
     // the branch filter is disabled/irrelevant there anyway.
     const path = this.drillPath();
     const report = this.activeReport();
-    const drillKeys: Record<string, string | null> = { agent_id: null, product_id: null };
+    const drillKeys: Record<string, string | null> = {
+      agent_id: null, product_id: null, approver_id: null,
+    };
     if (report === 'branch-performance') drillKeys['branch_id'] = null; // drill owns it here
     path.forEach(p => {
-      if (p.key === 'agent_id')   drillKeys['agent_id']   = p.value ?? null;
-      if (p.key === 'product_id') drillKeys['product_id'] = p.value ?? null;
+      if (p.key === 'agent_id')    drillKeys['agent_id']    = p.value ?? null;
+      if (p.key === 'product_id')  drillKeys['product_id']  = p.value ?? null;
+      if (p.key === 'approver_id') drillKeys['approver_id'] = p.value ?? null;
       if (p.key === 'branch_id' && report === 'branch-performance') drillKeys['branch_id'] = p.value ?? null;
     });
     Object.assign(params, drillKeys);
@@ -695,6 +783,7 @@ export class ReportsComponent implements OnInit {
       this.filterDateTo = '';
       this.filterStatus = '';
       this.filterBranch = '';
+      this.filterGranularity = 'day';
     }
     this.syncUrl();
     this.loadReport();
@@ -711,6 +800,7 @@ export class ReportsComponent implements OnInit {
     this.filterDateTo = '';
     this.filterStatus = '';
     this.filterBranch = '';
+    this.filterGranularity = 'day';
     this.currentPage.set(1);
     this.syncUrl();
     this.loadReport();
@@ -738,6 +828,12 @@ export class ReportsComponent implements OnInit {
       if (this.filterDateTo)   params['date_to']   = this.filterDateTo;
       if (this.filterStatus)   params['status']    = this.filterStatus;
       if (this.filterBranch)   params['branch_id'] = this.filterBranch;
+      // Granularity only affects the approver report; sending it on
+      // other performance endpoints is harmless (backend ignores unknown
+      // query params) but keeping the request URLs clean helps debugging.
+      if (this.isApproverTab() && this.filterGranularity !== 'day') {
+        params['granularity'] = this.filterGranularity;
+      }
     }
 
     this.api.get(`/reports/${this.activeReport()}`, params).subscribe({
@@ -778,6 +874,34 @@ export class ReportsComponent implements OnInit {
     if (k.active_branches !== undefined && kpis.length < 4) kpis.push({ label: 'Active Branches', value: k.active_branches, format: '1.0-0' });
     if (k.active_products !== undefined && kpis.length < 4) kpis.push({ label: 'Active Products', value: k.active_products, format: '1.0-0' });
 
+    // Approver-specific — these win priority on the approver tab because
+    // they answer the report's core question. Checked before the slice(0,4)
+    // truncation so they're guaranteed to surface.
+    if (this.isApproverTab()) {
+      // Reset and build the approver-specific KPI set directly — avoids
+      // mixing loan-centric KPIs (disbursed, active agents, etc) that
+      // don't apply to approver throughput.
+      kpis.length = 0;
+      kpis.push({ label: 'Decisions', value: k.decisions || 0, format: '1.0-0' });
+      kpis.push({ label: 'Approval Rate', value: k.approval_rate || 0, suffix: '%', format: '1.1-1' });
+      // Hours read naturally to most operators; switch to days once
+      // we're past 48h to keep labels compact.
+      const clockFmt = (v: number | null): { value: number; suffix: string } => {
+        if (v === null || v === undefined) return { value: 0, suffix: 'h' };
+        return v >= 48 ? { value: Math.round(v / 24 * 10) / 10, suffix: 'd' } : { value: v, suffix: 'h' };
+      };
+      const apprClock = clockFmt(k.avg_approver_clock_hours);
+      const loanClock = clockFmt(k.avg_loan_clock_hours);
+      kpis.push({ label: 'Avg Approver Time', value: apprClock.value, suffix: apprClock.suffix, format: '1.1-1' });
+      kpis.push({ label: 'Avg Loan Wait',     value: loanClock.value, suffix: loanClock.suffix, format: '1.1-1' });
+      // HH: on-desk snapshot as a bonus KPI-row item via pushing beyond 4
+      // would be cut off by slice — swap avg_loan_wait for on_desk when the
+      // loan_clock average is unavailable (no completed decisions yet).
+      if (k.avg_loan_clock_hours === null || k.avg_loan_clock_hours === undefined) {
+        kpis[3] = { label: 'Currently On Desk', value: k.currently_on_desk || 0, format: '1.0-0' };
+      }
+    }
+
     this.kpis.set(kpis.slice(0, 4));
 
     // ─── Chart ───
@@ -787,7 +911,7 @@ export class ReportsComponent implements OnInit {
     const drilled = this.drillPath().length > 0;
     const breakdown = drilled
       ? []
-      : (data.by_status || data.by_branch || data.by_agent || data.by_product || data.breakdown || []);
+      : (data.by_status || data.by_branch || data.by_agent || data.by_product || data.by_approver || data.breakdown || []);
 
     if (Array.isArray(breakdown) && breakdown.length) {
       const chartItems = breakdown.map((item: any) => ({
@@ -814,10 +938,17 @@ export class ReportsComponent implements OnInit {
     if (drilled && Array.isArray(data.details)) {
       tableRows = data.details;
     } else if (this.isPerformanceTab()) {
-      tableRows = data.by_agent || data.by_branch || data.by_product || [];
+      tableRows = data.by_agent || data.by_branch || data.by_product || data.by_approver || [];
     } else {
       tableRows = data.loans || data.payments || data.agents || data.branches || data.details || [];
     }
+
+    // Approver time-series is a side-panel that lives below the main
+    // content. Empty array when not on the approver tab so the @if in the
+    // template cleanly hides the section.
+    this.approverTimeSeries.set(
+      this.isApproverTab() && Array.isArray(data.time_series) ? data.time_series : []
+    );
 
     if (Array.isArray(tableRows) && tableRows.length) {
       this.tableData.set(tableRows);
@@ -842,6 +973,7 @@ export class ReportsComponent implements OnInit {
       if (report === 'agent-performance')   return 'Top Agents by Volume';
       if (report === 'branch-performance')  return 'Branches by Volume';
       if (report === 'product-performance') return 'Products by Volume';
+      if (report === 'approver-performance') return 'Approvers by Decision Count';
     }
     return 'Breakdown';
   }
@@ -863,9 +995,10 @@ export class ReportsComponent implements OnInit {
     //   agent-performance:    rollup -> agent_id (1 level), stop
     //   branch-performance:   rollup -> branch_id (level 1) -> agent_id (level 2)
     //   product-performance:  rollup -> product_id (1 level), stop
-    if (report === 'agent-performance')   return path.length === 0;
-    if (report === 'product-performance') return path.length === 0;
-    if (report === 'branch-performance')  return path.length < 2;
+    if (report === 'agent-performance')    return path.length === 0;
+    if (report === 'product-performance')  return path.length === 0;
+    if (report === 'approver-performance') return path.length === 0;
+    if (report === 'branch-performance')   return path.length < 2;
 
     // Existing portfolio/collection behaviour preserved.
     if (report === 'portfolio' && path.length === 0) return true;
@@ -882,6 +1015,8 @@ export class ReportsComponent implements OnInit {
       this.drillPath.set([{ label: 'Agent', key: 'agent_id', value: item.key }]);
     } else if (report === 'product-performance' && path.length === 0) {
       this.drillPath.set([{ label: 'Product', key: 'product_id', value: item.key }]);
+    } else if (report === 'approver-performance' && path.length === 0) {
+      this.drillPath.set([{ label: 'Approver', key: 'approver_id', value: item.key }]);
     } else if (report === 'branch-performance' && path.length === 0) {
       // Level 1: branch -> agents-in-branch
       this.drillPath.set([{ label: 'Branch', key: 'branch_id', value: item.key }]);
@@ -908,6 +1043,7 @@ export class ReportsComponent implements OnInit {
     let key = row.id;
     let label = row.name;
     if (report === 'agent-performance')        { key = row.agent_id;   label = row.agent_name; }
+    else if (report === 'approver-performance') { key = row.approver_id; label = row.approver_name; }
     else if (report === 'branch-performance' && this.drillPath().length === 0) {
                                                  key = row.branch_id;  label = row.branch_name; }
     else if (report === 'branch-performance' && this.drillPath().length === 1) {
@@ -962,6 +1098,38 @@ export class ReportsComponent implements OnInit {
     return String(value);
   }
 
+  /**
+   * Export the time-series panel as its own CSV — distinct from the
+   * main export which targets rollup or drill details. Backend
+   * `view=time_series` returns period/submissions/approvals/rejections
+   * rows. Only meaningful on the approver tab.
+   */
+  exportTimeSeries() {
+    if (!this.isApproverTab()) return;
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    const params: any = {
+      format: 'csv',
+      view: 'time_series',
+      granularity: this.filterGranularity,
+    };
+    if (this.filterDateFrom) params.date_from = this.filterDateFrom;
+    if (this.filterDateTo)   params.date_to   = this.filterDateTo;
+    if (this.filterBranch)   params.branch_id = this.filterBranch;
+
+    this.api.downloadCsv('/reports/approver-performance', params).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CreditX_approver-timeline_${this.filterGranularity}_${ts}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast.success('Timeline CSV exported');
+      },
+      error: () => this.toast.error('Export failed'),
+    });
+  }
+
   exportData(format: 'csv' | 'excel') {
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
 
@@ -975,6 +1143,12 @@ export class ReportsComponent implements OnInit {
       if (this.filterDateTo)   params.date_to   = this.filterDateTo;
       if (this.filterStatus)   params.status    = this.filterStatus;
       if (this.filterBranch)   params.branch_id = this.filterBranch;
+      // Include granularity when approver report — downstream service uses
+      // it only for time_series view, but passing it on details/rollup is
+      // harmless and keeps the param set consistent with the current UI.
+      if (this.isApproverTab() && this.filterGranularity !== 'day') {
+        params.granularity = this.filterGranularity;
+      }
       // Pass drill keys so the backend knows which slice to export.
       this.drillPath().forEach(p => { if (p.value !== undefined) params[p.key] = p.value; });
 

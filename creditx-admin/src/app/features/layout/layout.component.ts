@@ -63,9 +63,10 @@ export class LayoutComponent {
     // permission-gated separately so a user with only 'agents' doesn't
     // see a Branches entry that would 403.
     { label: 'Performance', items: [
-      { label: 'Agent Performance',   icon: 'user-round',       route: '/reports', queryParams: { tab: 'agent-performance' },   permission: 'reports.performance.agents' },
-      { label: 'Branch Performance',  icon: 'building',         route: '/reports', queryParams: { tab: 'branch-performance' },  permission: 'reports.performance.branches' },
-      { label: 'Product Performance', icon: 'package',          route: '/reports', queryParams: { tab: 'product-performance' }, permission: 'reports.performance.products' },
+      { label: 'Agent Performance',    icon: 'user-round',   route: '/reports', queryParams: { tab: 'agent-performance' },    permission: 'reports.performance.agents' },
+      { label: 'Branch Performance',   icon: 'building',     route: '/reports', queryParams: { tab: 'branch-performance' },   permission: 'reports.performance.branches' },
+      { label: 'Product Performance',  icon: 'package',      route: '/reports', queryParams: { tab: 'product-performance' },  permission: 'reports.performance.products' },
+      { label: 'Approver Performance', icon: 'shield-check', route: '/reports', queryParams: { tab: 'approver-performance' }, permission: 'reports.performance.approvers' },
     ]},
     { label: 'Configuration', items: [
       { label: 'Loan Products', icon: 'folder-kanban', route: '/loan-products', permission: 'products.view' },
