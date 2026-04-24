@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -559,19 +560,114 @@ export class ReportsComponent implements OnInit {
     return [1, -1, curr - 1, curr, curr + 1, -1, total];
   });
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(
+    public auth: AuthService,
+    private api: ApiService,
+    private toast: ToastService,
+    private route: ActivatedRoute,
+    private router: Router,
+  ) {}
 
   ngOnInit() {
     this.loadBranches();
-    // If the user's default 'portfolio' tab isn't visible (shouldn't
-    // happen today — everyone has reports.portfolio — but defensive for
-    // future permission tightening), fall back to the first visible tab.
+
+    // Hydrate state from URL query params so refresh / deep-links land
+    // in the same view the URL describes. We read once from the current
+    // snapshot rather than subscribing to queryParamMap because all our
+    // subsequent param changes are driven by this component itself —
+    // subscribing would create a feedback loop. External navigations
+    // (e.g. clicking the Performance nav entry from a different tab
+    // with a different ?tab) trigger a full component re-init anyway
+    // since routerLinkActiveOptions.exact is true.
+    const q = this.route.snapshot.queryParamMap;
     const visible = this.visibleReportTabs();
-    if (visible.length && !visible.some(t => t.key === this.activeReport())) {
+    const requestedTab = q.get('tab');
+    if (requestedTab && visible.some(t => t.key === requestedTab)) {
+      this.activeReport.set(requestedTab);
+      this.reportTitle.set(this.allReportTabs.find(t => t.key === requestedTab)?.label || requestedTab);
+    } else if (visible.length && !visible.some(t => t.key === this.activeReport())) {
+      // Defensive: fall back to first visible tab if the default isn't
+      // accessible under the user's permissions.
       this.activeReport.set(visible[0].key);
       this.reportTitle.set(visible[0].label);
     }
+
+    // Filters (performance tabs only — the URL schema doesn't attempt to
+    // represent non-performance reports' filters since they don't exist).
+    if (this.isPerformanceTab()) {
+      this.filterDateFrom = q.get('date_from') || '';
+      this.filterDateTo   = q.get('date_to')   || '';
+      this.filterStatus   = q.get('status')    || '';
+      this.filterBranch   = q.get('branch_id') || '';
+    }
+
+    // Drill path: which drill key is present decides the shape. For
+    // branch-performance we may have two levels (branch_id + agent_id).
+    const path: DrillLevel[] = [];
+    const report = this.activeReport();
+    if (report === 'agent-performance' && q.get('agent_id')) {
+      path.push({ label: 'Agent', key: 'agent_id', value: q.get('agent_id')! });
+    } else if (report === 'product-performance' && q.get('product_id')) {
+      path.push({ label: 'Product', key: 'product_id', value: q.get('product_id')! });
+    } else if (report === 'branch-performance') {
+      if (q.get('branch_id')) path.push({ label: 'Branch', key: 'branch_id', value: q.get('branch_id')! });
+      if (q.get('branch_id') && q.get('agent_id')) path.push({ label: 'Agent', key: 'agent_id', value: q.get('agent_id')! });
+    }
+    if (path.length) this.drillPath.set(path);
+
     this.loadReport();
+  }
+
+  /**
+   * Mirror current state to the URL so refresh preserves context and
+   * users can bookmark/share deep links. Called on every action that
+   * would otherwise cause loadReport() to fire.
+   *
+   * Uses replaceUrl to avoid polluting browser history — each filter
+   * tweak pushing a history entry would turn the back button into a
+   * mess of intermediate states.
+   */
+  private syncUrl(): void {
+    const params: Record<string, string | null> = {
+      tab: this.activeReport(),
+    };
+
+    if (this.isPerformanceTab()) {
+      params['date_from'] = this.filterDateFrom || null;
+      params['date_to']   = this.filterDateTo   || null;
+      params['status']    = this.filterStatus   || null;
+      params['branch_id'] = this.filterBranch   || null;
+    } else {
+      // Clear any performance-only params from the URL when leaving
+      // the performance group so the URL accurately represents what
+      // the page is showing.
+      params['date_from'] = null;
+      params['date_to']   = null;
+      params['status']    = null;
+      params['branch_id'] = this.filterBranch ? this.filterBranch : null;
+    }
+
+    // Drill keys — only emit ones applicable to the current report
+    // so the URL stays clean. branch_id set via filter vs drill would
+    // collide for branch-performance; we give drill precedence since
+    // the branch filter is disabled/irrelevant there anyway.
+    const path = this.drillPath();
+    const report = this.activeReport();
+    const drillKeys: Record<string, string | null> = { agent_id: null, product_id: null };
+    if (report === 'branch-performance') drillKeys['branch_id'] = null; // drill owns it here
+    path.forEach(p => {
+      if (p.key === 'agent_id')   drillKeys['agent_id']   = p.value ?? null;
+      if (p.key === 'product_id') drillKeys['product_id'] = p.value ?? null;
+      if (p.key === 'branch_id' && report === 'branch-performance') drillKeys['branch_id'] = p.value ?? null;
+    });
+    Object.assign(params, drillKeys);
+
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: params,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   private loadBranches() {
@@ -600,11 +696,13 @@ export class ReportsComponent implements OnInit {
       this.filterStatus = '';
       this.filterBranch = '';
     }
+    this.syncUrl();
     this.loadReport();
   }
 
   onFilterChange() {
     this.currentPage.set(1);
+    this.syncUrl();
     this.loadReport();
   }
 
@@ -614,12 +712,14 @@ export class ReportsComponent implements OnInit {
     this.filterStatus = '';
     this.filterBranch = '';
     this.currentPage.set(1);
+    this.syncUrl();
     this.loadReport();
   }
 
   resetDrill() {
     this.drillPath.set([]);
     this.currentPage.set(1);
+    this.syncUrl();
     this.loadReport();
   }
 
@@ -797,6 +897,7 @@ export class ReportsComponent implements OnInit {
     }
 
     this.currentPage.set(1);
+    this.syncUrl();
     this.loadReport();
   }
 

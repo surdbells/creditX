@@ -12,7 +12,21 @@ import { ChatBubbleComponent } from '../../shared/components/chat-bubble/chat-bu
 import { FontScaleControlComponent } from '../../shared/components/font-scale-control/font-scale-control.component';
 import { FontScaleService } from '../../core/services/font-scale.service';
 
-interface NavItem { label: string; icon: string; route: string; permission?: string; }
+interface NavItem {
+  label: string;
+  icon: string;
+  route: string;
+  permission?: string;
+  // OR-semantics: shown if the user has ANY of these. Used for the Performance
+  // group where operators with only one of the three granular report
+  // permissions still need the entry point. If both `permission` and
+  // `anyPermission` are set, both must pass.
+  anyPermission?: string[];
+  // Query params appended when the nav link is followed. Used by the
+  // Performance group to deep-link into /reports?tab=agent-performance —
+  // ReportsComponent picks up `tab` from the URL on init.
+  queryParams?: Record<string, string>;
+}
 interface NavGroup { label: string; items: NavItem[]; }
 
 @Component({
@@ -40,6 +54,18 @@ export class LayoutComponent {
       { label: 'Disbursement Queue', icon: 'banknote', route: '/disbursement-queue', permission: 'loans.disburse' },
       { label: 'Maker-Checker', icon: 'gavel', route: '/maker-checker', permission: 'maker_checker.check' },
       { label: 'Payments', icon: 'credit-card', route: '/payments', permission: 'payments.view' },
+    ]},
+    // Performance reports are promoted to a top-level group rather than
+    // hiding inside the generic Reports tab. Each entry deep-links into
+    // /reports with a pre-selected tab; ReportsComponent reads ?tab= on
+    // init. The group as a whole shows when the user has ANY of the
+    // three granular performance permissions; individual items are
+    // permission-gated separately so a user with only 'agents' doesn't
+    // see a Branches entry that would 403.
+    { label: 'Performance', items: [
+      { label: 'Agent Performance',   icon: 'user-round',       route: '/reports', queryParams: { tab: 'agent-performance' },   permission: 'reports.performance.agents' },
+      { label: 'Branch Performance',  icon: 'building',         route: '/reports', queryParams: { tab: 'branch-performance' },  permission: 'reports.performance.branches' },
+      { label: 'Product Performance', icon: 'package',          route: '/reports', queryParams: { tab: 'product-performance' }, permission: 'reports.performance.products' },
     ]},
     { label: 'Configuration', items: [
       { label: 'Loan Products', icon: 'folder-kanban', route: '/loan-products', permission: 'products.view' },
@@ -90,7 +116,23 @@ export class LayoutComponent {
   constructor(public auth: AuthService, public theme: ThemeService, private router: Router, private api: ApiService, private toast: ToastService, private _fontScale: FontScaleService) {}
 
   get filteredGroups(): NavGroup[] {
-    return this.navGroups.map(g => ({ ...g, items: g.items.filter(i => !i.permission || this.auth.hasPermission(i.permission)) })).filter(g => g.items.length > 0);
+    return this.navGroups.map(g => ({ ...g, items: g.items.filter(i => this.isItemAccessible(i)) })).filter(g => g.items.length > 0);
+  }
+
+  /**
+   * Visibility rules for a nav item:
+   *   - No permission fields set    -> always visible
+   *   - permission set              -> user must hold it
+   *   - anyPermission set           -> user must hold AT LEAST ONE
+   *   - Both set                    -> both gates apply (permission AND any)
+   * Super admin short-circuits all gates via auth.hasPermission.
+   */
+  private isItemAccessible(item: NavItem): boolean {
+    if (item.permission && !this.auth.hasPermission(item.permission)) return false;
+    if (item.anyPermission && item.anyPermission.length > 0) {
+      if (!item.anyPermission.some(p => this.auth.hasPermission(p))) return false;
+    }
+    return true;
   }
 
   get filteredMobileNav(): NavItem[] {

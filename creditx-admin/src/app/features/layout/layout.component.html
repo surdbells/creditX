@@ -23,8 +23,8 @@
         }
         <!-- Section items -->
         @if (isSectionOpen(group.label) || collapsed()) {
-          @for (item of group.items; track item.route) {
-            <a [routerLink]="item.route" routerLinkActive="active"
+          @for (item of group.items; track item.route + (item.queryParams?.['tab'] || '')) {
+            <a [routerLink]="item.route" [queryParams]="item.queryParams || null" routerLinkActive="active"
                [routerLinkActiveOptions]="{exact: true}"
                class="nav-item" [title]="item.label"
                (click)="mobileMenuOpen.set(false)">
@@ -73,8 +73,8 @@
         <div class="p-2 overflow-y-auto flex-1">
           @for (group of filteredGroups; track group.label) {
             <div class="text-xs font-medium text-[var(--cx-text-muted)] px-3 pt-3 pb-1 uppercase tracking-wider">{{ group.label }}</div>
-            @for (item of group.items; track item.route) {
-              <a [routerLink]="item.route" routerLinkActive="active"
+            @for (item of group.items; track item.route + (item.queryParams?.['tab'] || '')) {
+              <a [routerLink]="item.route" [queryParams]="item.queryParams || null" routerLinkActive="active"
                  [routerLinkActiveOptions]="{exact: true}"
                  class="mobile-nav-item" (click)="mobileMenuOpen.set(false)">
                 <lucide-icon [name]="item.icon" [size]="18"></lucide-icon>
