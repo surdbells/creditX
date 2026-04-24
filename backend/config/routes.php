@@ -273,6 +273,12 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('loans.create'));
             $group->post('/{id}/cancel', Loan\CancelLoanAction::class)
                 ->add(new RbacMiddleware('loans.edit'));
+            // Used by the underwriter approval form to auto-prefill the
+            // top-up balance from the previous loan's outstanding. Gated
+            // by loans.view since it only exposes schedule sums the
+            // viewer can already see via the regular loan endpoint.
+            $group->get('/{id}/previous-outstanding', Loan\GetPreviousOutstandingAction::class)
+                ->add(new RbacMiddleware('loans.view'));
         });
 
         // ─── Approval Workflows ───

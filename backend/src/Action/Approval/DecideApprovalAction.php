@@ -27,13 +27,17 @@ final class DecideApprovalAction
         $data = (array) ($request->getParsedBody() ?? []);
         $action = $data['action'] ?? '';
         $comment = $data['comment'] ?? null;
+        // Optional underwriter top-up balance override. The service layer
+        // enforces that this only applies when the step's role slug is
+        // 'underwriter' + action is 'approve'; we just forward the value.
+        $topUpBalance = isset($data['top_up_balance']) ? (string) $data['top_up_balance'] : null;
 
         if (!in_array($action, ['approve', 'reject'], true)) {
             return $this->validationError(['action' => 'Action must be "approve" or "reject"']);
         }
 
         try {
-            $result = $this->engine->decide($loan, $user, $action, $comment);
+            $result = $this->engine->decide($loan, $user, $action, $comment, $topUpBalance);
         } catch (\App\Domain\Exception\DomainException $e) {
             return $this->error($e->getMessage(), 400);
         }

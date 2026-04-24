@@ -81,9 +81,28 @@ final class DisbursementPreviewAction
          * The actual disbursement still requires this value via POST
          * body, which is separately validated by DisburseLoanAction.
          */
+        /*
+         * Underwriter lock takes priority over everything else. If the
+         * underwriter set a top-up during their approval step, that's
+         * the authoritative value and neither auto-detection nor the
+         * operator's ?top_up_balance= override applies. DisburseLoanAction
+         * will reject an override attempt anyway (see the lock throw in
+         * DisbursementService); surfacing it at preview time means the
+         * UI can disable the input and display the locked value up-front
+         * instead of letting operators type something that won't stick.
+         */
         $overrideRaw = (string) ($request->getQueryParams()['top_up_balance'] ?? '');
         $overrideApplied = false;
-        if ($overrideRaw !== '') {
+        if ($loan->isTopUpLockedByUnderwriter()) {
+            $topUp = [
+                'auto_detected'    => false,
+                'balance'          => $loan->getTopUpBalanceUnderwriter(),
+                'source_loan'      => null,
+                'message'          => 'Locked by underwriter — cannot be changed at disbursement.',
+                'override_applied' => false,
+                'locked_by_underwriter' => true,
+            ];
+        } elseif ($overrideRaw !== '') {
             $cleaned = preg_replace('/[^0-9.]/', '', $overrideRaw);
             $overrideNum = max(0.0, (float) ($cleaned ?? '0'));
             $topUp = [
@@ -92,6 +111,7 @@ final class DisbursementPreviewAction
                 'source_loan'      => null,
                 'message'          => 'Using your manual top-up entry.',
                 'override_applied' => true,
+                'locked_by_underwriter' => false,
             ];
             $overrideApplied = true;
         } else {
@@ -101,6 +121,7 @@ final class DisbursementPreviewAction
             // the repayment schedule has unpaid rows.
             $topUp = $this->detectTopUpBalance($loan);
             $topUp['override_applied'] = false;
+            $topUp['locked_by_underwriter'] = false;
         }
 
         // Re-run the calculation with the chosen top-up balance.

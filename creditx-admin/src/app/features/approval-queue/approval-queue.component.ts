@@ -341,6 +341,43 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
         <div class="cx-aq-modal-actions">
           @if (mode() === 'review') {
             <div class="cx-aq-decision-area">
+              <!-- Underwriter-only: top-up balance override for top-up loans.
+                   Shown when the active step's role is underwriter AND the
+                   loan is a top-up. Pre-filled from the previous loan's
+                   current outstanding on modal open; underwriter can edit
+                   before approving. The submitted value locks the
+                   disbursement-side field. -->
+              @if (isUnderwriterOnTopUp()) {
+                <div class="cx-aq-topup-block">
+                  <label class="cx-aq-label" for="aq-topup">
+                    Top-up balance (previous loan outstanding)
+                    @if (topUpPrefillBusy()) {
+                      <span class="cx-aq-topup-busy">
+                        <lucide-icon name="loader-2" [size]="11" class="cx-aq-spin"></lucide-icon>
+                        auto-detecting…
+                      </span>
+                    }
+                  </label>
+                  <div class="cx-aq-topup-row">
+                    <span class="cx-aq-topup-currency">₦</span>
+                    <input id="aq-topup" class="cx-aq-topup-input" type="number" step="0.01" min="0"
+                           placeholder="0.00"
+                           [(ngModel)]="topUpBalance"
+                           [disabled]="deciding()">
+                  </div>
+                  <div class="cx-aq-topup-hint">
+                    @if (previousOutstandingInfo(); as p) {
+                      @if (p.has_previous) {
+                        Previous loan {{ p.previous_application_id }} — outstanding ₦{{ p.outstanding | number:'1.2-2' }} across {{ p.unpaid_count }} unpaid schedule(s).
+                      } @else {
+                        No previous loan on file — type the top-up balance manually if one applies.
+                      }
+                    } @else {
+                      Once approved, this value locks the disbursement field — operators cannot change it.
+                    }
+                  </div>
+                </div>
+              }
               <label class="cx-aq-label" for="aq-comment">Comment (optional for approve, required for reject)</label>
               <textarea id="aq-comment" class="cx-aq-textarea" rows="2"
                         placeholder="Type a note about your decision..."
@@ -916,6 +953,52 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
       gap: 8px;
       margin-top: 4px;
     }
+
+    /* ── Underwriter top-up balance block ─────────────────────── */
+    .cx-aq-topup-block {
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      background: var(--cx-accent-50, rgba(201, 162, 39, 0.08));
+      border: 1px solid var(--cx-accent-200, rgba(201, 162, 39, 0.25));
+      border-radius: var(--cx-radius-md);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .cx-aq-topup-busy {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-weight: 400;
+      color: var(--cx-text-muted);
+      margin-left: 6px;
+    }
+    .cx-aq-spin { animation: cx-aq-spin 900ms linear infinite; }
+    @keyframes cx-aq-spin { to { transform: rotate(360deg); } }
+    .cx-aq-topup-row {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      padding: 0 12px;
+    }
+    .cx-aq-topup-currency {
+      font-size: 14px; font-weight: 500;
+      color: var(--cx-text-muted);
+    }
+    .cx-aq-topup-input {
+      flex: 1;
+      padding: 8px 0;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      color: var(--cx-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .cx-aq-topup-hint {
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--cx-text-secondary);
+    }
   `],
 })
 export class ApprovalQueueComponent implements OnInit {
@@ -951,6 +1034,32 @@ export class ApprovalQueueComponent implements OnInit {
   detailLoading = signal(false);
   deciding = signal(false);
   comment = '';
+
+  // ── Underwriter top-up balance — only relevant when
+  // activeRow.current_step_role_slug === 'underwriter' AND
+  // activeRow.loan_type === 'top_up'. See the review modal's
+  // conditional block and decide().
+  topUpBalance: string | number = '';
+  topUpPrefillBusy = signal(false);
+  previousOutstandingInfo = signal<{
+    has_previous: boolean;
+    previous_application_id: string | null;
+    outstanding: string;
+    unpaid_count: number;
+  } | null>(null);
+
+  /**
+   * True when the active step is an underwriter review AND the loan
+   * is a top-up. Drives both the top-up input's visibility in the
+   * modal and whether decide() attaches the field to its POST.
+   *
+   * The role slug check is exact — role names in CreditX are
+   * lowercase snake_case ('underwriter', 'operations_head', etc.).
+   */
+  isUnderwriterOnTopUp(): boolean {
+    const r = this.activeRow();
+    return r?.current_step_role_slug === 'underwriter' && r?.loan_type === 'top_up';
+  }
 
   // Document preview overlay — sits on top of the review modal
   docPreviewDoc = signal<any>(null);
@@ -1057,6 +1166,13 @@ export class ApprovalQueueComponent implements OnInit {
   /**
    * Open the full review modal. Fetches loan + approvals in parallel
    * so the modal renders quickly without waiting for both.
+   *
+   * Underwriter + top-up loan case: also fetch the previous loan's
+   * current outstanding and prefill the top-up input. The
+   * underwriter can override before approving. If a top-up was
+   * already set on a prior underwriter decision (e.g. re-reviewing
+   * after reject/reopen), that value pre-fills instead of the
+   * computed previous outstanding.
    */
   openReview(row: any) {
     const loanId = row.loan_id || row.id;
@@ -1065,6 +1181,8 @@ export class ApprovalQueueComponent implements OnInit {
     this.loanDetail.set(null);
     this.approvals.set([]);
     this.comment = '';
+    this.topUpBalance = row.top_up_balance_underwriter ?? row.top_up_balance ?? '';
+    this.previousOutstandingInfo.set(null);
     this.mode.set('review');
     this.modalOpen.set(true);
     this.detailLoading.set(true);
@@ -1080,6 +1198,24 @@ export class ApprovalQueueComponent implements OnInit {
       next: r => this.approvals.set(r.data || []),
       error: () => {},
     });
+
+    // Auto-prefill for underwriter + top-up only. If the
+    // underwriter already set a value (sticky across re-opens), we
+    // don't overwrite — we still fetch for the hint text but leave
+    // topUpBalance alone.
+    if (this.isUnderwriterOnTopUp()) {
+      this.topUpPrefillBusy.set(true);
+      this.api.get(`/loans/${loanId}/previous-outstanding`).subscribe({
+        next: r => {
+          this.previousOutstandingInfo.set(r.data);
+          this.topUpPrefillBusy.set(false);
+          if (!this.topUpBalance && r.data?.has_previous && r.data.outstanding) {
+            this.topUpBalance = r.data.outstanding;
+          }
+        },
+        error: () => this.topUpPrefillBusy.set(false),
+      });
+    }
   }
 
   /**
@@ -1133,6 +1269,9 @@ export class ApprovalQueueComponent implements OnInit {
     this.loanDetail.set(null);
     this.approvals.set([]);
     this.comment = '';
+    this.topUpBalance = '';
+    this.topUpPrefillBusy.set(false);
+    this.previousOutstandingInfo.set(null);
   }
 
   /**
@@ -1159,10 +1298,24 @@ export class ApprovalQueueComponent implements OnInit {
    * Note: the backend accepts 'action' (not 'decision' as the previous
    * version of this component sent) — the old payload key was a bug
    * that caused 400s on quickApprove/quickReject. Fixed here.
+   *
+   * top_up_balance is sent only when the current step's role is
+   * 'underwriter' AND action is 'approve' AND a value was entered.
+   * Service-side validation re-checks the role gate so we can't
+   * accidentally smuggle an underwriter-only field through from a
+   * different step.
    */
   private decide(loanId: string, action: 'approve' | 'reject', comment: string | null) {
     this.deciding.set(true);
-    this.api.post(`/approvals/loan/${loanId}/decide`, { action, comment }).subscribe({
+    const payload: any = { action, comment };
+    if (
+      action === 'approve'
+      && this.isUnderwriterOnTopUp()
+      && this.topUpBalance !== '' && this.topUpBalance != null
+    ) {
+      payload.top_up_balance = String(this.topUpBalance);
+    }
+    this.api.post(`/approvals/loan/${loanId}/decide`, payload).subscribe({
       next: r => {
         this.deciding.set(false);
         this.toast.success(r.message || `Loan ${action}d`);

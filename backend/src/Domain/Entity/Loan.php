@@ -79,6 +79,25 @@ class Loan
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
     private ?string $topUpBalance = null;
 
+    /**
+     * Top-up override set during underwriter approval.
+     *
+     * The application-time $topUpBalance is captured by the agent at
+     * the point of capture — often an estimate or based on the
+     * customer's self-reported balance. The underwriter is the
+     * authoritative reviewer: during their approval step they can
+     * look at the actual outstanding on the previous loan and fix
+     * the number.
+     *
+     * When this field is set, DisbursementService uses it instead of
+     * $topUpBalance and the disbursement form locks the field in the
+     * UI so operators can't accidentally revert to the captured
+     * value. Null means "underwriter has not adjusted" — fall back to
+     * $topUpBalance as before.
+     */
+    #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
+    private ?string $topUpBalanceUnderwriter = null;
+
     /** Reference to previous loan (for top-ups) */
     #[ORM\Column(type: 'string', length: 36, nullable: true)]
     private ?string $previousLoanId = null;
@@ -169,6 +188,28 @@ class Loan
     public function getLoanType(): LoanType { return $this->loanType; }
     public function getBankStatementMode(): ?string { return $this->bankStatementMode; }
     public function getTopUpBalance(): ?string { return $this->topUpBalance; }
+    public function getTopUpBalanceUnderwriter(): ?string { return $this->topUpBalanceUnderwriter; }
+
+    /**
+     * The authoritative top-up balance for disbursement.
+     *
+     * If the underwriter set a value during review, that wins. Otherwise
+     * fall back to the application-time capture. Callers should use
+     * this resolver rather than reading either raw field, so the
+     * lookup rule lives in one place.
+     */
+    public function getEffectiveTopUpBalance(): ?string
+    {
+        return $this->topUpBalanceUnderwriter ?? $this->topUpBalance;
+    }
+
+    /** True when an underwriter has explicitly set the top-up balance.
+     *  The disbursement UI uses this to decide whether to lock the field. */
+    public function isTopUpLockedByUnderwriter(): bool
+    {
+        return $this->topUpBalanceUnderwriter !== null;
+    }
+
     public function getPreviousLoanId(): ?string { return $this->previousLoanId; }
     public function getDisbursedAt(): ?\DateTimeImmutable { return $this->disbursedAt; }
     public function getLoanAmountWords(): ?string { return $this->loanAmountWords; }
@@ -198,6 +239,7 @@ class Loan
     public function setLoanType(LoanType $v): void { $this->loanType = $v; }
     public function setBankStatementMode(?string $v): void { $this->bankStatementMode = $v; }
     public function setTopUpBalance(?string $v): void { $this->topUpBalance = $v; }
+    public function setTopUpBalanceUnderwriter(?string $v): void { $this->topUpBalanceUnderwriter = $v; }
     public function setPreviousLoanId(?string $v): void { $this->previousLoanId = $v; }
     public function setDisbursedAt(?\DateTimeImmutable $v): void { $this->disbursedAt = $v; }
     public function setLoanAmountWords(?string $v): void { $this->loanAmountWords = $v; }
@@ -282,7 +324,10 @@ class Loan
             'status'             => $this->status->value,
             'loan_type'          => $this->loanType->value,
             'bank_statement_mode' => $this->bankStatementMode,
-            'top_up_balance'     => $this->topUpBalance,
+            'top_up_balance'                  => $this->topUpBalance,
+            'top_up_balance_underwriter'      => $this->topUpBalanceUnderwriter,
+            'top_up_balance_effective'        => $this->getEffectiveTopUpBalance(),
+            'top_up_locked_by_underwriter'    => $this->isTopUpLockedByUnderwriter(),
             'previous_loan_id'   => $this->previousLoanId,
             'disbursed_at'       => $this->disbursedAt?->format('Y-m-d H:i:s'),
             'loan_amount_words'  => $this->loanAmountWords,

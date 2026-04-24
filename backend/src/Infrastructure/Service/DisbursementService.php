@@ -87,7 +87,15 @@ final class DisbursementService
          * dialog re-detects the current outstanding balance and can pass
          * it here as an override.
          *
-         * When overridden, we:
+         * LOCK RULE: if the underwriter explicitly set a top-up balance
+         * during their approval step (isTopUpLockedByUnderwriter), the
+         * disbursement override is ignored. The underwriter's decision is
+         * the authoritative source — the disbursement step is a
+         * mechanical execution of what the underwriter approved. A client
+         * that tries to override anyway gets a DomainException so the
+         * mismatch surfaces rather than being silently dropped.
+         *
+         * When overridden (and not locked), we:
          *   1. Update LoanTransaction.topUpBalance
          *   2. Update Loan.topUpBalance (kept in sync)
          *   3. Re-run LoanCalculationService to compute fresh net_disbursed
@@ -98,6 +106,12 @@ final class DisbursementService
          * disbursed and B/F top-up amounts change based on the override.
          */
         if ($topUpBalanceOverride !== null) {
+            if ($loan->isTopUpLockedByUnderwriter()) {
+                throw new DomainException(
+                    'Top-up balance was set by the underwriter and cannot be changed at disbursement. ' .
+                    'Locked value: ' . $loan->getTopUpBalanceUnderwriter()
+                );
+            }
             $newTopUp = number_format((float) $topUpBalanceOverride, 2, '.', '');
             $calc = $this->calcService->calculate(
                 $loan->getProduct(),
@@ -109,6 +123,23 @@ final class DisbursementService
             $transaction->setTopUpBalance($newTopUp);
             $transaction->setNetDisbursed($calc['net_disbursed']);
             $loan->setTopUpBalance(bccomp($newTopUp, '0.00', 2) > 0 ? $newTopUp : null);
+        } elseif ($loan->isTopUpLockedByUnderwriter()) {
+            // Operator accepted the underwriter's locked value (no
+            // override) — sync the transaction's top_up + net_disbursed
+            // to match, in case the application-time values are stale.
+            $lockedTopUp = (string) $loan->getTopUpBalanceUnderwriter();
+            if (bccomp($transaction->getTopUpBalance() ?? '0.00', $lockedTopUp, 2) !== 0) {
+                $calc = $this->calcService->calculate(
+                    $loan->getProduct(),
+                    $loan->getAmountRequested(),
+                    $loan->getTenure(),
+                    $loan->getBankStatementMode(),
+                    $lockedTopUp,
+                );
+                $transaction->setTopUpBalance($lockedTopUp);
+                $transaction->setNetDisbursed($calc['net_disbursed']);
+                $loan->setTopUpBalance(bccomp($lockedTopUp, '0.00', 2) > 0 ? $lockedTopUp : null);
+            }
         }
 
         $callback = 'DISB-' . $loan->getApplicationId() . '-' . date('YmdHis');

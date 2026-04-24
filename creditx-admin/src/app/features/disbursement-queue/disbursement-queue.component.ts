@@ -156,18 +156,25 @@ import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/
             <div class="cx-dq-section">
               <label class="cx-label">
                 Top-up Balance
-                @if (recomputing()) {
+                @if (p.top_up?.locked_by_underwriter) {
+                  <span class="cx-dq-locked-tag">
+                    <lucide-icon name="lock" [size]="11"></lucide-icon>
+                    locked by underwriter
+                  </span>
+                } @else if (recomputing()) {
                   <span class="cx-dq-recomputing-tag">recalculating…</span>
                 }
               </label>
               <input type="number" class="cx-input tabular-nums"
                      [(ngModel)]="topUpBalance"
                      (ngModelChange)="onTopUpChange()"
+                     [readonly]="p.top_up?.locked_by_underwriter"
+                     [class.cx-dq-input-locked]="p.top_up?.locked_by_underwriter"
                      placeholder="0.00" step="0.01" min="0" />
               <div class="cx-dq-hint"
-                   [class.cx-dq-hint-info]="p.top_up?.auto_detected"
-                   [class.cx-dq-hint-muted]="!p.top_up?.auto_detected">
-                <lucide-icon name="info" [size]="14"></lucide-icon>
+                   [class.cx-dq-hint-info]="p.top_up?.auto_detected || p.top_up?.locked_by_underwriter"
+                   [class.cx-dq-hint-muted]="!p.top_up?.auto_detected && !p.top_up?.locked_by_underwriter">
+                <lucide-icon [name]="p.top_up?.locked_by_underwriter ? 'lock' : 'info'" [size]="14"></lucide-icon>
                 <span>{{ p.top_up?.message }}</span>
               </div>
             </div>
@@ -394,6 +401,26 @@ import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/
       border-radius: 4px;
       animation: cx-dq-pulse 1.2s ease-in-out infinite;
     }
+    /* Underwriter-locked top-up indicator + readonly input styling.
+       Same visual language as the account-type chips elsewhere —
+       subtle background, small caps tag, a lock icon to the left. */
+    .cx-dq-locked-tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      margin-left: 6px;
+      padding: 1px 6px;
+      background: rgba(124, 58, 237, 0.12);
+      color: #6d28d9;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-radius: 4px;
+    }
+    .cx-dq-input-locked {
+      background: var(--cx-surface-2) !important;
+      color: var(--cx-text-muted);
+      cursor: not-allowed;
+    }
     @keyframes cx-dq-pulse {
       0%, 100% { opacity: 0.6; }
       50% { opacity: 1; }
@@ -578,6 +605,10 @@ export class DisbursementQueueComponent implements OnInit {
   onTopUpChange() {
     const loanId = this.activeRow()?.id || this.activeRow()?.loan_id;
     if (!loanId) return;
+    // No-op when the underwriter has locked this value. The input is
+    // readonly in the UI but if somehow fired (programmatic change,
+    // browser autofill), don't round-trip the preview endpoint.
+    if (this.preview()?.top_up?.locked_by_underwriter) return;
     if (this.topUpDebounceTimer) clearTimeout(this.topUpDebounceTimer);
     this.topUpDebounceTimer = setTimeout(() => {
       this.recomputing.set(true);

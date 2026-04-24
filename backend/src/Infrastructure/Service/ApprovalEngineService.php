@@ -110,7 +110,7 @@ final class ApprovalEngineService
      *
      * @return array{loan_status: string, approval_status: string, message: string}
      */
-    public function decide(Loan $loan, User $user, string $action, ?string $comment = null): array
+    public function decide(Loan $loan, User $user, string $action, ?string $comment = null, ?string $topUpBalance = null): array
     {
         if ($loan->getStatus() !== LoanStatus::UNDER_REVIEW) {
             throw new DomainException('Loan is not under review');
@@ -190,6 +190,43 @@ final class ApprovalEngineService
                 $approval->approve($user, $comment);
             } else {
                 $approval->reject($user, $comment);
+            }
+
+            // Underwriter top-up balance override.
+            //
+            // When the step's role slug is 'underwriter' AND the action is
+            // 'approve' AND a top-up value was supplied in the request,
+            // persist it on the loan. DisbursementService later reads
+            // this via getEffectiveTopUpBalance() and locks the field in
+            // the disbursement UI so the operator can't silently revert
+            // to the agent's application-time value.
+            //
+            // Only applied on 'approve' — rejections don't carry a top-up
+            // meaning. Only applied when role='underwriter' — other
+            // approvers (e.g. credit, compliance) don't set top-up even
+            // if they pass a value in the request. Silently ignored in
+            // the non-underwriter case rather than erroring, because a
+            // parallel-approval workflow could legitimately have multiple
+            // approvers decide in one round trip.
+            if (
+                $action === 'approve'
+                && $topUpBalance !== null
+                && $approval->getStep()->getRole()->getSlug() === 'underwriter'
+            ) {
+                // Validate as a decimal string. Application-layer validation
+                // should have already rejected garbage, but defend here too
+                // in case the action plumbing is bypassed.
+                $normalised = number_format((float) $topUpBalance, 2, '.', '');
+                if (bccomp($normalised, '0.00', 2) < 0) {
+                    $this->em->rollback();
+                    throw new DomainException('Top-up balance cannot be negative');
+                }
+                $loan->setTopUpBalanceUnderwriter($normalised);
+
+                $trail = new LoanTrail();
+                $trail->setUserId($user->getId());
+                $trail->setAction('Underwriter set top-up balance to ₦' . $normalised);
+                $loan->addTrail($trail);
             }
 
             // Trail
@@ -434,11 +471,20 @@ final class ApprovalEngineService
                 'product_name'     => $loanData['product_name'] ?? null,
                 'amount_requested' => $loanData['amount_requested'] ?? null,
                 'loan_status'      => $loanData['status'] ?? null,
+                'loan_type'        => $loanData['loan_type'] ?? null,
+                'previous_loan_id' => $loanData['previous_loan_id'] ?? null,
+                'top_up_balance'   => $loanData['top_up_balance'] ?? null,
+                'top_up_balance_underwriter' => $loanData['top_up_balance_underwriter'] ?? null,
                 // Alias for display: 'current_step' reads as the step
                 // the loan is currently at, which is this approval's
                 // step_name for sequential mode or the earliest pending
                 // step name for parallel mode.
                 'current_step'     => $a->getStep()->getName(),
+                // Role slug on the CURRENT approval step. The admin
+                // approval UI keys off this to decide whether to show
+                // underwriter-only fields (the top-up balance override)
+                // in the decision modal.
+                'current_step_role_slug' => $a->getStep()->getRole()->getSlug(),
             ]);
         }, $items);
 
