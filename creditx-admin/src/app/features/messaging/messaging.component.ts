@@ -7,11 +7,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { LoanDetailComponent } from '../loans/loan-detail.component';
 
 @Component({
   selector: 'app-messaging', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxViewDialogComponent, SearchableSelectComponent, LoanDetailComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -117,12 +119,20 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                 <div class="cx-eyebrow">{{ activeType === 'channel' ? 'Channel' : 'Direct Message' }}</div>
                 <h3 class="cx-msg-thread-title">{{ activeName }}</h3>
               </div>
-              @if (activeType === 'channel') {
-                <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openManageMembers()">
-                  <lucide-icon name="users" [size]="14"></lucide-icon>
-                  <span>Members</span>
-                </button>
-              }
+              <div class="cx-msg-thread-header-actions">
+                @if (activeLoanId) {
+                  <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openLoanDetail()" title="View loan details">
+                    <lucide-icon name="info" [size]="14"></lucide-icon>
+                    <span>Loan Info</span>
+                  </button>
+                }
+                @if (activeType === 'channel') {
+                  <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openManageMembers()">
+                    <lucide-icon name="users" [size]="14"></lucide-icon>
+                    <span>Members</span>
+                  </button>
+                }
+              </div>
             </header>
             <div class="cx-msg-thread-scroll" #msgContainer>
               @for (msg of messages(); track msg.id) {
@@ -326,6 +336,21 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
         </div>
       </div>
     </cx-form-dialog>
+
+    <!-- Loan Detail View Dialog — shown when the user clicks the Loan Info -->
+    <!-- button on a conversation header. The full loan-detail component is  -->
+    <!-- embedded inside (embedded=true suppresses its own page-header so    -->
+    <!-- we don't double-up titles).                                         -->
+    <cx-view-dialog
+      [open]="showLoanDetail()"
+      title="Loan Details"
+      [subtitle]="activeName || ''"
+      maxWidth="800px"
+      (close)="closeLoanDetail()">
+      @if (showLoanDetail() && activeLoanId) {
+        <app-loan-detail [id]="activeLoanId" [embedded]="true"></app-loan-detail>
+      }
+    </cx-view-dialog>
   `,
   styles: [`
     :host { display: block; }
@@ -532,6 +557,10 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
       flex-shrink: 0;
     }
     .cx-msg-thread-header-meta { display: flex; flex-direction: column; }
+    .cx-msg-thread-header-actions {
+      display: flex; align-items: center; gap: 0.5rem;
+      flex-shrink: 0;
+    }
     .cx-msg-thread-title {
       margin: 1px 0 0;
       font-size: var(--cx-text-md); font-weight: 600;
@@ -827,6 +856,12 @@ export class MessagingComponent implements OnInit, OnDestroy {
   conversations = signal<any[]>([]); channels = signal<any[]>([]);
   messages = signal<any[]>([]);
   listSearch = ''; activeId = ''; activeName = ''; activeType: 'conversation' | 'channel' = 'conversation';
+  // Loan linked to the currently-open conversation, if any. Used by the
+  // 'Loan Info' header button to render loan-detail inside a view dialog
+  // without leaving the messaging page. Null when the active thread is a
+  // channel or a loan-less direct conversation.
+  activeLoanId: string | null = null;
+  showLoanDetail = signal(false);
   newMessage = '';
 
   // Create channel
@@ -894,6 +929,15 @@ export class MessagingComponent implements OnInit, OnDestroy {
     this.activeId = c.id;
     this.activeName = c.other_user_name || c.agent_name || c.subject;
     this.activeType = 'conversation';
+    // Conversations created from an approval flow get a loan_id (see
+    // ApprovalEngineService::createConversation on the backend). Capture
+    // it here so the header's Loan Info button knows what to open.
+    // Manually-created direct messages that aren't tied to a loan will
+    // have loan_id null — the button hides in that case.
+    this.activeLoanId = c.loan_id || null;
+    // If a previous thread had the loan modal open, close it now that
+    // we've switched context — the old loan id is no longer relevant.
+    if (this.showLoanDetail()) this.showLoanDetail.set(false);
     this.loadMessages();
     // Mark the thread as read now that the user has explicitly
     // opened it. Optimistically clear the unread count in the list
@@ -915,6 +959,10 @@ export class MessagingComponent implements OnInit, OnDestroy {
 
   selectChannel(ch: any) {
     this.activeId = ch.id; this.activeName = ch.name; this.activeType = 'channel';
+    // Channels aren't loan-scoped — clear any carry-over state so the
+    // Loan Info button disappears and a leftover modal closes.
+    this.activeLoanId = null;
+    if (this.showLoanDetail()) this.showLoanDetail.set(false);
     this.loadMessages();
     // Same user-intent mark-read pattern as conversations. The
     // channel endpoint is mark-read, not read — mirrors the existing
@@ -951,6 +999,24 @@ export class MessagingComponent implements OnInit, OnDestroy {
     this.channelForm = { name: '', description: '', type: 'group' };
     this.selDepts = []; this.selTeams = []; this.selUsers = [];
     this.showNewChannel.set(true);
+  }
+
+  /**
+   * Open the Loan Details modal for the loan tied to the active
+   * conversation. The loan-detail component fetches its own data via
+   * its id input on instantiation, so no pre-load here — the modal
+   * renders with its own loading spinner while the GET fires.
+   *
+   * Guarded on activeLoanId so a stray keystroke or stale state
+   * doesn't surface an empty modal.
+   */
+  openLoanDetail() {
+    if (!this.activeLoanId) return;
+    this.showLoanDetail.set(true);
+  }
+
+  closeLoanDetail() {
+    this.showLoanDetail.set(false);
   }
 
   saveChannel() {

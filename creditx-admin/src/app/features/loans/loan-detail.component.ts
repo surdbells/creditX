@@ -19,23 +19,25 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
   imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent],
   template: `
     <div class="cx-animate-in">
-      <cx-page-header
-        [title]="'Loan ' + (loan()?.application_id || '—')"
-        [subtitle]="loan()?.customer_name || ''"
-        eyebrow="Loan details">
-        <div class="flex items-center gap-2">
-          @if (loan()?.status === 'approved' && auth.hasPermission('loans.disburse')) {
-            <button class="cx-btn cx-btn-primary" (click)="openDisburseDialog()">
-              <lucide-icon name="banknote" [size]="14"></lucide-icon>
-              <span>Disburse</span>
-            </button>
-          }
-          <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm">
-            <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
-            <span>Back</span>
-          </a>
-        </div>
-      </cx-page-header>
+      @if (!embedded) {
+        <cx-page-header
+          [title]="'Loan ' + (loan()?.application_id || '—')"
+          [subtitle]="loan()?.customer_name || ''"
+          eyebrow="Loan details">
+          <div class="flex items-center gap-2">
+            @if (loan()?.status === 'approved' && auth.hasPermission('loans.disburse')) {
+              <button class="cx-btn cx-btn-primary" (click)="openDisburseDialog()">
+                <lucide-icon name="banknote" [size]="14"></lucide-icon>
+                <span>Disburse</span>
+              </button>
+            }
+            <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm">
+              <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+              <span>Back</span>
+            </a>
+          </div>
+        </cx-page-header>
+      }
 
       @if (loading()) {
         <cx-loading message="Loading loan details..."></cx-loading>
@@ -1108,6 +1110,13 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 })
 export class LoanDetailComponent implements OnInit {
   @Input() id = '';
+  /**
+   * When true, hides the page-header chrome (title / eyebrow / back link /
+   * disburse CTA) so the component can be embedded inside another container
+   * — typically a modal that supplies its own header. Data loading and
+   * internal interaction behaviour is unchanged either way.
+   */
+  @Input() embedded = false;
   loan = signal<any>(null);
   loading = signal(true);
   schedule = signal<any[]>([]);
