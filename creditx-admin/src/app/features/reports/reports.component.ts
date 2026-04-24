@@ -24,7 +24,7 @@ interface DrillLevel { label: string; key: string; value?: string; }
 
       <!-- Report Tabs -->
       <div class="cx-rpt-tabs-row">
-        <cx-tabs [tabs]="cxTabs" [activeId]="activeReport()" (activeIdChange)="switchReport($event)"></cx-tabs>
+        <cx-tabs [tabs]="cxTabs()" [activeId]="activeReport()" (activeIdChange)="switchReport($event)"></cx-tabs>
       </div>
 
       <!-- Breadcrumb Navigation -->
@@ -47,6 +47,48 @@ interface DrillLevel { label: string; key: string; value?: string; }
       @if (loading()) {
         <cx-loading message="Generating report..."></cx-loading>
       } @else {
+        <!-- Performance Filter Bar (performance tabs only) -->
+        @if (isPerformanceTab()) {
+          <div class="cx-rpt-filter-bar">
+            <div class="cx-rpt-filter-group">
+              <label class="cx-rpt-filter-label">From</label>
+              <input type="date" class="cx-input cx-input-sm"
+                [(ngModel)]="filterDateFrom" (change)="onFilterChange()">
+            </div>
+            <div class="cx-rpt-filter-group">
+              <label class="cx-rpt-filter-label">To</label>
+              <input type="date" class="cx-input cx-input-sm"
+                [(ngModel)]="filterDateTo" (change)="onFilterChange()">
+            </div>
+            <div class="cx-rpt-filter-group">
+              <label class="cx-rpt-filter-label">Branch</label>
+              <select class="cx-select cx-input-sm"
+                [(ngModel)]="filterBranch" (change)="onFilterChange()">
+                <option value="">All branches</option>
+                @for (b of branches(); track b.id) {
+                  <option [value]="b.id">{{ b.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="cx-rpt-filter-group">
+              <label class="cx-rpt-filter-label">Status</label>
+              <select class="cx-select cx-input-sm"
+                [(ngModel)]="filterStatus" (change)="onFilterChange()">
+                <option value="">All</option>
+                @for (s of statusBuckets; track s.value) {
+                  <option [value]="s.value">{{ s.label }}</option>
+                }
+              </select>
+            </div>
+            @if (hasActiveFilters()) {
+              <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="resetFilters()">
+                <lucide-icon name="x" [size]="14"></lucide-icon>
+                <span>Reset</span>
+              </button>
+            }
+          </div>
+        }
+
         <!-- Summary KPIs -->
         @if (kpis().length) {
           <div class="cx-rpt-kpis cx-stagger">
@@ -226,6 +268,28 @@ interface DrillLevel { label: string; key: string; value?: string; }
       font-weight: 400;
     }
 
+    /* ═══ Filter Bar (performance tabs) ═══ */
+    .cx-rpt-filter-bar {
+      display: flex; flex-wrap: wrap; gap: 0.75rem;
+      align-items: flex-end;
+      padding: 0.85rem 1rem;
+      margin-bottom: 1.25rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+    }
+    .cx-rpt-filter-group {
+      display: flex; flex-direction: column; gap: 0.25rem;
+      min-width: 140px;
+    }
+    .cx-rpt-filter-label {
+      font-size: var(--cx-text-xs);
+      color: var(--cx-text-muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
     /* ═══ KPI Grid ═══ */
     .cx-rpt-kpis {
       display: grid;
@@ -388,7 +452,38 @@ interface DrillLevel { label: string; key: string; value?: string; }
   `],
 })
 export class ReportsComponent implements OnInit {
-  reportTabs = [
+  // Performance tab keys — used by permission gating, filter visibility,
+  // and drill/export routing. Keep the list here as the canonical source
+  // so adding a new performance report later is a single-line change.
+  private readonly PERFORMANCE_TABS = new Set([
+    'agent-performance',
+    'branch-performance',
+    'product-performance',
+  ]);
+
+  // Permission slug required for each performance tab. Aligns with the
+  // granular permissions introduced in Phase 2.1 (see migrate-performance-
+  // permissions.php and seed-lite.php).
+  private readonly TAB_PERMISSION_MAP: Record<string, string> = {
+    'agent-performance':   'reports.performance.agents',
+    'branch-performance':  'reports.performance.branches',
+    'product-performance': 'reports.performance.products',
+  };
+
+  // Friendly status buckets for the performance filter dropdown. These
+  // map to the StatusBucketResolver on the backend. Order matters — shown
+  // top-to-bottom in the dropdown.
+  readonly statusBuckets = [
+    { value: 'pending',        label: 'Pending' },
+    { value: 'approved',       label: 'Approved' },
+    { value: 'disbursed',      label: 'Disbursed' },
+    { value: 'performing',     label: 'Performing' },
+    { value: 'non_performing', label: 'Non-Performing' },
+    { value: 'closed',         label: 'Closed' },
+    { value: 'rejected',       label: 'Rejected' },
+  ];
+
+  private allReportTabs = [
     { key: 'portfolio', label: 'Loan Portfolio' },
     { key: 'par', label: 'Portfolio at Risk' },
     { key: 'agent-performance', label: 'Agent Performance' },
@@ -400,13 +495,43 @@ export class ReportsComponent implements OnInit {
     { key: 'collection', label: 'Collection Efficiency' },
   ];
 
-  cxTabs: CxTab[] = this.reportTabs.map(r => ({ id: r.key, label: r.label }));
+  // Filter hide performance tabs from users who lack their specific permission.
+  // Non-performance tabs remain unfiltered (they have their own permission
+  // gating via RBAC middleware on the backend routes — a user hitting them
+  // without the permission sees an empty error state, not the tab missing,
+  // which is how the existing UI already works).
+  visibleReportTabs = computed(() => {
+    return this.allReportTabs.filter(t => {
+      const perm = this.TAB_PERMISSION_MAP[t.key];
+      if (!perm) return true;
+      return this.auth.hasPermission(perm);
+    });
+  });
+
+  cxTabs = computed<CxTab[]>(() => this.visibleReportTabs().map(r => ({ id: r.key, label: r.label })));
 
   activeReport = signal('portfolio');
   reportTitle = signal('Loan Portfolio');
   loading = signal(false);
   drillPath = signal<DrillLevel[]>([]);
-  
+
+  // Performance filter state. Shown only when isPerformanceTab() is true.
+  // Empty string === unset; this is what <input type="date"> naturally
+  // round-trips, and our query-param serialization treats empty as omitted.
+  filterDateFrom = '';
+  filterDateTo = '';
+  filterStatus = '';
+  filterBranch = '';
+  branches = signal<Array<{ id: string; name: string }>>([]);
+
+  isPerformanceTab = computed(() => this.PERFORMANCE_TABS.has(this.activeReport()));
+
+  hasActiveFilters = () =>
+    this.filterDateFrom !== '' ||
+    this.filterDateTo !== '' ||
+    this.filterStatus !== '' ||
+    this.filterBranch !== '';
+
   kpis = signal<any[]>([]);
   chartData = signal<any[]>([]);
   chartTitle = signal('');
@@ -436,12 +561,58 @@ export class ReportsComponent implements OnInit {
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
-  ngOnInit() { this.loadReport(); }
+  ngOnInit() {
+    this.loadBranches();
+    // If the user's default 'portfolio' tab isn't visible (shouldn't
+    // happen today — everyone has reports.portfolio — but defensive for
+    // future permission tightening), fall back to the first visible tab.
+    const visible = this.visibleReportTabs();
+    if (visible.length && !visible.some(t => t.key === this.activeReport())) {
+      this.activeReport.set(visible[0].key);
+      this.reportTitle.set(visible[0].label);
+    }
+    this.loadReport();
+  }
+
+  private loadBranches() {
+    // per_page=100 matches the pattern used in users.component.ts for the
+    // same dropdown — we're not paginating branches in the UI so pulling
+    // a larger chunk keeps things simple. If a tenant ever exceeds 100
+    // branches this becomes a typeahead problem, not a paging problem.
+    this.api.get('/locations', { per_page: 100 }).subscribe({
+      next: (r: any) => this.branches.set(r.data || []),
+      error: () => { /* silently ignore — filter just stays at "All branches" */ },
+    });
+  }
 
   switchReport(key: string) {
     this.activeReport.set(key);
-    this.reportTitle.set(this.reportTabs.find(t => t.key === key)?.label || key);
+    this.reportTitle.set(this.allReportTabs.find(t => t.key === key)?.label || key);
     this.drillPath.set([]);
+    this.currentPage.set(1);
+    // Filters are preserved across tab switches within the performance group
+    // so switching from Agent to Branch to Product keeps the user's chosen
+    // date range / branch. Leaving the performance group resets to avoid
+    // sending unsupported params to non-performance reports.
+    if (!this.isPerformanceTab()) {
+      this.filterDateFrom = '';
+      this.filterDateTo = '';
+      this.filterStatus = '';
+      this.filterBranch = '';
+    }
+    this.loadReport();
+  }
+
+  onFilterChange() {
+    this.currentPage.set(1);
+    this.loadReport();
+  }
+
+  resetFilters() {
+    this.filterDateFrom = '';
+    this.filterDateTo = '';
+    this.filterStatus = '';
+    this.filterBranch = '';
     this.currentPage.set(1);
     this.loadReport();
   }
@@ -458,6 +629,17 @@ export class ReportsComponent implements OnInit {
     const params: any = {};
     path.forEach(p => params[p.key] = p.value);
 
+    // Performance filters: only attached when the active tab is a
+    // performance report. The backend Actions (AgentPerformanceAction etc.)
+    // silently ignore params they don't expect, but we keep other reports
+    // clean so the request URL matches operator intent.
+    if (this.isPerformanceTab()) {
+      if (this.filterDateFrom) params['date_from'] = this.filterDateFrom;
+      if (this.filterDateTo)   params['date_to']   = this.filterDateTo;
+      if (this.filterStatus)   params['status']    = this.filterStatus;
+      if (this.filterBranch)   params['branch_id'] = this.filterBranch;
+    }
+
     this.api.get(`/reports/${this.activeReport()}`, params).subscribe({
       next: res => {
         this.processReportData(res.data);
@@ -473,17 +655,40 @@ export class ReportsComponent implements OnInit {
   private processReportData(data: any) {
     if (!data) return;
 
-    // Extract KPIs
+    // ─── KPIs ───
+    // Performance reports put numbers under data.summary; other reports
+    // put them at the root. We merge the two so a single extraction pass
+    // handles both — performance summary keys just override anything with
+    // the same name at the root (they shouldn't collide in practice).
+    const k = { ...data, ...(data.summary || {}) };
     const kpis: any[] = [];
-    if (data.total_loans) kpis.push({ label: 'Total Loans', value: data.total_loans, format: '1.0-0' });
-    if (data.total_amount) kpis.push({ label: 'Total Amount', value: data.total_amount, prefix: '₦', format: '1.0-0' });
-    if (data.outstanding) kpis.push({ label: 'Outstanding', value: data.outstanding, prefix: '₦', format: '1.0-0' });
-    if (data.collection_rate !== undefined) kpis.push({ label: 'Collection Rate', value: data.collection_rate, suffix: '%', format: '1.1-1' });
-    if (data.par_ratio !== undefined) kpis.push({ label: 'PAR Ratio', value: data.par_ratio, suffix: '%', format: '1.2-2', color: data.par_ratio > 5 ? '#ef4444' : '#10b981' });
+
+    // Generic (portfolio, PAR, etc.)
+    if (k.total_loans !== undefined)       kpis.push({ label: 'Total Loans', value: k.total_loans, format: '1.0-0' });
+    if (k.total_amount !== undefined)      kpis.push({ label: 'Total Amount', value: k.total_amount, prefix: '₦', format: '1.0-0' });
+    if (k.outstanding !== undefined)       kpis.push({ label: 'Outstanding', value: k.outstanding, prefix: '₦', format: '1.0-0' });
+    if (k.collection_rate !== undefined)   kpis.push({ label: 'Collection Rate', value: k.collection_rate, suffix: '%', format: '1.1-1' });
+    if (k.par_ratio !== undefined)         kpis.push({ label: 'PAR Ratio', value: k.par_ratio, suffix: '%', format: '1.2-2', color: k.par_ratio > 5 ? '#ef4444' : '#10b981' });
+
+    // Performance-specific
+    if (k.total_disbursed !== undefined && kpis.length < 4) kpis.push({ label: 'Total Disbursed', value: k.total_disbursed, prefix: '₦', format: '1.0-0' });
+    if (k.approval_rate !== undefined && kpis.length < 4)   kpis.push({ label: 'Approval Rate', value: k.approval_rate, suffix: '%', format: '1.1-1' });
+    if (k.avg_ticket_size !== undefined && kpis.length < 4) kpis.push({ label: 'Avg Ticket', value: k.avg_ticket_size, prefix: '₦', format: '1.0-0' });
+    if (k.active_agents !== undefined && kpis.length < 4)   kpis.push({ label: 'Active Agents', value: k.active_agents, format: '1.0-0' });
+    if (k.active_branches !== undefined && kpis.length < 4) kpis.push({ label: 'Active Branches', value: k.active_branches, format: '1.0-0' });
+    if (k.active_products !== undefined && kpis.length < 4) kpis.push({ label: 'Active Products', value: k.active_products, format: '1.0-0' });
+
     this.kpis.set(kpis.slice(0, 4));
 
-    // Extract chart data
-    const breakdown = data.by_status || data.by_branch || data.by_agent || data.by_product || data.breakdown || [];
+    // ─── Chart ───
+    // Performance reports: when NOT drilled, chart uses by_{agent,branch,product}.
+    // When drilled, chart either stays as the parent rollup (preserving context)
+    // or goes blank — we blank it to keep the drill view focused on details.
+    const drilled = this.drillPath().length > 0;
+    const breakdown = drilled
+      ? []
+      : (data.by_status || data.by_branch || data.by_agent || data.by_product || data.breakdown || []);
+
     if (Array.isArray(breakdown) && breakdown.length) {
       const chartItems = breakdown.map((item: any) => ({
         label: item.name || item.status || item.branch_name || item.agent_name || item.product_name || 'Unknown',
@@ -500,12 +705,24 @@ export class ReportsComponent implements OnInit {
       this.chartData.set([]);
     }
 
-    // Extract table data
-    const details = data.loans || data.payments || data.agents || data.branches || data.details || [];
-    if (Array.isArray(details) && details.length) {
-      this.tableData.set(details);
-      this.tableColumns.set(this.inferColumns(details[0]));
-      this.tableTitle.set('Details');
+    // ─── Table ───
+    // Priority order:
+    //   1. Drilled view -> data.details (always what the user wants after drilling)
+    //   2. Performance top rollup -> data.by_* (so the rollup table mirrors the chart)
+    //   3. Anything else -> legacy data.loans/payments/agents/branches/details fallback
+    let tableRows: any[] = [];
+    if (drilled && Array.isArray(data.details)) {
+      tableRows = data.details;
+    } else if (this.isPerformanceTab()) {
+      tableRows = data.by_agent || data.by_branch || data.by_product || [];
+    } else {
+      tableRows = data.loans || data.payments || data.agents || data.branches || data.details || [];
+    }
+
+    if (Array.isArray(tableRows) && tableRows.length) {
+      this.tableData.set(tableRows);
+      this.tableColumns.set(this.inferColumns(tableRows[0]));
+      this.tableTitle.set(drilled ? 'Drill Details' : 'Details');
       this.allowDrill.set(this.canDrillFromTable());
     } else {
       this.tableData.set([]);
@@ -522,6 +739,9 @@ export class ReportsComponent implements OnInit {
       if (report === 'repayment') return 'Repayment by Period';
       if (report === 'collection') return 'Collection by Agent';
       if (report === 'par') return 'PAR by Aging Bucket';
+      if (report === 'agent-performance')   return 'Top Agents by Volume';
+      if (report === 'branch-performance')  return 'Branches by Volume';
+      if (report === 'product-performance') return 'Products by Volume';
     }
     return 'Breakdown';
   }
@@ -538,8 +758,18 @@ export class ReportsComponent implements OnInit {
   private canDrillFromTable(): boolean {
     const report = this.activeReport();
     const path = this.drillPath();
-    if (report === 'portfolio' && path.length === 0) return true; // Drill to branch
-    if (report === 'collection' && path.length === 0) return true; // Drill to agent
+
+    // Performance-report drill rules:
+    //   agent-performance:    rollup -> agent_id (1 level), stop
+    //   branch-performance:   rollup -> branch_id (level 1) -> agent_id (level 2)
+    //   product-performance:  rollup -> product_id (1 level), stop
+    if (report === 'agent-performance')   return path.length === 0;
+    if (report === 'product-performance') return path.length === 0;
+    if (report === 'branch-performance')  return path.length < 2;
+
+    // Existing portfolio/collection behaviour preserved.
+    if (report === 'portfolio' && path.length === 0) return true;
+    if (report === 'collection' && path.length === 0) return true;
     return false;
   }
 
@@ -547,20 +777,44 @@ export class ReportsComponent implements OnInit {
     const report = this.activeReport();
     const path = this.drillPath();
 
-    if (report === 'portfolio' && path.length === 0) {
-      // Drill from status to branch
+    // ── Performance reports ──
+    if (report === 'agent-performance' && path.length === 0) {
+      this.drillPath.set([{ label: 'Agent', key: 'agent_id', value: item.key }]);
+    } else if (report === 'product-performance' && path.length === 0) {
+      this.drillPath.set([{ label: 'Product', key: 'product_id', value: item.key }]);
+    } else if (report === 'branch-performance' && path.length === 0) {
+      // Level 1: branch -> agents-in-branch
+      this.drillPath.set([{ label: 'Branch', key: 'branch_id', value: item.key }]);
+    } else if (report === 'branch-performance' && path.length === 1 && path[0].key === 'branch_id') {
+      // Level 2: agent within that branch -> that agent's loans
+      this.drillPath.set([...path, { label: 'Agent', key: 'agent_id', value: item.key }]);
+    }
+    // ── Existing portfolio/collection behaviour ──
+    else if (report === 'portfolio' && path.length === 0) {
       this.drillPath.set([{ label: 'Status', key: 'status', value: item.label }]);
     } else if (report === 'portfolio' && path.length === 1 && path[0].key === 'status') {
-      // Drill from branch to agent
       this.drillPath.set([...path, { label: 'Branch', key: 'branch_id', value: item.key }]);
     }
+
     this.currentPage.set(1);
     this.loadReport();
   }
 
   drillDownRow(row: any) {
-    // Row drill logic similar to chart drill
-    this.drillDown({ label: row.name || row.branch_name, key: row.id || row.branch_id, item: row });
+    // Pick the right id field based on the active report so row-drill
+    // agrees with chart-drill. Falls back to the generic 'id' field.
+    const report = this.activeReport();
+    let key = row.id;
+    let label = row.name;
+    if (report === 'agent-performance')        { key = row.agent_id;   label = row.agent_name; }
+    else if (report === 'branch-performance' && this.drillPath().length === 0) {
+                                                 key = row.branch_id;  label = row.branch_name; }
+    else if (report === 'branch-performance' && this.drillPath().length === 1) {
+                                                 key = row.agent_id;   label = row.agent_name; }
+    else if (report === 'product-performance') { key = row.product_id; label = row.product_name; }
+    else                                       { key = row.id || row.branch_id; label = row.name || row.branch_name; }
+
+    this.drillDown({ label, key, item: row });
   }
 
   barWidth = computed(() => Math.min(800 / Math.max(this.chartData().length, 1), 100));
@@ -608,12 +862,43 @@ export class ReportsComponent implements OnInit {
   }
 
   exportData(format: 'csv' | 'excel') {
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+
+    // Performance reports: call the backend CSV endpoint so the export
+    // respects the user's exact filter + drill context (rollup vs details)
+    // rather than just dumping whatever rows happen to be in memory. Keeps
+    // the filename meaningful and the data authoritative.
+    if (format === 'csv' && this.isPerformanceTab()) {
+      const params: any = { format: 'csv', view: this.drillPath().length > 0 ? 'details' : 'rollup' };
+      if (this.filterDateFrom) params.date_from = this.filterDateFrom;
+      if (this.filterDateTo)   params.date_to   = this.filterDateTo;
+      if (this.filterStatus)   params.status    = this.filterStatus;
+      if (this.filterBranch)   params.branch_id = this.filterBranch;
+      // Pass drill keys so the backend knows which slice to export.
+      this.drillPath().forEach(p => { if (p.value !== undefined) params[p.key] = p.value; });
+
+      this.api.downloadCsv(`/reports/${this.activeReport()}`, params).subscribe({
+        next: (blob: Blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `CreditX_${this.activeReport()}_${params.view}_${ts}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          this.toast.success('CSV exported');
+        },
+        error: () => this.toast.error('Export failed'),
+      });
+      return;
+    }
+
+    // Non-performance reports (or Excel requests): fall back to the
+    // in-memory export of whatever is currently in the data table. Keeps
+    // behaviour unchanged for portfolio/PAR/collection/etc.
     const data = this.tableData();
     if (!data.length) { this.toast.error('No data to export'); return; }
-    
+
     const cols = this.tableColumns();
-    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-    
     if (format === 'csv') {
       const csvRows = [
         cols.map(c => c.label).join(','),
