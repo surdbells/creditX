@@ -536,6 +536,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.performance.branches'));
             $group->get('/product-performance', Report\ProductPerformanceAction::class)
                 ->add(new RbacMiddleware('reports.performance.products'));
+            $group->get('/approver-performance', Report\ApproverPerformanceAction::class)
+                ->add(new RbacMiddleware('reports.performance.approvers'));
             $group->get('/receivables', Report\ReceivablesReportAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
             $group->get('/closed-loans', Report\ClosedLoansReportAction::class)

@@ -798,4 +798,322 @@ final class ReportingService
             'by_agent'        => $byAgent,
         ];
     }
+
+    /**
+     * Approver performance report — decision throughput and turnaround
+     * time per user who has acted on approvals.
+     *
+     * Framing (Commit 4 decisions):
+     *   - AA2: "approver" = any user with decisions, regardless of
+     *     role.slug. A branch manager signing off on loans counts
+     *     the same way an underwriter does — the report is about
+     *     who's deciding, not who's named 'underwriter'.
+     *   - BB1: "submission" = the moment a step became active for
+     *     the approver, which we read from loan_approvals.sla_started_at.
+     *     This is what the approver actually saw on their desk, not
+     *     when the loan was first captured days earlier.
+     *   - CC1: "approver clock" = decided_at - sla_started_at.
+     *     Measures the approver's own responsiveness once an item
+     *     hit their queue. The accountability metric.
+     *   - CC2: "loan clock" = decided_at - earliest_sla_on_loan.
+     *     Measures total wait time from the loan's first arrival in
+     *     the approval pipeline to this decision. The customer-
+     *     experience metric. Computed per decision by joining to
+     *     a subquery that finds each loan's earliest sla_started_at.
+     *   - GG: "active" = user who made ≥ 1 decision in the range.
+     *   - HH: "currently on desk" = count of PENDING approvals
+     *     with slaStartedAt IS NOT NULL (the definition of 'on desk'
+     *     we already use in the approval queue). Not date-ranged —
+     *     a real-time snapshot regardless of date filters.
+     *
+     * Drill:
+     *   When $approverId is provided, $details is populated with
+     *   individual decisions (status filter applies per Q2 convention).
+     *
+     * Time series:
+     *   $granularity in {day, week, month} chooses DATE_TRUNC bucket.
+     *   Each bucket row reports (submissions, approvals, rejections)
+     *   for the approver scope in effect (all approvers unless filtered).
+     */
+    public function approverPerformance(
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?array $statusRaw = null,
+        ?string $branchId = null,
+        ?string $approverId = null,
+        string $granularity = 'day'
+    ): array {
+        $conn = $this->em->getConnection();
+
+        // ── date boundary normalisation ──
+        // Default to last 30 days if caller didn't supply a range — gives
+        // the charts sensible data without forcing the UI to pre-fill.
+        $df = $dateFrom ?: (new \DateTimeImmutable('-30 days'))->format('Y-m-d');
+        $dt = ($dateTo ?: (new \DateTimeImmutable('now'))->format('Y-m-d')) . ' 23:59:59';
+
+        // ── by_approver rollup ──
+        // Only DECIDED rows count for rollup throughput (status != PENDING).
+        // PENDING rows contribute to the 'on desk' KPI separately.
+        // decided_at range is the scope anchor (not sla_started_at) because
+        // operators ask 'how many did person X decide last week?' — that's
+        // the decided-at window regardless of when the item arrived.
+        $branchFilter = $branchId ? "AND l.branch_id = :bid" : "";
+
+        $byApproverSql = "
+            WITH loan_first_sla AS (
+                -- Earliest sla_started_at per loan. Proxy for 'when this
+                -- loan entered the approval pipeline.' Used for CC2.
+                SELECT loan_id, MIN(sla_started_at) AS first_sla
+                FROM loan_approvals
+                WHERE sla_started_at IS NOT NULL
+                GROUP BY loan_id
+            )
+            SELECT
+                u.id AS approver_id,
+                u.first_name || ' ' || u.last_name AS approver_name,
+                COUNT(*) AS decisions,
+                SUM(CASE WHEN la.status IN ('approved','auto_approved') THEN 1 ELSE 0 END) AS approved,
+                SUM(CASE WHEN la.status = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                AVG(EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)
+                    FILTER (WHERE la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL)
+                    AS avg_approver_clock_hours,
+                AVG(EXTRACT(EPOCH FROM (la.decided_at - lfs.first_sla)) / 3600.0)
+                    FILTER (WHERE la.decided_at IS NOT NULL AND lfs.first_sla IS NOT NULL)
+                    AS avg_loan_clock_hours
+            FROM loan_approvals la
+            INNER JOIN users u ON la.approver_id = u.id
+            INNER JOIN loans l ON la.loan_id = l.id
+            LEFT JOIN loan_first_sla lfs ON lfs.loan_id = la.loan_id
+            WHERE la.status IN ('approved','rejected','auto_approved')
+              AND la.decided_at >= :df AND la.decided_at <= :dt
+              {$branchFilter}
+            GROUP BY u.id, u.first_name, u.last_name
+            HAVING COUNT(*) >= 1
+            ORDER BY decisions DESC
+        ";
+        $params = ['df' => $df, 'dt' => $dt];
+        if ($branchId) $params['bid'] = $branchId;
+        $byApprover = $conn->fetchAllAssociative($byApproverSql, $params);
+
+        // Approval rate + chart-shape fields.
+        foreach ($byApprover as &$row) {
+            $d = (int) $row['decisions'];
+            $row['approval_rate'] = $d > 0 ? round(((int) $row['approved'] / $d) * 100, 2) : 0;
+            $row['avg_approver_clock_hours'] = $row['avg_approver_clock_hours'] !== null
+                ? round((float) $row['avg_approver_clock_hours'], 2) : null;
+            $row['avg_loan_clock_hours'] = $row['avg_loan_clock_hours'] !== null
+                ? round((float) $row['avg_loan_clock_hours'], 2) : null;
+            // Chart compat — front-end pie/bar reads count/amount/name.
+            // amount = decisions (not a monetary figure, but it's what the
+            // chart visualises so the bigger-bar = more-decided semantic
+            // carries through without a custom chart variant).
+            $row['count']  = $d;
+            $row['amount'] = $d;
+            $row['name']   = $row['approver_name'];
+        }
+        unset($row);
+
+        // ── summary ──
+        $totalDecisions = array_sum(array_column($byApprover, 'decisions'));
+        $totalApproved  = array_sum(array_column($byApprover, 'approved'));
+        $totalRejected  = array_sum(array_column($byApprover, 'rejected'));
+
+        // Global averages — re-compute from raw rows so per-approver
+        // averaging doesn't skew against high-volume approvers.
+        $globalAvgSql = "
+            WITH loan_first_sla AS (
+                SELECT loan_id, MIN(sla_started_at) AS first_sla
+                FROM loan_approvals WHERE sla_started_at IS NOT NULL
+                GROUP BY loan_id
+            )
+            SELECT
+                AVG(EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)
+                    FILTER (WHERE la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL)
+                    AS avg_approver_clock_hours,
+                AVG(EXTRACT(EPOCH FROM (la.decided_at - lfs.first_sla)) / 3600.0)
+                    FILTER (WHERE la.decided_at IS NOT NULL AND lfs.first_sla IS NOT NULL)
+                    AS avg_loan_clock_hours
+            FROM loan_approvals la
+            INNER JOIN loans l ON la.loan_id = l.id
+            LEFT JOIN loan_first_sla lfs ON lfs.loan_id = la.loan_id
+            WHERE la.status IN ('approved','rejected','auto_approved')
+              AND la.decided_at >= :df AND la.decided_at <= :dt
+              {$branchFilter}
+        ";
+        $globalAvg = $conn->fetchAssociative($globalAvgSql, $params) ?: [];
+
+        // HH — on-desk snapshot (ignores date range by design).
+        $onDeskSql = "
+            SELECT COUNT(*) AS c
+            FROM loan_approvals la
+            INNER JOIN loans l ON la.loan_id = l.id
+            WHERE la.status = 'pending' AND la.sla_started_at IS NOT NULL
+              {$branchFilter}
+        ";
+        $onDeskParams = $branchId ? ['bid' => $branchId] : [];
+        $onDesk = (int) ($conn->fetchOne($onDeskSql, $onDeskParams) ?: 0);
+
+        $summary = [
+            'decisions'                => $totalDecisions,
+            'approved'                 => $totalApproved,
+            'rejected'                 => $totalRejected,
+            'approval_rate'            => $totalDecisions > 0
+                ? round(($totalApproved / $totalDecisions) * 100, 2) : 0,
+            'active_approvers'         => count($byApprover),
+            'currently_on_desk'        => $onDesk,
+            'avg_approver_clock_hours' => $globalAvg['avg_approver_clock_hours'] !== null
+                ? round((float) $globalAvg['avg_approver_clock_hours'], 2) : null,
+            'avg_loan_clock_hours'     => $globalAvg['avg_loan_clock_hours'] !== null
+                ? round((float) $globalAvg['avg_loan_clock_hours'], 2) : null,
+        ];
+
+        // ── time series ──
+        // BB1: submissions = sla_started_at bucket.
+        // approvals/rejections = decided_at bucket.
+        // Two queries, zipped by period in PHP — simpler than a
+        // full-outer-join dance in SQL.
+        $bucket = match ($granularity) {
+            'week'  => 'week',
+            'month' => 'month',
+            default => 'day',
+        };
+
+        $submissionsSql = "
+            SELECT DATE_TRUNC(:bucket, la.sla_started_at)::date AS period,
+                   COUNT(*) AS submissions
+            FROM loan_approvals la
+            INNER JOIN loans l ON la.loan_id = l.id
+            WHERE la.sla_started_at >= :df AND la.sla_started_at <= :dt
+              {$branchFilter}
+            GROUP BY period ORDER BY period
+        ";
+        $decisionsSql = "
+            SELECT DATE_TRUNC(:bucket, la.decided_at)::date AS period,
+                   SUM(CASE WHEN la.status IN ('approved','auto_approved') THEN 1 ELSE 0 END) AS approvals,
+                   SUM(CASE WHEN la.status = 'rejected' THEN 1 ELSE 0 END) AS rejections
+            FROM loan_approvals la
+            INNER JOIN loans l ON la.loan_id = l.id
+            WHERE la.decided_at IS NOT NULL
+              AND la.decided_at >= :df AND la.decided_at <= :dt
+              {$branchFilter}
+            GROUP BY period ORDER BY period
+        ";
+        $tsParams = $params + ['bucket' => $bucket];
+        $subsRows = $conn->fetchAllAssociative($submissionsSql, $tsParams);
+        $decRows  = $conn->fetchAllAssociative($decisionsSql,  $tsParams);
+
+        $series = [];
+        foreach ($subsRows as $r) {
+            $key = $r['period'];
+            $series[$key] = [
+                'period'      => $key,
+                'submissions' => (int) $r['submissions'],
+                'approvals'   => 0,
+                'rejections'  => 0,
+            ];
+        }
+        foreach ($decRows as $r) {
+            $key = $r['period'];
+            if (!isset($series[$key])) {
+                $series[$key] = ['period' => $key, 'submissions' => 0, 'approvals' => 0, 'rejections' => 0];
+            }
+            $series[$key]['approvals']  = (int) $r['approvals'];
+            $series[$key]['rejections'] = (int) $r['rejections'];
+        }
+        ksort($series);
+        $timeSeries = array_values($series);
+
+        // ── details (drill) ──
+        $details = [];
+        if ($approverId !== null) {
+            $details = $this->fetchApproverDecisions(
+                $approverId, $df, $dt, $branchId, $statusRaw
+            );
+        }
+
+        return [
+            'summary'     => $summary,
+            'by_approver' => $byApprover,
+            'time_series' => $timeSeries,
+            'details'     => $details,
+        ];
+    }
+
+    /**
+     * Per-decision drill for a single approver.
+     * Status filter here maps the app-level bucket to approval statuses
+     * (approved/auto_approved, rejected, pending — no "performing" etc.
+     * since those are loan statuses, not approval statuses). The
+     * StatusBucketResolver is loan-centric, so we interpret statusRaw
+     * liberally: if it contains 'approved'/'rejected' we match, anything
+     * else is ignored (returns all decided rows).
+     */
+    private function fetchApproverDecisions(
+        string $approverId,
+        string $df,
+        string $dt,
+        ?string $branchId,
+        ?array $statusRaw
+    ): array {
+        $conn = $this->em->getConnection();
+
+        $where = "la.approver_id = :aid AND la.decided_at >= :df AND la.decided_at <= :dt";
+        $params = ['aid' => $approverId, 'df' => $df, 'dt' => $dt];
+        if ($branchId) { $where .= " AND l.branch_id = :bid"; $params['bid'] = $branchId; }
+
+        // Filter by approval-status bucket when user picked approved/rejected.
+        // loan-status buckets (performing, non_performing, closed, etc) don't
+        // apply to approvals, so we fall back to no filter.
+        if ($statusRaw && !empty($statusRaw)) {
+            $approvalStatuses = [];
+            foreach ($statusRaw as $s) {
+                if ($s === 'approved')  $approvalStatuses = array_merge($approvalStatuses, ['approved', 'auto_approved']);
+                if ($s === 'rejected')  $approvalStatuses[] = 'rejected';
+                if ($s === 'pending')   $approvalStatuses[] = 'pending';
+            }
+            if (!empty($approvalStatuses)) {
+                $placeholders = [];
+                foreach ($approvalStatuses as $i => $s) {
+                    $k = "as{$i}";
+                    $placeholders[] = ":{$k}";
+                    $params[$k] = $s;
+                }
+                $where .= ' AND la.status IN (' . implode(',', $placeholders) . ')';
+            }
+        }
+
+        $sql = "
+            WITH loan_first_sla AS (
+                SELECT loan_id, MIN(sla_started_at) AS first_sla
+                FROM loan_approvals WHERE sla_started_at IS NOT NULL
+                GROUP BY loan_id
+            )
+            SELECT
+                la.id AS approval_id,
+                l.id AS loan_id,
+                l.application_id,
+                c.full_name AS customer_name,
+                la.status AS decision,
+                la.decided_at,
+                la.sla_started_at,
+                lfs.first_sla AS loan_submitted_at,
+                loc.name AS branch_name,
+                la.comment,
+                CASE WHEN la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL
+                     THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)::numeric, 2)
+                     ELSE NULL END AS approver_clock_hours,
+                CASE WHEN la.decided_at IS NOT NULL AND lfs.first_sla IS NOT NULL
+                     THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - lfs.first_sla)) / 3600.0)::numeric, 2)
+                     ELSE NULL END AS loan_clock_hours
+            FROM loan_approvals la
+            INNER JOIN loans l ON la.loan_id = l.id
+            INNER JOIN customers c ON l.customer_id = c.id
+            LEFT JOIN locations loc ON l.branch_id = loc.id
+            LEFT JOIN loan_first_sla lfs ON lfs.loan_id = la.loan_id
+            WHERE {$where}
+            ORDER BY la.decided_at DESC
+            LIMIT 500
+        ";
+        return $conn->fetchAllAssociative($sql, $params);
+    }
 }
