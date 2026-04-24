@@ -106,7 +106,9 @@ $permissionsDef = [
     'reports' => [
         ['reports.portfolio', 'View Portfolio Reports'],
         ['reports.par', 'View PAR Reports'],
-        ['reports.performance', 'View Performance Reports'],
+        ['reports.performance.agents', 'View Agent Performance Report'],
+        ['reports.performance.branches', 'View Branch Performance Report'],
+        ['reports.performance.products', 'View Product Performance Report'],
         ['reports.cbn', 'View CBN Reports'],
         ['reports.reconciliation', 'View Reconciliation'],
         ['reports.export', 'Export Reports'],
@@ -163,7 +165,9 @@ $rolesDef = [
     ['Operations Head', 'operations_head', 'Head of operations — loan oversight', true, [
         'loans.view', 'loans.approve', 'loans.reject', 'loans.disburse', 'loans.close', 'loans.write_off', 'loans.restructure',
         'customers.view', 'records.view', 'products.view', 'accounting.view',
-        'payments.view', 'reports.portfolio', 'reports.par', 'reports.performance', 'reports.cbn', 'reports.export',
+        'payments.view', 'reports.portfolio', 'reports.par',
+        'reports.performance.agents', 'reports.performance.branches', 'reports.performance.products',
+        'reports.cbn', 'reports.export',
         'messaging.view', 'messaging.send', 'maker_checker.check', 'notifications.view',
     ]],
     ['Underwriter', 'underwriter', 'Loan underwriting and approval', true, [
@@ -181,7 +185,9 @@ $rolesDef = [
         'accounting.view', 'accounting.create', 'accounting.edit', 'accounting.journal', 'accounting.reverse',
         'payments.view', 'payments.create', 'payments.bulk_upload',
         'loans.view', 'customers.view',
-        'reports.portfolio', 'reports.par', 'reports.performance', 'reports.cbn', 'reports.reconciliation', 'reports.export',
+        'reports.portfolio', 'reports.par',
+        'reports.performance.agents', 'reports.performance.branches', 'reports.performance.products',
+        'reports.cbn', 'reports.reconciliation', 'reports.export',
         'maker_checker.make', 'notifications.view',
     ]],
     ['Compliance Officer', 'compliance_officer', 'Regulatory compliance and reporting', true, [

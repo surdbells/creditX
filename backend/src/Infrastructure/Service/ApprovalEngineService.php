@@ -28,6 +28,7 @@ final class ApprovalEngineService
         private readonly LoanApprovalRepository $approvalRepo,
         private readonly SettingsCacheService $settings,
         private readonly ?NotificationDispatchService $notifService = null,
+        private readonly ?BranchScopeService $branchScope = null,
     ) {
     }
 
@@ -416,9 +417,20 @@ final class ApprovalEngineService
          * This matches how admins expect approval queues to work:
          * permissions gate access, roles provide default routing but
          * don't restrict broad-access users.
+         *
+         * Branch scoping: both paths also pass a branch-id whitelist
+         * down to the repository when the user is NOT admin/super_admin.
+         * Underwriters and operations heads only see loans from their
+         * assigned branches (User.locations ManyToMany). Admin and
+         * super_admin bypass the scope and see every branch — so an
+         * operations head with loans.approve still goes down the
+         * global-visibility path, but only sees loans from branches
+         * assigned to them.
          */
+        $branchIds = $this->branchScope?->getUserBranchIds($user);
+
         if ($user->hasPermission('loans.approve')) {
-            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search);
+            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds);
             $items = $result['items'];
             $total = $result['total'];
         } else {
@@ -433,7 +445,7 @@ final class ApprovalEngineService
             // has multiple roles that match the same step.
             $allItems = [];
             foreach ($roleIds as $roleId) {
-                $result = $this->approvalRepo->findPendingForRole($roleId, 0, 1000, $search);
+                $result = $this->approvalRepo->findPendingForRole($roleId, 0, 1000, $search, $branchIds);
                 foreach ($result['items'] as $item) {
                     $allItems[$item->getId()] = $item;
                 }

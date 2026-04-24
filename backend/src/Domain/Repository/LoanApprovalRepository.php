@@ -44,10 +44,25 @@ class LoanApprovalRepository extends BaseRepository
 
     /**
      * Get pending approvals for a specific role (approval queue).
+     *
+     * @param string[]|null $branchIds  Optional branch scope. Null means no
+     *                                  scope (typically admin/super_admin —
+     *                                  though the current caller never takes
+     *                                  this path since the global-visibility
+     *                                  branch goes through findAllPendingQueue
+     *                                  instead). Empty array means the user
+     *                                  has no assigned branches and should
+     *                                  see nothing. Non-empty array restricts
+     *                                  to loans whose branch_id is in the set.
      * @return array{items: LoanApproval[], total: int}
      */
-    public function findPendingForRole(string $roleId, int $offset, int $limit, ?string $search = null): array
-    {
+    public function findPendingForRole(
+        string $roleId,
+        int $offset,
+        int $limit,
+        ?string $search = null,
+        ?array $branchIds = null
+    ): array {
         $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
             ->innerJoin('a.step', 's')
             ->innerJoin('a.loan', 'l')
@@ -67,6 +82,15 @@ class LoanApprovalRepository extends BaseRepository
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
+        if ($branchIds !== null) {
+            if (empty($branchIds)) {
+                $qb->andWhere('1 = 0');
+            } else {
+                $qb->andWhere('l.branch IN (:branchIds)')
+                   ->setParameter('branchIds', $branchIds);
+            }
+        }
+
         $countQb = clone $qb;
         $countQb->select('COUNT(a.id)')->resetDQLPart('orderBy');
         $total = (int) $countQb->getQuery()->getSingleScalarResult();
@@ -84,10 +108,15 @@ class LoanApprovalRepository extends BaseRepository
      * Distinct from findAllPending(loanId) above which filters by a single
      * loan. This method is the queue-wide counterpart.
      *
+     * @param string[]|null $branchIds  See findPendingForRole for semantics.
      * @return array{items: LoanApproval[], total: int}
      */
-    public function findAllPendingQueue(int $offset, int $limit, ?string $search = null): array
-    {
+    public function findAllPendingQueue(
+        int $offset,
+        int $limit,
+        ?string $search = null,
+        ?array $branchIds = null
+    ): array {
         $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
             ->innerJoin('a.step', 's')
             ->innerJoin('a.loan', 'l')
@@ -113,6 +142,15 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->expr()->like('LOWER(l.applicationId)', ':search'),
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
+        }
+
+        if ($branchIds !== null) {
+            if (empty($branchIds)) {
+                $qb->andWhere('1 = 0');
+            } else {
+                $qb->andWhere('l.branch IN (:branchIds)')
+                   ->setParameter('branchIds', $branchIds);
+            }
         }
 
         $countQb = clone $qb;

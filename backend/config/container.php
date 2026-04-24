@@ -6,6 +6,7 @@ use App\Infrastructure\Logger\AppLogger;
 use App\Infrastructure\Persistence\DoctrineEntityManagerFactory;
 use App\Infrastructure\Service\ApprovalEngineService;
 use App\Infrastructure\Service\AuditService;
+use App\Infrastructure\Service\BranchScopeService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\LoanLifecycleService;
@@ -231,8 +232,12 @@ return [
             $c->get(ApprovalWorkflowRepository::class),
             $c->get(LoanApprovalRepository::class),
             $c->get(SettingsCacheService::class),
-            $c->get(NotificationDispatchService::class)
+            $c->get(NotificationDispatchService::class),
+            $c->get(BranchScopeService::class),
         );
+    },
+    BranchScopeService::class => function (ContainerInterface $c): BranchScopeService {
+        return new BranchScopeService();
     },
     PeriodGuardService::class => function (ContainerInterface $c): PeriodGuardService {
         return new PeriodGuardService(
