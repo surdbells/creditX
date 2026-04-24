@@ -98,17 +98,51 @@ final class ReportingService
     /**
      * Agent (DSA) performance report.
      */
-    public function agentPerformance(?string $dateFrom = null, ?string $dateTo = null, ?string $locationId = null): array
-    {
+    /**
+     * Agent performance report.
+     *
+     * Returns a structured payload:
+     *
+     *   {
+     *     summary:   { total_loans, total_amount_requested, total_disbursed,
+     *                  active_agents, approval_rate, avg_ticket_size },
+     *     by_agent:  [ { agent_id, agent_name, total_loans, ..., total_disbursed } ],
+     *     details:   []   // populated only on drill-down (see $agentId)
+     *   }
+     *
+     * Filters:
+     *   - $dateFrom / $dateTo:       applied to summary + by_agent (l.created_at)
+     *   - $locationId (branch):      applied to summary + by_agent
+     *   - $statusRaw (string[]|null): applied ONLY to $details when drilled.
+     *     Top-level rollups intentionally ignore the status filter so operators
+     *     can see "1,000 loans: 800 approved, 750 disbursed" while filtering
+     *     the drill view to e.g. rejected loans only. This is the Q2 decision
+     *     from the Phase 2.2 plan.
+     *
+     * Drill:
+     *   When $agentId is provided, $details is populated with that agent's
+     *   individual loans (respecting all filters including status). The
+     *   summary and by_agent arrays still reflect the unfiltered-by-status
+     *   rollups — they don't change when you drill.
+     */
+    public function agentPerformance(
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?string $locationId = null,
+        ?array $statusRaw = null,
+        ?string $agentId = null
+    ): array {
         $conn = $this->em->getConnection();
 
+        // Base filter shared by summary + by_agent (NO status filter here — Q2)
         $where = 'l.agent_id IS NOT NULL';
         $params = [];
-        if ($dateFrom) { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
-        if ($dateTo) { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($dateFrom)   { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
+        if ($dateTo)     { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
         if ($locationId) { $where .= " AND l.branch_id = :lid"; $params['lid'] = $locationId; }
 
-        $sql = "
+        // ── by_agent rollup ──
+        $byAgentSql = "
             SELECT u.id as agent_id, u.first_name || ' ' || u.last_name as agent_name,
                 COUNT(*) as total_loans,
                 SUM(CASE WHEN l.status = 'captured' THEN 1 ELSE 0 END) as captured,
@@ -124,27 +158,135 @@ final class ReportingService
             GROUP BY u.id, u.first_name, u.last_name
             ORDER BY total_disbursed DESC
         ";
+        $byAgent = $conn->fetchAllAssociative($byAgentSql, $params);
 
+        // Frontend chart consumer expects `count` and `amount` — map for compat.
+        foreach ($byAgent as &$row) {
+            $row['count']  = (int) $row['total_loans'];
+            $row['amount'] = (float) $row['total_disbursed'];
+            $row['name']   = $row['agent_name'];
+        }
+        unset($row);
+
+        // ── summary ──
+        $summary = [
+            'total_loans'            => array_sum(array_column($byAgent, 'count')),
+            'total_amount_requested' => array_sum(array_column($byAgent, 'total_amount_requested')),
+            'total_disbursed'        => array_sum(array_column($byAgent, 'amount')),
+            'active_agents'          => count($byAgent),
+        ];
+        $approved = array_sum(array_column($byAgent, 'approved'))
+                  + array_sum(array_column($byAgent, 'disbursed'));
+        $summary['approval_rate']  = $summary['total_loans'] > 0
+            ? round(($approved / $summary['total_loans']) * 100, 2) : 0;
+        $summary['avg_ticket_size'] = $summary['total_loans'] > 0
+            ? round($summary['total_amount_requested'] / $summary['total_loans'], 2) : 0;
+
+        // ── details (drill) ──
+        $details = [];
+        if ($agentId !== null) {
+            $details = $this->fetchAgentLoans($agentId, $dateFrom, $dateTo, $locationId, $statusRaw);
+        }
+
+        return [
+            'summary'  => $summary,
+            'by_agent' => $byAgent,
+            'details'  => $details,
+        ];
+    }
+
+    /**
+     * Fetch a single agent's loans for drill-down.
+     * Applies date/location/status filters.
+     */
+    private function fetchAgentLoans(
+        string $agentId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?string $locationId,
+        ?array $statusRaw
+    ): array {
+        $conn = $this->em->getConnection();
+
+        $where = 'l.agent_id = :aid';
+        $params = ['aid' => $agentId];
+        if ($dateFrom)   { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
+        if ($dateTo)     { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($locationId) { $where .= " AND l.branch_id = :lid"; $params['lid'] = $locationId; }
+        if ($statusRaw && !empty($statusRaw)) {
+            $placeholders = [];
+            foreach ($statusRaw as $i => $s) {
+                $key = "s{$i}";
+                $placeholders[] = ":{$key}";
+                $params[$key] = $s;
+            }
+            $where .= ' AND l.status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $sql = "
+            SELECT l.id as loan_id, l.application_id, l.status,
+                c.full_name as customer_name,
+                lp.name as product_name,
+                loc.name as branch_name,
+                l.amount_requested,
+                l.net_disbursed,
+                l.disbursed_at,
+                l.created_at
+            FROM loans l
+            INNER JOIN customers c ON l.customer_id = c.id
+            LEFT JOIN loan_products lp ON l.product_id = lp.id
+            LEFT JOIN locations loc ON l.branch_id = loc.id
+            WHERE {$where}
+            ORDER BY l.created_at DESC
+            LIMIT 500
+        ";
         return $conn->fetchAllAssociative($sql, $params);
     }
 
     /**
      * Branch performance report.
      */
-    public function branchPerformance(?string $dateFrom = null, ?string $dateTo = null): array
-    {
+    /**
+     * Branch performance report.
+     *
+     * Returns:
+     *   {
+     *     summary:   { total_applications, total_approvals, total_disbursements,
+     *                  total_disbursed, active_branches, approval_rate, avg_ticket_size },
+     *     by_branch: [ { branch_id, branch_name, branch_code, total_applications, ..., total_disbursed } ],
+     *     details:   []   // populated on drill
+     *   }
+     *
+     * Drill:
+     *   - Level 1 ($branchId only): $details = agents rollup for that branch
+     *     (shape matches by_agent row — so the frontend can reuse the chart
+     *     pattern). $details does NOT respect the status filter — it's still
+     *     a rollup, per Q2.
+     *   - Level 2 ($branchId AND $agentId): $details = that agent's loans in
+     *     that branch. $details respects the status filter at this level.
+     */
+    public function branchPerformance(
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?array $statusRaw = null,
+        ?string $branchId = null,
+        ?string $agentId = null
+    ): array {
         $conn = $this->em->getConnection();
 
         $where = 'l.branch_id IS NOT NULL';
         $params = [];
         if ($dateFrom) { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
-        if ($dateTo) { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($dateTo)   { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
 
-        $sql = "
+        // ── by_branch rollup ──
+        $byBranchSql = "
             SELECT loc.id as branch_id, loc.name as branch_name, loc.code as branch_code,
                 COUNT(*) as total_applications,
                 SUM(CASE WHEN l.status IN ('approved','disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as approvals,
                 SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as disbursements,
+                SUM(CASE WHEN l.status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) as total_amount_requested,
                 COALESCE(SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN CAST(l.net_disbursed AS NUMERIC) ELSE 0 END), 0) as total_disbursed
             FROM loans l
             INNER JOIN locations loc ON l.branch_id = loc.id
@@ -152,26 +294,125 @@ final class ReportingService
             GROUP BY loc.id, loc.name, loc.code
             ORDER BY total_disbursed DESC
         ";
+        $byBranch = $conn->fetchAllAssociative($byBranchSql, $params);
 
-        return $conn->fetchAllAssociative($sql, $params);
+        foreach ($byBranch as &$row) {
+            $row['count']  = (int) $row['total_applications'];
+            $row['amount'] = (float) $row['total_disbursed'];
+            $row['name']   = $row['branch_name'];
+        }
+        unset($row);
+
+        // ── summary ──
+        $totalApps  = array_sum(array_column($byBranch, 'count'));
+        $totalAppr  = array_sum(array_column($byBranch, 'approvals'));
+        $totalDisb  = array_sum(array_column($byBranch, 'disbursements'));
+        $totalAmt   = array_sum(array_column($byBranch, 'total_amount_requested'));
+        $totalVal   = array_sum(array_column($byBranch, 'amount'));
+
+        $summary = [
+            'total_applications'   => $totalApps,
+            'total_approvals'      => $totalAppr,
+            'total_disbursements'  => $totalDisb,
+            'total_disbursed'      => $totalVal,
+            'active_branches'      => count($byBranch),
+            'approval_rate'        => $totalApps > 0 ? round(($totalAppr / $totalApps) * 100, 2) : 0,
+            'avg_ticket_size'      => $totalApps > 0 ? round($totalAmt / $totalApps, 2) : 0,
+        ];
+
+        // ── details (drill) ──
+        $details = [];
+        if ($branchId !== null && $agentId !== null) {
+            // Level 2: agent's loans in this branch
+            $details = $this->fetchAgentLoans($agentId, $dateFrom, $dateTo, $branchId, $statusRaw);
+        } elseif ($branchId !== null) {
+            // Level 1: agents in this branch — rollup (ignores status filter, Q2)
+            $details = $this->fetchAgentsInBranch($branchId, $dateFrom, $dateTo);
+        }
+
+        return [
+            'summary'   => $summary,
+            'by_branch' => $byBranch,
+            'details'   => $details,
+        ];
+    }
+
+    /**
+     * Fetch agent-level rollup scoped to a single branch.
+     * Used for branchPerformance level-1 drill.
+     */
+    private function fetchAgentsInBranch(string $branchId, ?string $dateFrom, ?string $dateTo): array
+    {
+        $conn = $this->em->getConnection();
+
+        $where = 'l.agent_id IS NOT NULL AND l.branch_id = :bid';
+        $params = ['bid' => $branchId];
+        if ($dateFrom) { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
+        if ($dateTo)   { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+
+        $sql = "
+            SELECT u.id as agent_id, u.first_name || ' ' || u.last_name as agent_name,
+                COUNT(*) as total_loans,
+                SUM(CASE WHEN l.status IN ('approved','disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as disbursed,
+                SUM(CASE WHEN l.status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) as total_amount_requested,
+                COALESCE(SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN CAST(l.net_disbursed AS NUMERIC) ELSE 0 END), 0) as total_disbursed
+            FROM loans l
+            INNER JOIN users u ON l.agent_id = u.id
+            WHERE {$where}
+            GROUP BY u.id, u.first_name, u.last_name
+            ORDER BY total_disbursed DESC
+        ";
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        foreach ($rows as &$row) {
+            $row['count']  = (int) $row['total_loans'];
+            $row['amount'] = (float) $row['total_disbursed'];
+            $row['name']   = $row['agent_name'];
+        }
+        return $rows;
     }
 
     /**
      * Product performance report.
      */
-    public function productPerformance(?string $dateFrom = null, ?string $dateTo = null): array
-    {
+    /**
+     * Product performance report.
+     *
+     * Returns:
+     *   {
+     *     summary:     { total_loans, total_requested, total_disbursed,
+     *                    active_products, avg_ticket_size, approval_rate },
+     *     by_product:  [ { product_id, product_name, product_code, ..., total_disbursed } ],
+     *     details:     []   // populated on drill
+     *   }
+     *
+     * Drill:
+     *   When $productId is provided, $details is populated with loans of that
+     *   product (respects status filter — Q2).
+     */
+    public function productPerformance(
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?array $statusRaw = null,
+        ?string $branchId = null,
+        ?string $productId = null
+    ): array {
         $conn = $this->em->getConnection();
 
         $where = '1=1';
         $params = [];
         if ($dateFrom) { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
-        if ($dateTo) { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($dateTo)   { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($branchId) { $where .= " AND l.branch_id = :bid"; $params['bid'] = $branchId; }
 
-        $sql = "
+        // ── by_product rollup ──
+        $byProductSql = "
             SELECT lp.id as product_id, lp.name as product_name, lp.code as product_code,
                 COUNT(*) as total_loans,
+                SUM(CASE WHEN l.status IN ('approved','disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as approved,
                 SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN 1 ELSE 0 END) as disbursed_count,
+                SUM(CASE WHEN l.status = 'rejected' THEN 1 ELSE 0 END) as rejected,
                 COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) as total_requested,
                 COALESCE(SUM(CASE WHEN l.status IN ('disbursed','active','overdue','closed') THEN CAST(l.net_disbursed AS NUMERIC) ELSE 0 END), 0) as total_disbursed
             FROM loans l
@@ -180,7 +421,87 @@ final class ReportingService
             GROUP BY lp.id, lp.name, lp.code
             ORDER BY total_disbursed DESC
         ";
+        $byProduct = $conn->fetchAllAssociative($byProductSql, $params);
 
+        foreach ($byProduct as &$row) {
+            $row['count']  = (int) $row['total_loans'];
+            $row['amount'] = (float) $row['total_disbursed'];
+            $row['name']   = $row['product_name'];
+        }
+        unset($row);
+
+        // ── summary ──
+        $totalLoans = array_sum(array_column($byProduct, 'count'));
+        $totalReq   = array_sum(array_column($byProduct, 'total_requested'));
+        $totalDisb  = array_sum(array_column($byProduct, 'amount'));
+        $totalAppr  = array_sum(array_column($byProduct, 'approved'));
+
+        $summary = [
+            'total_loans'      => $totalLoans,
+            'total_requested'  => $totalReq,
+            'total_disbursed'  => $totalDisb,
+            'active_products'  => count($byProduct),
+            'avg_ticket_size'  => $totalLoans > 0 ? round($totalReq / $totalLoans, 2) : 0,
+            'approval_rate'    => $totalLoans > 0 ? round(($totalAppr / $totalLoans) * 100, 2) : 0,
+        ];
+
+        // ── details (drill) ──
+        $details = [];
+        if ($productId !== null) {
+            $details = $this->fetchProductLoans($productId, $dateFrom, $dateTo, $branchId, $statusRaw);
+        }
+
+        return [
+            'summary'    => $summary,
+            'by_product' => $byProduct,
+            'details'    => $details,
+        ];
+    }
+
+    /**
+     * Fetch a product's loans for drill-down.
+     */
+    private function fetchProductLoans(
+        string $productId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?string $branchId,
+        ?array $statusRaw
+    ): array {
+        $conn = $this->em->getConnection();
+
+        $where = 'l.product_id = :pid';
+        $params = ['pid' => $productId];
+        if ($dateFrom) { $where .= " AND l.created_at >= :df"; $params['df'] = $dateFrom; }
+        if ($dateTo)   { $where .= " AND l.created_at <= :dt"; $params['dt'] = $dateTo . ' 23:59:59'; }
+        if ($branchId) { $where .= " AND l.branch_id = :bid"; $params['bid'] = $branchId; }
+        if ($statusRaw && !empty($statusRaw)) {
+            $placeholders = [];
+            foreach ($statusRaw as $i => $s) {
+                $key = "s{$i}";
+                $placeholders[] = ":{$key}";
+                $params[$key] = $s;
+            }
+            $where .= ' AND l.status IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $sql = "
+            SELECT l.id as loan_id, l.application_id, l.status,
+                c.full_name as customer_name,
+                u.first_name || ' ' || u.last_name as agent_name,
+                loc.name as branch_name,
+                l.amount_requested,
+                l.net_disbursed,
+                l.disbursed_at,
+                l.created_at
+            FROM loans l
+            INNER JOIN customers c ON l.customer_id = c.id
+            LEFT JOIN users u ON l.agent_id = u.id
+            LEFT JOIN locations loc ON l.branch_id = loc.id
+            WHERE {$where}
+            ORDER BY l.created_at DESC
+            LIMIT 500
+        ";
         return $conn->fetchAllAssociative($sql, $params);
     }
 

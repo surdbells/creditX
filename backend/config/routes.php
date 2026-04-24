@@ -531,11 +531,11 @@ return function (App $app): void {
             $group->get('/par', Report\ParReportAction::class)
                 ->add(new RbacMiddleware('reports.par'));
             $group->get('/agent-performance', Report\AgentPerformanceAction::class)
-                ->add(new RbacMiddleware('reports.performance'));
+                ->add(new RbacMiddleware('reports.performance.agents'));
             $group->get('/branch-performance', Report\BranchPerformanceAction::class)
-                ->add(new RbacMiddleware('reports.performance'));
+                ->add(new RbacMiddleware('reports.performance.branches'));
             $group->get('/product-performance', Report\ProductPerformanceAction::class)
-                ->add(new RbacMiddleware('reports.performance'));
+                ->add(new RbacMiddleware('reports.performance.products'));
             $group->get('/receivables', Report\ReceivablesReportAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
             $group->get('/closed-loans', Report\ClosedLoansReportAction::class)
