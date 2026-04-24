@@ -4,7 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { LucideAngularModule,
   LayoutDashboard, Users, Shield, MapPin, Settings, ScrollText, Database,
-  FileText, UserCheck, UserX, Landmark, Building2, CreditCard, Banknote, BarChart3,
+  FileText, UserCheck, UserX, Landmark, Building, Building2, CreditCard, Banknote, BarChart3,
   ArrowLeftRight, Bell, MessageSquare, Menu, X, Moon, Sun, LogOut, ChevronDown,
   ChevronLeft, ChevronRight, FolderKanban, Gavel, Eye, EyeOff, LogIn, Plus,
   Pencil, Trash2, Search, Download, Upload, Filter, CheckCircle, XCircle,
@@ -12,7 +12,7 @@ import { LucideAngularModule,
   Calendar, Hash, DollarSign, Percent, Info, ArrowUp, ArrowDown, Loader2,
   Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
   ALargeSmall, ChevronsUpDown, Minus, Inbox, Target, PlusCircle, Edit3,
-  Scale, History, ShieldAlert, Link,
+  Scale, History, ShieldAlert, Link, UserRound, Package,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -27,7 +27,7 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(
       LucideAngularModule.pick({
         LayoutDashboard, Users, Shield, MapPin, Settings, ScrollText, Database,
-        FileText, UserCheck, UserX, Landmark, Building2, CreditCard, Banknote, BarChart3,
+        FileText, UserCheck, UserX, Landmark, Building, Building2, CreditCard, Banknote, BarChart3,
         ArrowLeftRight, Bell, MessageSquare, Menu, X, Moon, Sun, LogOut, ChevronDown,
         ChevronLeft, ChevronRight, FolderKanban, Gavel, Eye, EyeOff, LogIn, Plus,
         Pencil, Trash2, Search, Download, Upload, Filter, CheckCircle, XCircle,
@@ -35,7 +35,7 @@ export const appConfig: ApplicationConfig = {
         Calendar, Hash, DollarSign, Percent, Info, ArrowUp, ArrowDown, Loader2,
         Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
         ALargeSmall, ChevronsUpDown, Minus, Inbox, Target, PlusCircle, Edit3,
-        Scale, History, ShieldAlert, Link,
+        Scale, History, ShieldAlert, Link, UserRound, Package,
       })
     ),
   ],
