@@ -50,7 +50,22 @@ export const routes: Routes = [
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
-      { path: 'reports', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) },
+      { path: 'reports', redirectTo: 'reports/portfolio', pathMatch: 'full' },
+      // Dedicated routes per report — replaces the old tab-driven /reports?tab=X
+      // pattern. Each route loads ReportsComponent with a tab key in route.data,
+      // which the component reads on init to render the correct report. Single
+      // shared component because all 10 reports share the same generic shell
+      // (filters, drill, KPI/chart/table renderer driven by tab key).
+      { path: 'reports/portfolio',            loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'portfolio' } },
+      { path: 'reports/par',                  loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'par' } },
+      { path: 'reports/agent-performance',    loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'agent-performance' } },
+      { path: 'reports/branch-performance',   loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'branch-performance' } },
+      { path: 'reports/product-performance',  loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'product-performance' } },
+      { path: 'reports/approver-performance', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'approver-performance' } },
+      { path: 'reports/receivables',          loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'receivables' } },
+      { path: 'reports/closed-loans',         loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'closed-loans' } },
+      { path: 'reports/repayment',            loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'repayment' } },
+      { path: 'reports/collection',           loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'collection' } },
       { path: 'reports/loans', loadComponent: () => import('./features/reports/general-loan-report.component').then(m => m.GeneralLoanReportComponent) },
       { path: 'disbursement/bulk', loadComponent: () => import('./features/disbursement/bulk-disburse.component').then(m => m.BulkDisburseComponent) },
       { path: 'reconciliation', loadComponent: () => import('./features/reconciliation/reconciliation.component').then(m => m.ReconciliationComponent) },

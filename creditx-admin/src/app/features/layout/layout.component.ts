@@ -56,18 +56,30 @@ export class LayoutComponent {
       { label: 'Maker-Checker', icon: 'gavel', route: '/maker-checker', permission: 'maker_checker.check' },
       { label: 'Payments', icon: 'credit-card', route: '/payments', permission: 'payments.view' },
     ]},
-    // Performance reports are promoted to a top-level group rather than
-    // hiding inside the generic Reports tab. Each entry deep-links into
-    // /reports with a pre-selected tab; ReportsComponent reads ?tab= on
-    // init. The group as a whole shows when the user has ANY of the
-    // three granular performance permissions; individual items are
-    // permission-gated separately so a user with only 'agents' doesn't
-    // see a Branches entry that would 403.
-    { label: 'Performance', items: [
-      { label: 'Agent Performance',    icon: 'user-round',   route: '/reports', queryParams: { tab: 'agent-performance' },    permission: 'reports.performance.agents' },
-      { label: 'Branch Performance',   icon: 'building',     route: '/reports', queryParams: { tab: 'branch-performance' },   permission: 'reports.performance.branches' },
-      { label: 'Product Performance',  icon: 'package',      route: '/reports', queryParams: { tab: 'product-performance' },  permission: 'reports.performance.products' },
-      { label: 'Approver Performance', icon: 'shield-check', route: '/reports', queryParams: { tab: 'approver-performance' }, permission: 'reports.performance.approvers' },
+    // Reports — top-level group with one sidebar entry per report.
+    // Replaces:
+    //   - The old 'Performance' group (4 entries) which deep-linked into
+    //     /reports?tab=...; tabs are gone, each is now its own route.
+    //   - The reports nested inside 'Accounting' (CBN Returns, General
+    //     Loan Report, the catch-all 'Reports' link) — those moved here.
+    //   - The card-grid landing at /reports — replaced by sidebar nav.
+    // 'anyPermission' on the group itself means it shows when the user
+    // can see at least one entry within. Individual entries still gate
+    // by their own permission so users only see what they can access.
+    { label: 'Reports', items: [
+      { label: 'Loan Portfolio',         icon: 'bar-chart-3',     route: '/reports/portfolio',            permission: 'reports.portfolio' },
+      { label: 'Portfolio at Risk',      icon: 'alert-triangle',  route: '/reports/par',                  permission: 'reports.par' },
+      { label: 'PAR30 / 60 / 90',        icon: 'shield-alert',    route: '/reports/portfolio-at-risk',    permission: 'reports.par' },
+      { label: 'Receivables',            icon: 'clock',           route: '/reports/receivables',          permission: 'reports.portfolio' },
+      { label: 'Closed Loans',           icon: 'check-circle',    route: '/reports/closed-loans',         permission: 'reports.portfolio' },
+      { label: 'Repayment Performance',  icon: 'trending-up',     route: '/reports/repayment',            permission: 'reports.portfolio' },
+      { label: 'Collection Efficiency',  icon: 'target',          route: '/reports/collection',           permission: 'reports.portfolio' },
+      { label: 'Agent Performance',      icon: 'user-round',      route: '/reports/agent-performance',    permission: 'reports.performance.agents' },
+      { label: 'Branch Performance',     icon: 'building',        route: '/reports/branch-performance',   permission: 'reports.performance.branches' },
+      { label: 'Product Performance',    icon: 'package',         route: '/reports/product-performance',  permission: 'reports.performance.products' },
+      { label: 'Approver Performance',   icon: 'shield-check',    route: '/reports/approver-performance', permission: 'reports.performance.approvers' },
+      { label: 'General Loan Report',    icon: 'file-spreadsheet', route: '/reports/loans',               permission: 'reports.general_loans' },
+      { label: 'CBN Returns',            icon: 'file-spreadsheet', route: '/reports/cbn-returns',         permission: 'reports.cbn' },
     ]},
     { label: 'Configuration', items: [
       { label: 'Loan Products', icon: 'folder-kanban', route: '/loan-products', permission: 'products.view' },
@@ -84,14 +96,10 @@ export class LayoutComponent {
       { label: 'Income Statement', icon: 'trending-up', route: '/reports/income-statement', permission: 'accounting.view' },
       { label: 'Balance Sheet', icon: 'file-text', route: '/reports/balance-sheet', permission: 'accounting.view' },
       { label: 'Aged Receivables', icon: 'clock', route: '/reports/aged-receivables', permission: 'accounting.view' },
-      { label: 'Portfolio At Risk', icon: 'alert-triangle', route: '/reports/portfolio-at-risk', permission: 'reports.par' },
       { label: 'Period Close', icon: 'lock', route: '/period-close', permission: 'accounting.close' },
       { label: 'Budgets', icon: 'dollar-sign', route: '/budgets', permission: 'accounting.view' },
       { label: 'Budget vs Actual', icon: 'bar-chart-3', route: '/reports/budget-vs-actual', permission: 'accounting.view' },
       { label: 'Provisions', icon: 'shield-alert', route: '/provisions', permission: 'accounting.provision' },
-      { label: 'CBN Returns', icon: 'file-spreadsheet', route: '/reports/cbn-returns', permission: 'reports.cbn' },
-      { label: 'General Loan Report', icon: 'file-spreadsheet', route: '/reports/loans', permission: 'reports.general_loans' },
-      { label: 'Reports', icon: 'bar-chart-3', route: '/reports', permission: 'reports.portfolio' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
     ]},
     { label: 'System', items: [

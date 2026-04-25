@@ -1,13 +1,12 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
-import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
@@ -15,7 +14,7 @@ interface DrillLevel { label: string; key: string; value?: string; }
 
 @Component({
   selector: 'app-reports', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -23,51 +22,10 @@ interface DrillLevel { label: string; key: string; value?: string; }
         subtitle="Portfolio insights with drill-down analytics"
         eyebrow="Intelligence"></cx-page-header>
 
-      @if (showLanding()) {
-        <!-- ════════════════ Landing card grid ════════════════
-             Shown when the user navigates to /reports without a ?tab=
-             query param. Each card links into the tabbed view (or to
-             a dedicated route for reports that have one). Categories
-             with zero accessible cards are filtered out entirely.
-        -->
-        @if (visibleCategories().length === 0) {
-          <cx-empty-state
-            title="No reports available"
-            description="You don't have access to any reports. Contact your administrator if you need access."
-            icon="bar-chart-3"></cx-empty-state>
-        } @else {
-          @for (cat of visibleCategories(); track cat.label) {
-            <section class="cx-rpt-category">
-              <header class="cx-rpt-category-head">
-                <lucide-icon [name]="cat.icon" [size]="16"></lucide-icon>
-                <h2 class="cx-rpt-category-title">{{ cat.label }}</h2>
-              </header>
-              <div class="cx-rpt-card-grid">
-                @for (card of cat.cards; track card.label) {
-                  <a class="cx-rpt-card"
-                    [routerLink]="card.route"
-                    [queryParams]="card.queryParams || null">
-                    <div class="cx-rpt-card-icon">
-                      <lucide-icon [name]="card.icon" [size]="20"></lucide-icon>
-                    </div>
-                    <div class="cx-rpt-card-body">
-                      <h3 class="cx-rpt-card-title">{{ card.label }}</h3>
-                      <p class="cx-rpt-card-desc">{{ card.description }}</p>
-                    </div>
-                    <lucide-icon name="chevron-right" [size]="14" class="cx-rpt-card-arrow"></lucide-icon>
-                  </a>
-                }
-              </div>
-            </section>
-          }
-        }
-      } @else {
-        <!-- ════════════════ Tabbed view (existing) ════════════════ -->
-
-        <!-- Report Tabs -->
-        <div class="cx-rpt-tabs-row">
-          <cx-tabs [tabs]="cxTabs()" [activeId]="activeReport()" (activeIdChange)="switchReport($event)"></cx-tabs>
-        </div>
+      <!-- Phase 4.1: tab strip removed. Each report has its own
+           dedicated route in the sidebar; ReportsComponent reads
+           route.data.tab to know which to render. The previous
+           cx-tabs UI inside the page was redundant with sidebar nav. -->
 
       <!-- Breadcrumb Navigation -->
       @if (drillPath().length > 0) {
@@ -329,93 +287,12 @@ interface DrillLevel { label: string; key: string; value?: string; }
           </div>
         }
       }
-      }
     </div>
   `,
   styles: [`
     :host { display: block; }
 
-    /* ═══ Landing card grid (Phase 3.4) ═══ */
-    .cx-rpt-category {
-      margin-bottom: 2rem;
-    }
-    .cx-rpt-category:last-child { margin-bottom: 0.5rem; }
-    .cx-rpt-category-head {
-      display: flex; align-items: center; gap: 0.5rem;
-      margin-bottom: 0.85rem;
-      color: var(--cx-text-muted);
-    }
-    .cx-rpt-category-title {
-      margin: 0;
-      font-size: var(--cx-text-sm);
-      font-weight: 600;
-      color: var(--cx-text);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .cx-rpt-card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 0.85rem;
-    }
-    .cx-rpt-card {
-      display: grid;
-      grid-template-columns: 44px 1fr 16px;
-      gap: 0.85rem;
-      align-items: center;
-      padding: 1rem 1.1rem;
-      background: var(--cx-surface);
-      border: 1px solid var(--cx-border);
-      border-radius: var(--cx-radius-xl);
-      text-decoration: none;
-      color: inherit;
-      transition: border-color var(--cx-dur-base) var(--cx-ease-premium),
-                  transform var(--cx-dur-base) var(--cx-ease-premium),
-                  box-shadow var(--cx-dur-base) var(--cx-ease-premium);
-    }
-    .cx-rpt-card:hover {
-      border-color: var(--cx-accent, #0A4F2A);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.08);
-    }
-    .cx-rpt-card-icon {
-      width: 44px; height: 44px;
-      border-radius: var(--cx-radius);
-      background: var(--cx-bg);
-      display: flex; align-items: center; justify-content: center;
-      color: var(--cx-accent, #0A4F2A);
-      flex-shrink: 0;
-    }
-    .cx-rpt-card:hover .cx-rpt-card-icon {
-      background: var(--cx-accent-soft, rgba(10, 79, 42, 0.08));
-    }
-    .cx-rpt-card-body {
-      min-width: 0;
-    }
-    .cx-rpt-card-title {
-      margin: 0 0 0.2rem;
-      font-size: var(--cx-text-md);
-      font-weight: 600;
-      color: var(--cx-text);
-    }
-    .cx-rpt-card-desc {
-      margin: 0;
-      font-size: var(--cx-text-xs);
-      color: var(--cx-text-muted);
-      line-height: 1.4;
-    }
-    .cx-rpt-card-arrow {
-      color: var(--cx-text-muted);
-      transition: transform var(--cx-dur-base) var(--cx-ease-premium),
-                  color var(--cx-dur-base) var(--cx-ease-premium);
-    }
-    .cx-rpt-card:hover .cx-rpt-card-arrow {
-      transform: translateX(2px);
-      color: var(--cx-accent, #0A4F2A);
-    }
-
-    /* ═══ Tabs + breadcrumb ═══ */
-    .cx-rpt-tabs-row { margin-bottom: 1.25rem; }
+    /* ═══ Breadcrumb ═══ */
     .cx-rpt-breadcrumb {
       display: flex; align-items: center; gap: 0.45rem;
       flex-wrap: wrap;
@@ -691,8 +568,6 @@ export class ReportsComponent implements OnInit {
     });
   });
 
-  cxTabs = computed<CxTab[]>(() => this.visibleReportTabs().map(r => ({ id: r.key, label: r.label })));
-
   activeReport = signal('portfolio');
   reportTitle = signal('Loan Portfolio');
   loading = signal(false);
@@ -710,86 +585,6 @@ export class ReportsComponent implements OnInit {
   // while the default is selected to keep URLs cleaner.
   filterGranularity: 'day' | 'week' | 'month' = 'day';
   branches = signal<Array<{ id: string; name: string }>>([]);
-
-  // Landing-vs-tabbed UI mode. Driven by the URL: presence of ?tab=
-  // means tabbed UI; absence means card-grid landing. Updated reactively
-  // via the queryParamMap subscription in ngOnInit so in-page card
-  // clicks toggle modes without a full route reload.
-  showLanding = signal(false);
-
-  // Card grid config — drives the landing page when showLanding=true.
-  // Each card represents a report; cards are filtered by permission
-  // before render so users only see what they can access. Categories
-  // map to L decision (Financial / Operational / Regulatory / Performance).
-  //
-  // Reports with their own dedicated route (e.g. General Loan Report
-  // at /reports/loans, CBN Returns at /reports/cbn-returns) link to
-  // those routes directly; tab-based reports link to /reports?tab=<key>
-  // which triggers tabbed mode in this same component.
-  readonly reportCategories: Array<{
-    label: string;
-    icon: string;
-    cards: Array<{
-      label: string;
-      description: string;
-      icon: string;
-      route: string;
-      queryParams?: Record<string, string>;
-      permission: string;
-    }>;
-  }> = [
-    {
-      label: 'Financial',
-      icon: 'landmark',
-      cards: [
-        { label: 'Loan Portfolio',     description: 'Status mix, disbursed totals, average ticket size',     icon: 'bar-chart-3',  route: '/reports', queryParams: { tab: 'portfolio' },     permission: 'reports.portfolio' },
-        { label: 'Portfolio at Risk',  description: 'PAR ratio with aging buckets',                          icon: 'alert-triangle', route: '/reports', queryParams: { tab: 'par' },           permission: 'reports.par' },
-        { label: 'Receivables',        description: 'Outstanding amounts and aging schedules',               icon: 'clock',        route: '/reports', queryParams: { tab: 'receivables' },   permission: 'reports.portfolio' },
-        { label: 'Closed Loans',       description: 'Recently closed accounts with settlement details',      icon: 'check-circle', route: '/reports', queryParams: { tab: 'closed-loans' },  permission: 'reports.portfolio' },
-      ],
-    },
-    {
-      label: 'Operational',
-      icon: 'layout-dashboard',
-      cards: [
-        { label: 'General Loan Report',    description: 'Wide flat-row export — 44 columns matching the legacy CSV', icon: 'file-spreadsheet', route: '/reports/loans',                                                permission: 'reports.general_loans' },
-        { label: 'Repayment Performance',  description: 'On-time vs late repayment trends by product',              icon: 'trending-up',     route: '/reports', queryParams: { tab: 'repayment' },  permission: 'reports.portfolio' },
-        { label: 'Collection Efficiency',  description: 'Agent collection rates and outstanding chase rates',        icon: 'target',          route: '/reports', queryParams: { tab: 'collection' }, permission: 'reports.portfolio' },
-      ],
-    },
-    {
-      label: 'Regulatory',
-      icon: 'shield',
-      cards: [
-        { label: 'CBN Returns', description: 'Central Bank monthly returns and NPL schedules', icon: 'file-text', route: '/reports/cbn-returns', permission: 'reports.cbn' },
-      ],
-    },
-    {
-      label: 'Performance',
-      icon: 'trending-up',
-      cards: [
-        { label: 'Agent Performance',    description: 'Loan throughput, approval rates, and disbursement volume per agent',     icon: 'user-round',   route: '/reports', queryParams: { tab: 'agent-performance' },    permission: 'reports.performance.agents' },
-        { label: 'Branch Performance',   description: 'Branch-level loan volume, agent activity, and outstanding portfolio',   icon: 'building',     route: '/reports', queryParams: { tab: 'branch-performance' },   permission: 'reports.performance.branches' },
-        { label: 'Product Performance',  description: 'Product-level disbursement, approval, and default rates',                icon: 'package',      route: '/reports', queryParams: { tab: 'product-performance' },  permission: 'reports.performance.products' },
-        { label: 'Approver Performance', description: 'Decision throughput and turnaround time per approver',                   icon: 'shield-check', route: '/reports', queryParams: { tab: 'approver-performance' }, permission: 'reports.performance.approvers' },
-      ],
-    },
-  ];
-
-  /**
-   * Categories with cards filtered by the user's permissions. A category
-   * with zero accessible cards is dropped entirely from the rendered grid.
-   * Computed so it stays in sync if permissions ever change at runtime
-   * (rare, but cheap to be reactive).
-   */
-  visibleCategories = computed(() => {
-    return this.reportCategories
-      .map(cat => ({
-        ...cat,
-        cards: cat.cards.filter(c => this.auth.hasPermission(c.permission)),
-      }))
-      .filter(cat => cat.cards.length > 0);
-  });
 
   isPerformanceTab = computed(() => this.PERFORMANCE_TABS.has(this.activeReport()));
   // Approver tab has bespoke UI affordances (granularity selector, time-
@@ -845,22 +640,44 @@ export class ReportsComponent implements OnInit {
   ngOnInit() {
     this.loadBranches();
 
-    // Initial mode: landing if no ?tab=, tabbed otherwise. Hydrate the
-    // rest of state from the snapshot regardless — landing mode just
-    // skips loadReport() at the bottom of this method.
+    // Route-driven tab (Phase 4.1). The 10 dedicated /reports/<tab> routes
+    // each pass a 'tab' value via route.data. Backward-compat: if someone
+    // hits an old /reports?tab=X URL we redirect them to the new
+    // /reports/X route instead of trying to render in-place.
+    const routeTab = this.route.snapshot.data['tab'] as string | undefined;
     const q = this.route.snapshot.queryParamMap;
-    this.showLanding.set(!q.get('tab'));
+    const legacyTab = q.get('tab');
 
-    // Hydrate tab + filter state from URL query params so refresh /
-    // deep-links land in the same view the URL describes.
+    if (!routeTab && legacyTab) {
+      // Old bookmark hit /reports?tab=X — redirect to new path. Preserve
+      // any other query params (filters, drill keys) so deep-links keep
+      // their context after the upgrade.
+      const otherParams: Record<string, string> = {};
+      q.keys.forEach(k => {
+        if (k === 'tab') return;
+        const v = q.get(k);
+        if (v !== null) otherParams[k] = v;
+      });
+      this.router.navigate([`/reports/${legacyTab}`], {
+        queryParams: otherParams,
+        replaceUrl: true,
+      });
+      return;
+    }
+
+    // Determine the active tab. Priority: route.data (canonical), then
+    // any visible default. activeReport's initial 'portfolio' value is
+    // a fallback for the (currently impossible) case where neither is
+    // present — the /reports root redirects to /reports/portfolio so
+    // this branch is essentially defensive.
     const visible = this.visibleReportTabs();
-    const requestedTab = q.get('tab');
-    if (requestedTab && visible.some(t => t.key === requestedTab)) {
-      this.activeReport.set(requestedTab);
-      this.reportTitle.set(this.allReportTabs.find(t => t.key === requestedTab)?.label || requestedTab);
+    if (routeTab && visible.some(t => t.key === routeTab)) {
+      this.activeReport.set(routeTab);
+      this.reportTitle.set(this.allReportTabs.find(t => t.key === routeTab)?.label || routeTab);
     } else if (visible.length && !visible.some(t => t.key === this.activeReport())) {
-      // Defensive: fall back to first visible tab if the default isn't
-      // accessible under the user's permissions.
+      // Fall back to first visible tab if the requested one isn't
+      // accessible under the user's permissions. This can happen if a
+      // user shares a deep-link to a report the recipient can't see.
       this.activeReport.set(visible[0].key);
       this.reportTitle.set(visible[0].label);
     }
@@ -892,52 +709,7 @@ export class ReportsComponent implements OnInit {
     }
     if (path.length) this.drillPath.set(path);
 
-    // Only fetch report data if we're in tabbed mode. Landing mode
-    // shows the card grid and never needs report data.
-    if (!this.showLanding()) {
-      this.loadReport();
-    }
-
-    // React to in-page navigations between landing and tabbed mode.
-    // Card clicks update the URL via routerLink; without this subscription
-    // Angular keeps the same component instance and our snapshot-only
-    // init would leave us stuck in landing mode forever.
-    //
-    // Loop guard: this.syncUrl() also writes the 'tab' param, so the
-    // subscription will fire on tab switches too. The landing/tabbed
-    // mode flips correctly (false→false), and the actual tab-driven
-    // load is already handled by switchReport's loadReport() call —
-    // we explicitly skip re-loading here when only the tab is changing
-    // within tabbed mode to avoid duplicate requests.
-    this.route.queryParamMap.subscribe(qm => {
-      const newTab = qm.get('tab');
-      const wasLanding = this.showLanding();
-      const willBeLanding = !newTab;
-
-      if (wasLanding === willBeLanding) {
-        // Same mode — no re-init needed. Tab switches within tabbed
-        // mode handle their own data loading via switchReport().
-        return;
-      }
-
-      this.showLanding.set(willBeLanding);
-
-      if (!willBeLanding && newTab) {
-        // Transitioning from landing → tabbed: hydrate the chosen tab
-        // and fire the load. Treats this like a fresh init for the
-        // selected tab.
-        const visibleNow = this.visibleReportTabs();
-        if (visibleNow.some(t => t.key === newTab)) {
-          this.activeReport.set(newTab);
-          this.reportTitle.set(this.allReportTabs.find(t => t.key === newTab)?.label || newTab);
-          this.drillPath.set([]);
-          this.currentPage.set(1);
-          this.loadReport();
-        }
-      }
-      // Transitioning tabbed → landing (rare in practice — would require
-      // explicit URL stripping) is a no-op beyond the showLanding flip.
-    });
+    this.loadReport();
   }
 
   /**
@@ -948,11 +720,14 @@ export class ReportsComponent implements OnInit {
    * Uses replaceUrl to avoid polluting browser history — each filter
    * tweak pushing a history entry would turn the back button into a
    * mess of intermediate states.
+   *
+   * Phase 4.1: tab is no longer a query param — it's encoded in the
+   * route path (e.g., /reports/portfolio). syncUrl only writes the
+   * filters and drill keys; navigate() with relativeTo: this.route
+   * preserves the path so the user stays on /reports/<currentTab>.
    */
   private syncUrl(): void {
-    const params: Record<string, string | null> = {
-      tab: this.activeReport(),
-    };
+    const params: Record<string, string | null> = {};
 
     if (this.isPerformanceTab()) {
       params['date_from'] = this.filterDateFrom || null;
@@ -1012,26 +787,6 @@ export class ReportsComponent implements OnInit {
       next: (r: any) => this.branches.set(r.data || []),
       error: () => { /* silently ignore — filter just stays at "All branches" */ },
     });
-  }
-
-  switchReport(key: string) {
-    this.activeReport.set(key);
-    this.reportTitle.set(this.allReportTabs.find(t => t.key === key)?.label || key);
-    this.drillPath.set([]);
-    this.currentPage.set(1);
-    // Filters are preserved across tab switches within the performance group
-    // so switching from Agent to Branch to Product keeps the user's chosen
-    // date range / branch. Leaving the performance group resets to avoid
-    // sending unsupported params to non-performance reports.
-    if (!this.isPerformanceTab()) {
-      this.filterDateFrom = '';
-      this.filterDateTo = '';
-      this.filterStatus = '';
-      this.filterBranch = '';
-      this.filterGranularity = 'day';
-    }
-    this.syncUrl();
-    this.loadReport();
   }
 
   onFilterChange() {
