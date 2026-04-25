@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -577,6 +578,7 @@ export class GeneralLoanReportComponent implements OnInit {
     private toast: ToastService,
     private route: ActivatedRoute,
     private router: Router,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit() {
@@ -752,9 +754,9 @@ export class GeneralLoanReportComponent implements OnInit {
   // without external libraries — matches the rest of the platform's
   // pure-SVG approach.
 
-  monthlyDisbursementSvg(): string {
+  monthlyDisbursementSvg(): SafeHtml {
     const data = this.monthlyDisbursement();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const w = 600, h = 220, padL = 60, padR = 20, padT = 20, padB = 40;
     const max = Math.max(...data.map(d => d.value), 1);
     const stepX = (w - padL - padR) / (data.length - 1 || 1);
@@ -781,21 +783,21 @@ export class GeneralLoanReportComponent implements OnInit {
       `<circle cx="${padL + i * stepX}" cy="${scaleY(d.value)}" r="3" fill="${this.chartPalette[0]}"/>`
     ).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
       ${yTicks}
       <polygon points="${fillPoints}" fill="${this.chartPalette[0]}" fill-opacity="0.12"/>
       <polyline points="${points}" fill="none" stroke="${this.chartPalette[0]}" stroke-width="2" stroke-linejoin="round"/>
       ${dots}
       ${xLabels}
-    </svg>`;
+    </svg>`);
   }
 
-  statusDistributionSvg(): string {
-    return this.donutSvg(this.statusDistribution());
+  statusDistributionSvg(): SafeHtml {
+    return this.trustSvg(this.donutSvg(this.statusDistribution()));
   }
 
-  productMixSvg(): string {
-    return this.donutSvg(this.productMix());
+  productMixSvg(): SafeHtml {
+    return this.trustSvg(this.donutSvg(this.productMix()));
   }
 
   /**
@@ -831,9 +833,9 @@ export class GeneralLoanReportComponent implements OnInit {
     </svg>`;
   }
 
-  topAgentsSvg(): string {
+  topAgentsSvg(): SafeHtml {
     const data = this.topAgents();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const max = Math.max(...data.map(d => d.value), 1);
     const rowH = 28, padL = 160, padR = 50, padT = 8;
     const w = 600, h = padT + data.length * rowH + 8;
@@ -850,12 +852,12 @@ export class GeneralLoanReportComponent implements OnInit {
       `;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`;
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`);
   }
 
-  branchPerformanceSvg(): string {
+  branchPerformanceSvg(): SafeHtml {
     const data = this.branchPerformance();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const w = 800, h = 280, padL = 50, padR = 20, padT = 20, padB = 80;
     const max = Math.max(...data.map(d => d.value), 1);
     const barCount = data.length;
@@ -884,10 +886,24 @@ export class GeneralLoanReportComponent implements OnInit {
       `;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
       ${yTicks}
       ${bars}
-    </svg>`;
+    </svg>`);
+  }
+
+  /**
+   * Wrap a hand-built SVG string as SafeHtml so Angular's HTML
+   * sanitizer (run by [innerHTML]) doesn't strip the geometric
+   * elements (line/polygon/circle/rect/path) — those get stripped
+   * silently by the default sanitizer because Angular treats SVG
+   * children as untrusted HTML, leaving only <text> visible. We
+   * own the SVG strings here (no user-controlled content reaches
+   * tag/attribute names), and escapeXml() handles user-controlled
+   * text inside <text> nodes, so bypassing sanitization is safe.
+   */
+  private trustSvg(html: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   /**

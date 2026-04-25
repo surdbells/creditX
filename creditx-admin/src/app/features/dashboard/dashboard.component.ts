@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -487,7 +488,7 @@ export class DashboardComponent implements OnInit {
     return this.chartPalette[i % this.chartPalette.length];
   }
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private sanitizer: DomSanitizer) {
     const h = new Date().getHours();
     this.greeting = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
     this.today = new Date().toLocaleDateString('en-NG', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -579,11 +580,11 @@ export class DashboardComponent implements OnInit {
   // extracted into a shared service when a third chart-heavy view lands.
 
   /** Portfolio donut — center shows total count. */
-  portfolioDonutSvg(): string {
+  portfolioDonutSvg(): SafeHtml {
     const data = this.portfolioByStatus();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const total = data.reduce((s, d) => s + d.value, 0);
-    if (total === 0) return '';
+    if (total === 0) return this.trustSvg('');
 
     const cx = 110, cy = 110, r = 90, ir = 55;
     let acc = 0;
@@ -602,17 +603,17 @@ export class DashboardComponent implements OnInit {
       return `<path d="${path}" fill="${this.palette(i)}"/>`;
     }).join('');
 
-    return `<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+    return this.trustSvg(`<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
       ${slices}
       <text x="110" y="106" text-anchor="middle" font-size="28" font-weight="700" fill="#111827">${total}</text>
       <text x="110" y="124" text-anchor="middle" font-size="11" fill="#6b7280">Total Loans</text>
-    </svg>`;
+    </svg>`);
   }
 
   /** Disbursement trend — bar chart, 12 months oldest-first. */
-  disbursementTrendSvg(): string {
+  disbursementTrendSvg(): SafeHtml {
     const data = this.disbursementTrend();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const w = 600, h = 220, padL = 60, padR = 20, padT = 20, padB = 40;
     const max = Math.max(...data.map(d => d.value), 1);
     const stepX = (w - padL - padR) / data.length;
@@ -642,17 +643,17 @@ export class DashboardComponent implements OnInit {
       return `<text x="${cx}" y="${h - padB + 16}" text-anchor="middle" font-size="9" fill="#6b7280">${this.escapeXml(d.label)}</text>`;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
       ${yTicks}
       ${bars}
       ${xLabels}
-    </svg>`;
+    </svg>`);
   }
 
   /** Collection trend — line chart with area fill. */
-  collectionTrendSvg(): string {
+  collectionTrendSvg(): SafeHtml {
     const data = this.collectionTrend();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const w = 600, h = 220, padL = 60, padR = 20, padT = 20, padB = 40;
     const max = Math.max(...data.map(d => d.value), 1);
     const stepX = (w - padL - padR) / (data.length - 1 || 1);
@@ -679,13 +680,13 @@ export class DashboardComponent implements OnInit {
       return `<text x="${padL + i * stepX}" y="${h - padB + 16}" text-anchor="middle" font-size="9" fill="#6b7280">${this.escapeXml(d.label)}</text>`;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
       ${yTicks}
       <polygon points="${fillPoints}" fill="${this.chartPalette[5]}" fill-opacity="0.12"/>
       <polyline points="${points}" fill="none" stroke="${this.chartPalette[5]}" stroke-width="2" stroke-linejoin="round"/>
       ${dots}
       ${xLabels}
-    </svg>`;
+    </svg>`);
   }
 
   /**
@@ -693,9 +694,9 @@ export class DashboardComponent implements OnInit {
    * 1-30 amber, 31-60 deeper amber, 61-90 red, 90+ darker red. Picks
    * the eye toward older buckets which matter most for collections.
    */
-  overdueAgingSvg(): string {
+  overdueAgingSvg(): SafeHtml {
     const data = this.overdueAging();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const bucketColors = ['#f59e0b', '#ea580c', '#dc2626', '#991b1b'];
     const max = Math.max(...data.map(d => d.value), 1);
     const rowH = 38, padL = 100, padR = 100, padT = 10;
@@ -712,13 +713,13 @@ export class DashboardComponent implements OnInit {
       `;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`;
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`);
   }
 
   /** Top products — horizontal bars, count-driven. */
-  topProductsSvg(): string {
+  topProductsSvg(): SafeHtml {
     const data = this.topProducts();
-    if (!data.length) return '';
+    if (!data.length) return this.trustSvg('');
     const max = Math.max(...data.map(d => d.value), 1);
     const rowH = 38, padL = 140, padR = 60, padT = 10;
     const w = 600, h = padT + data.length * rowH + 8;
@@ -735,7 +736,21 @@ export class DashboardComponent implements OnInit {
       `;
     }).join('');
 
-    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`;
+    return this.trustSvg(`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rows}</svg>`);
+  }
+
+  /**
+   * Wrap a hand-built SVG string as SafeHtml so Angular's HTML
+   * sanitizer (run by [innerHTML]) doesn't strip the geometric
+   * elements (line/polygon/circle/rect/path) — those get stripped
+   * silently by the default sanitizer because Angular treats SVG
+   * children as untrusted HTML, leaving only <text> visible. We
+   * own the SVG strings here (no user-controlled content reaches
+   * tag/attribute names), and escapeXml() handles user-controlled
+   * text inside <text> nodes, so bypassing sanitization is safe.
+   */
+  private trustSvg(html: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   /**
