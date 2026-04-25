@@ -51,6 +51,7 @@ export const routes: Routes = [
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
       { path: 'reports', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) },
+      { path: 'reports/loans', loadComponent: () => import('./features/reports/general-loan-report.component').then(m => m.GeneralLoanReportComponent) },
       { path: 'reconciliation', loadComponent: () => import('./features/reconciliation/reconciliation.component').then(m => m.ReconciliationComponent) },
       { path: 'notifications', loadComponent: () => import('./features/notifications/notifications.component').then(m => m.NotificationsComponent) },
       { path: 'messaging', loadComponent: () => import('./features/messaging/messaging.component').then(m => m.MessagingComponent) },
