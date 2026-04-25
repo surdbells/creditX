@@ -16,6 +16,14 @@ $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions(__DIR__ . '/../config/container.php');
 $container = $containerBuilder->build();
 
+// Register the settings cache as a static handle so the ApiResponse trait
+// (and any other code path that can't easily inject it) can read system
+// settings like the pagination default. Done once per request; the
+// SettingsCacheService itself caches reads in Redis.
+\App\Infrastructure\Service\SettingsRegistry::set(
+    $container->get(\App\Infrastructure\Service\SettingsCacheService::class)
+);
+
 // Create Slim app from container
 AppFactory::setContainer($container);
 $app = AppFactory::create();

@@ -4,6 +4,7 @@ namespace App\Action\User;
 
 use App\Domain\Entity\User;
 use App\Infrastructure\Service\ApiResponse;
+use App\Infrastructure\Service\SettingsCacheService;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\Filesystem;
 use League\Flysystem\Local\LocalFilesystemAdapter;
@@ -49,6 +50,7 @@ final class UploadAvatarAction
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly SettingsCacheService $settings,
         private readonly ?LoggerInterface $logger = null,
     ) {}
 
@@ -69,9 +71,12 @@ final class UploadAvatarAction
             return $this->validationError(['avatar' => 'Only JPEG, PNG, WebP, GIF allowed']);
         }
 
-        // Validate size (max 2MB)
-        if ($file->getSize() > 2 * 1024 * 1024) {
-            return $this->validationError(['avatar' => 'Max file size is 2MB']);
+        // Validate size — admin-configured via general.max_upload_size_mb in
+        // system settings. Defaults to 10MB if the setting is absent.
+        $maxMb = max(1, $this->settings->getInt('general.max_upload_size_mb', 10));
+        $maxBytes = $maxMb * 1024 * 1024;
+        if ($file->getSize() > $maxBytes) {
+            return $this->validationError(['avatar' => "Max file size is {$maxMb}MB"]);
         }
 
         $ext = match ($mime) {

@@ -82,11 +82,29 @@ trait ApiResponse
 
     /**
      * Extract common query params for listing endpoints.
+     *
+     * The default per-page value comes from the `general.pagination_default`
+     * system setting (configurable via the Settings UI). Falls back to 20
+     * if the setting isn't present or the bootstrap registrar wasn't
+     * invoked (e.g. CLI scripts that use this trait outside of a request
+     * lifecycle). The hard ceiling of 100 is intentional — even if an
+     * admin sets pagination_default to 500, callers can't request more
+     * than 100 per page to keep responses reasonable.
      */
     protected function getPaginationParams(array $queryParams): array
     {
         $page = max(1, (int) ($queryParams['page'] ?? 1));
-        $perPage = min(100, max(1, (int) ($queryParams['per_page'] ?? 20)));
+
+        $defaultPerPage = 20;
+        $settings = SettingsRegistry::get();
+        if ($settings !== null) {
+            $configured = $settings->getInt('general.pagination_default', 20);
+            // Defensive clamp: keep within the 1..100 envelope so a bad
+            // setting value can't 0-out responses or blow past the ceiling.
+            $defaultPerPage = max(1, min(100, $configured));
+        }
+
+        $perPage = min(100, max(1, (int) ($queryParams['per_page'] ?? $defaultPerPage)));
         $search = trim($queryParams['search'] ?? '');
         $sortBy = trim($queryParams['sort_by'] ?? 'createdAt');
         $sortDir = strtoupper(trim($queryParams['sort_dir'] ?? 'DESC'));

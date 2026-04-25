@@ -221,7 +221,10 @@ return [
         );
     },
     DocumentService::class => function (ContainerInterface $c): DocumentService {
-        return new DocumentService($c->get(DocumentRepository::class));
+        return new DocumentService(
+            $c->get(DocumentRepository::class),
+            $c->get(SettingsCacheService::class),
+        );
     },
     LoanCalculationService::class => function (ContainerInterface $c): LoanCalculationService {
         return new LoanCalculationService();
@@ -352,6 +355,7 @@ return [
         return new MakerCheckerExecutionService(
             $c->get(DisbursementService::class),
             $c->get(JournalReversalService::class),
+            $c->get(LoanLifecycleService::class),
             $c->get(LoanRepository::class),
             $c->get(EntityManagerInterface::class),
         );

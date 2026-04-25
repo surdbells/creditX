@@ -13,7 +13,6 @@ use Psr\Http\Message\UploadedFileInterface;
 final class DocumentService
 {
     private string $storagePath;
-    private int $maxFileSize;
 
     private const ALLOWED_MIME_TYPES = [
         'image/jpeg', 'image/png', 'image/gif', 'image/webp',
@@ -24,9 +23,31 @@ final class DocumentService
 
     public function __construct(
         private readonly DocumentRepository $docRepo,
+        private readonly SettingsCacheService $settings,
     ) {
         $this->storagePath = $_ENV['STORAGE_PATH'] ?? 'storage/uploads';
-        $this->maxFileSize = (int) ($_ENV['STORAGE_MAX_SIZE'] ?? 10485760); // 10MB
+    }
+
+    /**
+     * Resolve the max upload size in bytes.
+     *
+     * Priority:
+     *   1. general.max_upload_size_mb system setting (admin-configurable)
+     *   2. STORAGE_MAX_SIZE env var (legacy fallback for envs that pre-date
+     *      the settings-driven value)
+     *   3. 10MB hardcoded fallback
+     *
+     * Settings checked at call time rather than cached on construct so
+     * an admin's change to general.max_upload_size_mb takes effect on the
+     * next upload without needing a service restart.
+     */
+    private function maxFileSize(): int
+    {
+        $mb = $this->settings->getInt('general.max_upload_size_mb', 0);
+        if ($mb > 0) {
+            return $mb * 1024 * 1024;
+        }
+        return (int) ($_ENV['STORAGE_MAX_SIZE'] ?? 10485760);
     }
 
     /**
@@ -46,9 +67,10 @@ final class DocumentService
             throw new \RuntimeException('File upload failed with error code: ' . $file->getError());
         }
 
+        $maxFileSize = $this->maxFileSize();
         $fileSize = $file->getSize();
-        if ($fileSize === null || $fileSize > $this->maxFileSize) {
-            $maxMb = round($this->maxFileSize / 1048576, 1);
+        if ($fileSize === null || $fileSize > $maxFileSize) {
+            $maxMb = round($maxFileSize / 1048576, 1);
             throw new \RuntimeException("File size exceeds maximum of {$maxMb}MB");
         }
 

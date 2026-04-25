@@ -37,6 +37,7 @@ final class MakerCheckerExecutionService
     public function __construct(
         private readonly DisbursementService $disbursementService,
         private readonly JournalReversalService $reversalService,
+        private readonly LoanLifecycleService $lifecycleService,
         private readonly LoanRepository $loanRepo,
         private readonly EntityManagerInterface $em,
     ) {}
@@ -57,6 +58,7 @@ final class MakerCheckerExecutionService
         return match ($opType) {
             'disbursement' => $this->executeDisbursement($payload, $checker),
             'reversal'     => $this->executeReversal($payload, $checker),
+            'write_off'    => $this->executeWriteOff($payload, $checker),
             default => throw new DomainException(
                 "Maker-checker execution not implemented for operation type: {$opType}"
             ),
@@ -126,5 +128,35 @@ final class MakerCheckerExecutionService
         }
         $reason = $payload['reason'] ?? 'Reversal approved via maker-checker';
         return $this->reversalService->reverse($transactionId, $checker->getId(), $reason);
+    }
+
+    /**
+     * Execute a pending loan write-off.
+     *
+     * Re-fetches the loan rather than trusting any cached state from
+     * the maker submission — the loan's status may have changed in the
+     * interval (e.g. someone else closed it normally, or the borrower
+     * came back and paid). LoanLifecycleService::writeOff() runs its
+     * own status validation; if the loan is no longer write-off-eligible,
+     * the checker gets a clear error.
+     *
+     * Expected payload keys (matches WriteOffLoanAction's capture):
+     *   - loan_id
+     *   - reason
+     */
+    private function executeWriteOff(array $payload, User $checker): array
+    {
+        $loanId = $payload['loan_id'] ?? '';
+        if ($loanId === '') {
+            throw new DomainException('Maker-checker payload missing loan_id');
+        }
+
+        $loan = $this->loanRepo->find($loanId);
+        if ($loan === null) {
+            throw new DomainException('Loan not found (may have been deleted)');
+        }
+
+        $reason = $payload['reason'] ?? null;
+        return $this->lifecycleService->writeOff($loan, $reason, $checker->getId());
     }
 }

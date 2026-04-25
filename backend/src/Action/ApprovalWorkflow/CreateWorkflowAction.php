@@ -5,7 +5,7 @@ namespace App\Action\ApprovalWorkflow;
 use App\Domain\Entity\{ApprovalCondition, ApprovalStep, ApprovalWorkflow};
 use App\Domain\Enum\{ApprovalMode, ConditionOperator};
 use App\Domain\Repository\{ApprovalWorkflowRepository, LoanProductRepository, RoleRepository};
-use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator};
+use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, SettingsCacheService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -16,6 +16,7 @@ final class CreateWorkflowAction
         private readonly ApprovalWorkflowRepository $wfRepo,
         private readonly LoanProductRepository $productRepo,
         private readonly RoleRepository $roleRepo,
+        private readonly SettingsCacheService $settings,
         private readonly AuditService $audit,
         private readonly EntityManagerInterface $em,
     ) {}
@@ -23,10 +24,22 @@ final class CreateWorkflowAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $data = (array) ($request->getParsedBody() ?? []);
+
+        // Default mode comes from approval.default_mode (admin-configurable
+        // via Settings UI). Fallback to SEQUENTIAL if the setting is
+        // missing or holds a value that's no longer a valid ApprovalMode
+        // (e.g. an enum case was renamed). The validator's `in` rule
+        // still rejects a malformed payload-supplied mode regardless of
+        // what the default is.
+        $defaultModeRaw = $this->settings->get('approval.default_mode', ApprovalMode::SEQUENTIAL->value);
+        $defaultMode = (is_string($defaultModeRaw) && ApprovalMode::tryFrom($defaultModeRaw) !== null)
+            ? $defaultModeRaw
+            : ApprovalMode::SEQUENTIAL->value;
+
         $v = InputValidator::validate($data, [
             'product_id' => ['required' => true, 'type' => 'string'],
             'name'       => ['required' => true, 'type' => 'string', 'min' => 1, 'max' => 150],
-            'mode'       => ['required' => false, 'type' => 'string', 'in' => array_column(ApprovalMode::cases(), 'value'), 'default' => ApprovalMode::SEQUENTIAL->value],
+            'mode'       => ['required' => false, 'type' => 'string', 'in' => array_column(ApprovalMode::cases(), 'value'), 'default' => $defaultMode],
         ]);
         if (!empty($v['errors'])) return $this->validationError($v['errors']);
 

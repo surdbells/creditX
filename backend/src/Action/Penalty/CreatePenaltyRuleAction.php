@@ -5,7 +5,7 @@ namespace App\Action\Penalty;
 use App\Domain\Entity\PenaltyRule;
 use App\Domain\Enum\PenaltyCalculationType;
 use App\Domain\Repository\{LoanProductRepository, PenaltyRuleRepository};
-use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator};
+use App\Infrastructure\Service\{ApiResponse, AuditService, InputValidator, SettingsCacheService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class CreatePenaltyRuleAction
@@ -14,16 +14,26 @@ final class CreatePenaltyRuleAction
     public function __construct(
         private readonly PenaltyRuleRepository $repo,
         private readonly LoanProductRepository $productRepo,
+        private readonly SettingsCacheService $settings,
         private readonly AuditService $audit,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $data = (array) ($request->getParsedBody() ?? []);
+
+        // Default grace period comes from penalty.default_grace_days
+        // (admin-configurable). When the admin omits grace_period_days
+        // in the payload, the new rule inherits the system-wide default
+        // rather than silently zeroing out — which used to mean "penalty
+        // applies the same day as missed payment", surprising for
+        // operators who assumed the system setting was respected.
+        $defaultGrace = max(0, $this->settings->getInt('penalty.default_grace_days', 0));
+
         $v = InputValidator::validate($data, [
             'product_id'       => ['required' => true, 'type' => 'string'],
             'name'             => ['required' => true, 'type' => 'string', 'min' => 1, 'max' => 100],
-            'grace_period_days' => ['required' => false, 'type' => 'int', 'min' => 0, 'default' => 0],
+            'grace_period_days' => ['required' => false, 'type' => 'int', 'min' => 0, 'default' => $defaultGrace],
             'calculation_type' => ['required' => true, 'type' => 'string', 'in' => array_column(PenaltyCalculationType::cases(), 'value')],
             'value'            => ['required' => true, 'type' => 'string'],
             'max_amount'       => ['required' => false, 'type' => 'string'],
