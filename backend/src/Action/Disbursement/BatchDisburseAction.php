@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace App\Action\Disbursement;
 
-use App\Domain\Entity\MakerCheckerRequest;
+use App\Domain\Entity\{Loan, MakerCheckerRequest};
 use App\Domain\Repository\{LoanRepository, UserRepository};
 use App\Infrastructure\Service\{ApiResponse, AuditService, DisbursementService, SettingsCacheService};
 use Doctrine\ORM\EntityManagerInterface;
@@ -14,34 +14,29 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  * Contract:
  *   POST /api/disbursement/batch
  *   Body: {
- *     loan_ids: string[],
+ *     loan_ids?: string[],            // UUIDs (queue-checkbox flow)
+ *     application_ids?: string[],     // App IDs (paste/CSV flow)
  *     settlement_gl_id: string,
  *     effective_date?: 'YYYY-MM-DD',
  *     notes?: string,
  *   }
  *
+ * loan_ids and application_ids may be supplied independently or together.
+ * The combined deduplicated set is processed; any IDs that don't resolve
+ * to a real loan land in the `failed` array with a 'Loan not found' reason.
+ *
  * Response shape:
  *   { status, message, data: { success: [...], failed: [...], total } }
  *
- * Semantics:
+ * Semantics (unchanged from prior turn):
  *   - All loans disbursed from the SAME settlement GL on the SAME
- *     effective date. That matches the typical batch workflow
- *     (morning funding run from the ops bank account).
+ *     effective date.
  *   - Top-up balance is AUTO-DETECTED per loan at disburse time.
- *     Batch mode does not let the caller override top-up per loan —
- *     that would require a richer payload schema. If the user needs
- *     per-loan top-up control, they use the single-row disburse
- *     flow for that specific loan.
- *   - Maker-checker is RESPECTED per-loan. If security setting
- *     security.maker_checker_disbursement is true, each loan creates
- *     a MakerCheckerRequest and the 'result' for that row records
- *     the MC ID + pending_checker status rather than a posted
- *     disbursement. This matches the single-row behaviour exactly.
- *   - Per-item try/catch, no enveloping transaction. DisbursementService
- *     already opens its own transaction per loan — correct scope.
- *   - Max batch size: 50 loans. Disbursements post 5-6 GL entries
- *     per loan, so 50 loans ≈ 300 DB writes. Larger batches should
- *     be split or use a background job.
+ *   - Maker-checker is RESPECTED per-loan.
+ *   - Per-item try/catch, no enveloping transaction.
+ *   - Max combined batch size: 50 loans (W1 decision — kept consistent
+ *     with the original ceiling per BatchDisburseAction's comment about
+ *     ~300 DB writes per batch).
  */
 final class BatchDisburseAction
 {
@@ -63,16 +58,28 @@ final class BatchDisburseAction
         if ($user === null) return $this->unauthorized('User not found');
 
         $data = (array) ($request->getParsedBody() ?? []);
-        $loanIds = $data['loan_ids'] ?? [];
         $settlementGlId = (string) ($data['settlement_gl_id'] ?? '');
         $effectiveDate = $data['effective_date'] ?? date('Y-m-d');
         $notes = $data['notes'] ?? null;
 
-        if (!is_array($loanIds) || count($loanIds) === 0) {
-            return $this->validationError(['loan_ids' => 'At least one loan_id is required']);
+        // Resolve loans from both id types into a unified [id => Loan|null] map.
+        // Unresolved IDs are tracked separately and get reported as failures.
+        [$resolved, $unresolved] = BatchIdResolver::resolve(
+            $this->loanRepo,
+            (array) ($data['loan_ids'] ?? []),
+            (array) ($data['application_ids'] ?? []),
+        );
+
+        $totalRequested = count($resolved) + count($unresolved);
+        if ($totalRequested === 0) {
+            return $this->validationError([
+                'loan_ids' => 'At least one loan_id or application_id is required',
+            ]);
         }
-        if (count($loanIds) > 50) {
-            return $this->validationError(['loan_ids' => 'Maximum 50 loans per batch']);
+        if ($totalRequested > 50) {
+            return $this->validationError([
+                'loan_ids' => 'Maximum 50 loans per batch',
+            ]);
         }
         if ($settlementGlId === '') {
             return $this->validationError(['settlement_gl_id' => 'Settlement GL account is required']);
@@ -83,18 +90,22 @@ final class BatchDisburseAction
         $success = [];
         $failed = [];
 
-        foreach ($loanIds as $loanId) {
-            $lid = (string) $loanId;
-            $loan = $this->loanRepo->find($lid);
-            if ($loan === null) {
-                $failed[] = ['loan_id' => $lid, 'application_id' => null, 'error' => 'Loan not found'];
-                continue;
-            }
+        // Fold unresolved IDs straight into failed[] — they never reach
+        // the disburse path so per-item try/catch isn't relevant for them.
+        foreach ($unresolved as $unr) {
+            $failed[] = [
+                'loan_id'        => $unr['loan_id'] ?? null,
+                'application_id' => $unr['application_id'] ?? null,
+                'error'          => 'Loan not found',
+            ];
+        }
+
+        foreach ($resolved as $loan) {
+            /** @var Loan $loan */
+            $lid = $loan->getId();
 
             try {
                 if ($makerCheckerEnabled) {
-                    // Submit MC request instead of disbursing directly.
-                    // Matches DisburseLoanAction's single-item behaviour.
                     $mc = new MakerCheckerRequest();
                     $mc->setOperationType('disbursement');
                     $mc->setEntityType('Loan');
@@ -118,9 +129,6 @@ final class BatchDisburseAction
                         ],
                     ];
                 } else {
-                    // Direct disbursement — top-up auto-detected
-                    // (null override means 'use capture-time value
-                    // with fresh re-detection at disburse time').
                     $result = $this->disbService->disburse(
                         $loan,
                         $settlementGlId,
@@ -134,10 +142,6 @@ final class BatchDisburseAction
                         'result'         => $result,
                     ];
 
-                    // Audit per-item (batch audit is recorded at the
-                    // end by logCreate on the meta-level 'BatchDisburse'
-                    // entity). Matches the single-item flow's audit
-                    // pattern for continuity of the audit log.
                     $this->audit->logCreate(
                         $userId,
                         'Disbursement',
@@ -176,7 +180,7 @@ final class BatchDisburseAction
         return $this->success([
             'success' => $success,
             'failed'  => $failed,
-            'total'   => count($loanIds),
+            'total'   => $totalRequested,
         ], $msg);
     }
 }

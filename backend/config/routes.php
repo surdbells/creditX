@@ -415,6 +415,10 @@ return function (App $app): void {
         // same effective date. Top-up auto-detected per loan.
         $api->post('/disbursement/batch', Disbursement\BatchDisburseAction::class)
             ->add(new RbacMiddleware('loans.disburse'));
+        // Same payload as batch, but commits nothing — returns per-loan
+        // validation summary so operators can review before submitting.
+        $api->post('/disbursement/batch/preview', Disbursement\BatchDisbursePreviewAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
 
         // ─── Maker-Checker ───
         $api->group('/maker-checker', function (RouteCollectorProxy $group) {
