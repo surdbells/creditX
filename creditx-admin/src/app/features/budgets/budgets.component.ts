@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Budgets admin page.
@@ -22,7 +23,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -55,7 +56,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           </select>
         </label>
         <div class="cx-bg-summary">
-          Total budgeted: <strong class="tabular-nums">₦{{ totalBudget() | number:'1.2-2' }}</strong>
+          Total budgeted: <strong class="tabular-nums">{{ totalBudget() | money:2 }}</strong>
         </div>
       </div>
 
@@ -90,7 +91,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       <input type="number" class="cx-input cx-bg-edit-input"
                              [(ngModel)]="editAmount" step="0.01" min="0" />
                     } @else {
-                      <span class="tabular-nums">₦{{ b.amount | number:'1.2-2' }}</span>
+                      <span class="tabular-nums">{{ b.amount | money:2 }}</span>
                     }
                   </td>
                   <td>

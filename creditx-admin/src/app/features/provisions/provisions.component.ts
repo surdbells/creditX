@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Loan Loss Provisioning admin page.
@@ -24,7 +25,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-provisions',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -93,11 +94,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
             <div class="cx-pv-stat">
               <div class="cx-pv-stat-label">Required Provision</div>
-              <div class="cx-pv-stat-value tabular-nums">₦{{ p.summary.total_required | number:'1.0-0' }}</div>
+              <div class="cx-pv-stat-value tabular-nums">{{ p.summary.total_required | money }}</div>
             </div>
             <div class="cx-pv-stat">
               <div class="cx-pv-stat-label">Prior Provision</div>
-              <div class="cx-pv-stat-value tabular-nums cx-pv-muted">₦{{ p.summary.total_prior | number:'1.0-0' }}</div>
+              <div class="cx-pv-stat-value tabular-nums cx-pv-muted">{{ p.summary.total_prior | money }}</div>
             </div>
             <div class="cx-pv-stat cx-pv-stat-emphasis">
               <div class="cx-pv-stat-label">Net Δ to Post</div>
@@ -105,9 +106,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                    [class.cx-pv-pos]="+p.summary.total_delta > 0"
                    [class.cx-pv-neg]="+p.summary.total_delta < 0">
                 @if (+p.summary.total_delta >= 0) {
-                  +₦{{ p.summary.total_delta | number:'1.2-2' }}
+                  +{{ p.summary.total_delta | money:2 }}
                 } @else {
-                  −₦{{ (-p.summary.total_delta) | number:'1.2-2' }}
+                  −{{ (-p.summary.total_delta) | money:2 }}
                 }
               </div>
               <div class="cx-pv-stat-hint">
@@ -150,17 +151,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                           {{ l.classification | titlecase }}
                         </span>
                       </td>
-                      <td class="cx-pv-right tabular-nums">₦{{ l.outstanding | number:'1.0-0' }}</td>
+                      <td class="cx-pv-right tabular-nums">{{ l.outstanding | money }}</td>
                       <td class="cx-pv-right tabular-nums">{{ (+l.provision_rate * 100) | number:'1.0-0' }}%</td>
-                      <td class="cx-pv-right tabular-nums">₦{{ l.provision_amount_required | number:'1.0-0' }}</td>
-                      <td class="cx-pv-right tabular-nums cx-pv-muted">₦{{ l.prior_provision_amount | number:'1.0-0' }}</td>
+                      <td class="cx-pv-right tabular-nums">{{ l.provision_amount_required | money }}</td>
+                      <td class="cx-pv-right tabular-nums cx-pv-muted">{{ l.prior_provision_amount | money }}</td>
                       <td class="cx-pv-right tabular-nums"
                           [class.cx-pv-pos]="+l.delta_amount > 0"
                           [class.cx-pv-neg]="+l.delta_amount < 0">
                         @if (+l.delta_amount >= 0) {
-                          +₦{{ l.delta_amount | number:'1.0-0' }}
+                          +{{ l.delta_amount | money }}
                         } @else {
-                          −₦{{ (-l.delta_amount) | number:'1.0-0' }}
+                          −{{ (-l.delta_amount) | money }}
                         }
                       </td>
                     </tr>
@@ -211,15 +212,15 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       </span>
                     </td>
                     <td class="cx-pv-right tabular-nums">{{ r.loan_count | number }}</td>
-                    <td class="cx-pv-right tabular-nums">₦{{ r.total_provision_required | number:'1.0-0' }}</td>
-                    <td class="cx-pv-right tabular-nums cx-pv-muted">₦{{ r.total_prior_provision | number:'1.0-0' }}</td>
+                    <td class="cx-pv-right tabular-nums">{{ r.total_provision_required | money }}</td>
+                    <td class="cx-pv-right tabular-nums cx-pv-muted">{{ r.total_prior_provision | money }}</td>
                     <td class="cx-pv-right tabular-nums"
                         [class.cx-pv-pos]="+r.total_delta_posted > 0"
                         [class.cx-pv-neg]="+r.total_delta_posted < 0">
                       @if (+r.total_delta_posted >= 0) {
-                        +₦{{ r.total_delta_posted | number:'1.0-0' }}
+                        +{{ r.total_delta_posted | money }}
                       } @else {
-                        −₦{{ (-r.total_delta_posted) | number:'1.0-0' }}
+                        −{{ (-r.total_delta_posted) | money }}
                       }
                     </td>
                     <td class="cx-pv-notes">{{ r.notes || '—' }}</td>
@@ -260,8 +261,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                 <ul class="cx-pv-modal-list">
                   <li>{{ p.summary.loan_count }} NPL loan(s) covered</li>
                   <li>Net delta: <strong class="tabular-nums">
-                    @if (+p.summary.total_delta >= 0) { +₦{{ p.summary.total_delta | number:'1.2-2' }} }
-                    @else { −₦{{ (-p.summary.total_delta) | number:'1.2-2' }} }
+                    @if (+p.summary.total_delta >= 0) { +{{ p.summary.total_delta | money:2 }} }
+                    @else { −{{ (-p.summary.total_delta) | money:2 }} }
                   </strong></li>
                   <li>
                     @if (+p.summary.total_delta > 0) {
@@ -361,17 +362,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
             <div class="cx-pv-stat">
               <div class="cx-pv-stat-label">Required</div>
-              <div class="cx-pv-stat-value tabular-nums">₦{{ d.total_provision_required | number:'1.0-0' }}</div>
+              <div class="cx-pv-stat-value tabular-nums">{{ d.total_provision_required | money }}</div>
             </div>
             <div class="cx-pv-stat">
               <div class="cx-pv-stat-label">Prior</div>
-              <div class="cx-pv-stat-value tabular-nums">₦{{ d.total_prior_provision | number:'1.0-0' }}</div>
+              <div class="cx-pv-stat-value tabular-nums">{{ d.total_prior_provision | money }}</div>
             </div>
             <div class="cx-pv-stat">
               <div class="cx-pv-stat-label">Delta</div>
               <div class="cx-pv-stat-value tabular-nums">
-                @if (+d.total_delta_posted >= 0) { +₦{{ d.total_delta_posted | number:'1.0-0' }} }
-                @else { −₦{{ (-d.total_delta_posted) | number:'1.0-0' }} }
+                @if (+d.total_delta_posted >= 0) { +{{ d.total_delta_posted | money }} }
+                @else { −{{ (-d.total_delta_posted) | money }} }
               </div>
             </div>
           </div>
@@ -394,12 +395,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <td class="cx-pv-mono">{{ l.application_id }}</td>
                   <td class="cx-pv-right tabular-nums">{{ l.days_overdue }}</td>
                   <td><span class="cx-pv-class" [attr.data-cls]="l.classification">{{ l.classification | titlecase }}</span></td>
-                  <td class="cx-pv-right tabular-nums">₦{{ l.outstanding | number:'1.0-0' }}</td>
-                  <td class="cx-pv-right tabular-nums">₦{{ l.provision_amount_required | number:'1.0-0' }}</td>
-                  <td class="cx-pv-right tabular-nums cx-pv-muted">₦{{ l.prior_provision_amount | number:'1.0-0' }}</td>
+                  <td class="cx-pv-right tabular-nums">{{ l.outstanding | money }}</td>
+                  <td class="cx-pv-right tabular-nums">{{ l.provision_amount_required | money }}</td>
+                  <td class="cx-pv-right tabular-nums cx-pv-muted">{{ l.prior_provision_amount | money }}</td>
                   <td class="cx-pv-right tabular-nums">
-                    @if (+l.delta_amount >= 0) { +₦{{ l.delta_amount | number:'1.0-0' }} }
-                    @else { −₦{{ (-l.delta_amount) | number:'1.0-0' }} }
+                    @if (+l.delta_amount >= 0) { +{{ l.delta_amount | money }} }
+                    @else { −{{ (-l.delta_amount) | money }} }
                   </td>
                 </tr>
               }

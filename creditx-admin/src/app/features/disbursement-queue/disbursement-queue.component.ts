@@ -9,6 +9,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Disbursement queue — dedicated page for users with loans.disburse.
@@ -32,7 +33,7 @@ import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/
 @Component({
   selector: 'app-disbursement-queue',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -92,40 +93,40 @@ import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/
                 <div class="cx-dq-hero cx-dq-hero-primary">
                   <div class="cx-dq-hero-label">Net Disbursed</div>
                   <div class="cx-dq-hero-value tabular-nums">
-                    ₦{{ p.calculation?.net_disbursed | number:'1.0-0' }}
+                    {{ p.calculation?.net_disbursed | money }}
                   </div>
                 </div>
                 <div class="cx-dq-hero cx-dq-hero-gold">
                   <div class="cx-dq-hero-label">Monthly Repayment</div>
                   <div class="cx-dq-hero-value tabular-nums">
-                    ₦{{ p.calculation?.mr_principal_interest | number:'1.0-0' }}
+                    {{ p.calculation?.mr_principal_interest | money }}
                   </div>
                 </div>
               </div>
               <div class="cx-dq-rows">
                 <div class="cx-dq-row">
                   <span>Gross Loan</span>
-                  <span class="tabular-nums">₦{{ p.calculation?.gross_loan | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ p.calculation?.gross_loan | money:2 }}</span>
                 </div>
                 <div class="cx-dq-row">
                   <span>Total Fees</span>
-                  <span class="tabular-nums">₦{{ p.calculation?.total_fees | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ p.calculation?.total_fees | money:2 }}</span>
                 </div>
                 @if (p.calculation?.fee_details?.length) {
                   @for (fee of p.calculation.fee_details; track fee.code) {
                     <div class="cx-dq-row cx-dq-row-sub">
                       <span>↳ {{ fee.name || fee.code }}</span>
-                      <span class="tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                      <span class="tabular-nums">{{ fee.amount | money:2 }}</span>
                     </div>
                   }
                 }
                 <div class="cx-dq-row">
                   <span>Monthly Principal</span>
-                  <span class="tabular-nums">₦{{ p.calculation?.mr_principal | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ p.calculation?.mr_principal | money:2 }}</span>
                 </div>
                 <div class="cx-dq-row">
                   <span>Monthly Interest</span>
-                  <span class="tabular-nums">₦{{ p.calculation?.mr_interest | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ p.calculation?.mr_interest | money:2 }}</span>
                 </div>
                 <div class="cx-dq-row">
                   <span>Tenure</span>
@@ -142,9 +143,9 @@ import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/
                     @for (inst of p.calculation.schedule_preview; track $index) {
                       <div class="cx-dq-schedule-row">
                         <span class="tabular-nums">{{ $index + 1 }}</span>
-                        <span class="tabular-nums">₦{{ inst.principal | number:'1.2-2' }}</span>
-                        <span class="tabular-nums">₦{{ inst.interest | number:'1.2-2' }}</span>
-                        <span class="tabular-nums">₦{{ inst.total | number:'1.2-2' }}</span>
+                        <span class="tabular-nums">{{ inst.principal | money:2 }}</span>
+                        <span class="tabular-nums">{{ inst.interest | money:2 }}</span>
+                        <span class="tabular-nums">{{ inst.total | money:2 }}</span>
                       </div>
                     }
                   </div>

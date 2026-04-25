@@ -6,6 +6,8 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 /**
  * GL Reconciliation Report — double-entry integrity check.
@@ -32,7 +34,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-gl-reconciliation',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -61,10 +63,10 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
           </div>
           <div class="cx-glr-summary-cell">
-            <div class="cx-glr-summary-label">Total Discrepancy (₦)</div>
+            <div class="cx-glr-summary-label">Total Discrepancy ({{ settings.currencySymbol() }})</div>
             <div class="cx-glr-summary-value tabular-nums"
                  [class.cx-glr-danger]="s.accounts_with_discrepancy > 0">
-              ₦{{ s.total_discrepancy_amount | number:'1.2-2' }}
+              {{ s.total_discrepancy_amount | money:2 }}
             </div>
           </div>
           <div class="cx-glr-summary-cell">
@@ -133,19 +135,19 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <td class="cx-glr-right tabular-nums">{{ a.subledger_count }}</td>
                   <td class="cx-glr-right tabular-nums"
                       [class.cx-glr-danger]="a.has_discrepancy">
-                    ₦{{ a.parent_balance | number:'1.2-2' }}
+                    {{ a.parent_balance | money:2 }}
                   </td>
                   <td class="cx-glr-right tabular-nums">
-                    ₦{{ a.subledger_balance | number:'1.2-2' }}
+                    {{ a.subledger_balance | money:2 }}
                   </td>
                   <td class="cx-glr-right tabular-nums cx-glr-combined">
-                    ₦{{ a.combined_balance | number:'1.2-2' }}
+                    {{ a.combined_balance | money:2 }}
                   </td>
                   <td class="cx-glr-center">
                     @if (a.has_discrepancy) {
                       <span class="cx-glr-status cx-glr-status-alert">
                         <lucide-icon name="info" [size]="11"></lucide-icon>
-                        <span>Orphan ₦{{ a.discrepancy_amount | number:'1.2-2' }}</span>
+                        <span>Orphan {{ a.discrepancy_amount | money:2 }}</span>
                       </span>
                     } @else {
                       <span class="cx-glr-status cx-glr-status-clean">
@@ -175,7 +177,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <ul>
             <li>
               <strong>Parent-only balance</strong> — postings that hit the
-              parent GL directly without a sub-ledger. Should be ₦0.00 in a
+              parent GL directly without a sub-ledger. Should be 0 in a
               healthy system.
             </li>
             <li>
@@ -244,10 +246,10 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                     <td class="cx-glr-mono">{{ p.trans_reference || p.trans_callback || '—' }}</td>
                     <td class="cx-glr-narration">{{ p.trans_narration }}</td>
                     <td class="cx-glr-right tabular-nums">
-                      @if (p.trans_type === 'DR') { ₦{{ p.trans_amount | number:'1.2-2' }} } @else { — }
+                      @if (p.trans_type === 'DR') { {{ p.trans_amount | money:2 }} } @else { — }
                     </td>
                     <td class="cx-glr-right tabular-nums">
-                      @if (p.trans_type === 'CR') { ₦{{ p.trans_amount | number:'1.2-2' }} } @else { — }
+                      @if (p.trans_type === 'CR') { {{ p.trans_amount | money:2 }} } @else { — }
                     </td>
                     <td class="cx-glr-right">
                       <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openReassign(p)">
@@ -278,7 +280,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <h2 class="cx-glr-modal-title">Pick a destination sub-ledger</h2>
             <div class="cx-glr-modal-sub">
               Moving
-              <strong>{{ reassignTarget()?.trans_type }} ₦{{ reassignTarget()?.trans_amount | number:'1.2-2' }}</strong>
+              <strong>{{ reassignTarget()?.trans_type }} {{ reassignTarget()?.trans_amount | money:2 }}</strong>
               from the parent GL to a specific customer ledger on the
               same GL. The trial balance does not change — this is a
               linkage fix, not a value change. The narration will be
@@ -600,7 +602,7 @@ export class GlReconciliationComponent implements OnInit {
   reassignLedgerId = '';
   reassignBusy = signal(false);
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() { this.load(); }
 

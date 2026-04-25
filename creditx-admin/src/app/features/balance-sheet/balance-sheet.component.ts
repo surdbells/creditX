@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Balance Sheet — Assets / Liabilities / Equity snapshot as of a
@@ -27,7 +28,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-balance-sheet',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -69,7 +70,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <div class="cx-bs-col">
             <div class="cx-bs-section-head cx-bs-head-assets">
               <h3>Assets</h3>
-              <div class="tabular-nums">₦{{ d.assets.total | number:'1.2-2' }}</div>
+              <div class="tabular-nums">{{ d.assets.total | money:2 }}</div>
             </div>
             @if (d.assets.accounts.length === 0) {
               <div class="cx-bs-empty">No asset accounts with activity.</div>
@@ -82,14 +83,14 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         <span class="cx-bs-acct-code">{{ a.code }}</span>
                         <span>{{ a.name }}</span>
                       </td>
-                      <td class="cx-bs-right tabular-nums">₦{{ a.balance | number:'1.2-2' }}</td>
+                      <td class="cx-bs-right tabular-nums">{{ a.balance | money:2 }}</td>
                     </tr>
                   }
                 </tbody>
                 <tfoot>
                   <tr>
                     <td>Total Assets</td>
-                    <td class="cx-bs-right tabular-nums">₦{{ d.assets.total | number:'1.2-2' }}</td>
+                    <td class="cx-bs-right tabular-nums">{{ d.assets.total | money:2 }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -100,7 +101,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <div class="cx-bs-col">
             <div class="cx-bs-section-head cx-bs-head-liab">
               <h3>Liabilities</h3>
-              <div class="tabular-nums">₦{{ d.liabilities.total | number:'1.2-2' }}</div>
+              <div class="tabular-nums">{{ d.liabilities.total | money:2 }}</div>
             </div>
             @if (d.liabilities.accounts.length === 0) {
               <div class="cx-bs-empty">No liability accounts with activity.</div>
@@ -113,14 +114,14 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         <span class="cx-bs-acct-code">{{ a.code }}</span>
                         <span>{{ a.name }}</span>
                       </td>
-                      <td class="cx-bs-right tabular-nums">₦{{ a.balance | number:'1.2-2' }}</td>
+                      <td class="cx-bs-right tabular-nums">{{ a.balance | money:2 }}</td>
                     </tr>
                   }
                 </tbody>
                 <tfoot>
                   <tr>
                     <td>Total Liabilities</td>
-                    <td class="cx-bs-right tabular-nums">₦{{ d.liabilities.total | number:'1.2-2' }}</td>
+                    <td class="cx-bs-right tabular-nums">{{ d.liabilities.total | money:2 }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -128,7 +129,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
             <div class="cx-bs-section-head cx-bs-head-equity">
               <h3>Equity</h3>
-              <div class="tabular-nums">₦{{ d.equity.total | number:'1.2-2' }}</div>
+              <div class="tabular-nums">{{ d.equity.total | money:2 }}</div>
             </div>
             <table class="cx-bs-table">
               <tbody>
@@ -138,7 +139,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       <span class="cx-bs-acct-code">{{ a.code }}</span>
                       <span>{{ a.name }}</span>
                     </td>
-                    <td class="cx-bs-right tabular-nums">₦{{ a.balance | number:'1.2-2' }}</td>
+                    <td class="cx-bs-right tabular-nums">{{ a.balance | money:2 }}</td>
                   </tr>
                 }
                 <tr class="cx-bs-retained-row">
@@ -149,9 +150,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <td class="cx-bs-right tabular-nums"
                       [class.cx-bs-value-loss]="+d.equity.retained_earnings < 0">
                     @if (+d.equity.retained_earnings >= 0) {
-                      ₦{{ d.equity.retained_earnings | number:'1.2-2' }}
+                      {{ d.equity.retained_earnings | money:2 }}
                     } @else {
-                      (₦{{ (-d.equity.retained_earnings) | number:'1.2-2' }})
+                      ({{ (-d.equity.retained_earnings) | money:2 }})
                     }
                   </td>
                 </tr>
@@ -159,7 +160,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
               <tfoot>
                 <tr>
                   <td>Total Equity</td>
-                  <td class="cx-bs-right tabular-nums">₦{{ d.equity.total | number:'1.2-2' }}</td>
+                  <td class="cx-bs-right tabular-nums">{{ d.equity.total | money:2 }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -182,18 +183,18 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <div class="cx-bs-equation-formula">
             <div class="cx-bs-eq-part">
               <div class="cx-bs-eq-label">Assets</div>
-              <div class="cx-bs-eq-value tabular-nums">₦{{ d.accounting_equation.assets_total | number:'1.2-2' }}</div>
+              <div class="cx-bs-eq-value tabular-nums">{{ d.accounting_equation.assets_total | money:2 }}</div>
             </div>
             <div class="cx-bs-eq-op">=</div>
             <div class="cx-bs-eq-part">
               <div class="cx-bs-eq-label">Liabilities + Equity</div>
-              <div class="cx-bs-eq-value tabular-nums">₦{{ d.accounting_equation.liabilities_plus_equity | number:'1.2-2' }}</div>
+              <div class="cx-bs-eq-value tabular-nums">{{ d.accounting_equation.liabilities_plus_equity | money:2 }}</div>
             </div>
             @if (!d.accounting_equation.is_balanced) {
               <div class="cx-bs-eq-op">Δ</div>
               <div class="cx-bs-eq-part">
                 <div class="cx-bs-eq-label">Difference</div>
-                <div class="cx-bs-eq-value cx-bs-value-loss tabular-nums">₦{{ absDiff() | number:'1.2-2' }}</div>
+                <div class="cx-bs-eq-value cx-bs-value-loss tabular-nums">{{ absDiff() | money:2 }}</div>
               </div>
             }
           </div>

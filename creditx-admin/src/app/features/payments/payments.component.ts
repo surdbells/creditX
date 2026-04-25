@@ -9,6 +9,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-payments', standalone: true,
@@ -72,7 +73,7 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
           <cx-searchable-select [options]="loanOptions()" placeholder="Search loan by App ID..." [(ngModel)]="repForm.loan_id"></cx-searchable-select>
         </div>
         <div class="cx-form-row cx-form-row-2">
-          <div><label class="cx-label">Amount (₦) *</label><input class="cx-input" type="number" [(ngModel)]="repForm.amount" /></div>
+          <div><label class="cx-label">Amount ({{ settings.currencySymbol() }}) *</label><input class="cx-input" type="number" [(ngModel)]="repForm.amount" /></div>
           <div>
             <label class="cx-label">Payment Method</label>
             <select class="cx-select" [(ngModel)]="repForm.payment_method">
@@ -259,7 +260,7 @@ export class PaymentsComponent implements OnInit {
   bulkPreview = signal<any[]>([]);
   private bulkData: any[] = [];
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() { this.load(); }
 

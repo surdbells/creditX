@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Portfolio At Risk (PAR) Report — PAR30/60/90 loan-level metrics.
@@ -22,7 +23,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-portfolio-at-risk',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -68,7 +69,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           </div>
           <div class="cx-par-summary-cell">
             <div class="cx-par-summary-label">Total Outstanding</div>
-            <div class="cx-par-summary-value tabular-nums">₦{{ d.portfolio.total_outstanding | number:'1.0-0' }}</div>
+            <div class="cx-par-summary-value tabular-nums">{{ d.portfolio.total_outstanding | money }}</div>
           </div>
         </div>
 
@@ -82,7 +83,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-par-card-ratio tabular-nums">{{ d.par30.ratio_pct | number:'1.2-2' }}%</div>
             <div class="cx-par-card-meta">
               <span>{{ d.par30.loans_at_risk }} loan{{ d.par30.loans_at_risk === 1 ? '' : 's' }}</span>
-              <span class="tabular-nums">₦{{ d.par30.outstanding_at_risk | number:'1.0-0' }}</span>
+              <span class="tabular-nums">{{ d.par30.outstanding_at_risk | money }}</span>
             </div>
           </div>
           <div class="cx-par-card" [attr.data-severity]="severityFor(d.par60.ratio_pct)">
@@ -93,7 +94,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-par-card-ratio tabular-nums">{{ d.par60.ratio_pct | number:'1.2-2' }}%</div>
             <div class="cx-par-card-meta">
               <span>{{ d.par60.loans_at_risk }} loan{{ d.par60.loans_at_risk === 1 ? '' : 's' }}</span>
-              <span class="tabular-nums">₦{{ d.par60.outstanding_at_risk | number:'1.0-0' }}</span>
+              <span class="tabular-nums">{{ d.par60.outstanding_at_risk | money }}</span>
             </div>
           </div>
           <div class="cx-par-card" [attr.data-severity]="severityFor(d.par90.ratio_pct)">
@@ -104,7 +105,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-par-card-ratio tabular-nums">{{ d.par90.ratio_pct | number:'1.2-2' }}%</div>
             <div class="cx-par-card-meta">
               <span>{{ d.par90.loans_at_risk }} loan{{ d.par90.loans_at_risk === 1 ? '' : 's' }}</span>
-              <span class="tabular-nums">₦{{ d.par90.outstanding_at_risk | number:'1.0-0' }}</span>
+              <span class="tabular-nums">{{ d.par90.outstanding_at_risk | money }}</span>
             </div>
           </div>
         </div>
@@ -128,7 +129,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <tr>
                     <td class="cx-par-b-label">{{ b.label }}</td>
                     <td class="cx-par-right tabular-nums">{{ b.loan_count }}</td>
-                    <td class="cx-par-right tabular-nums">₦{{ b.outstanding | number:'1.0-0' }}</td>
+                    <td class="cx-par-right tabular-nums">{{ b.outstanding | money }}</td>
                     <td class="cx-par-right tabular-nums" [attr.data-severity]="severityFor(b.par30_pct)">
                       {{ b.par30_pct | number:'1.2-2' }}%
                     </td>

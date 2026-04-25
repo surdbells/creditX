@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * CBN Regulatory Returns — tabbed page exposing four production-grade
@@ -21,7 +22,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
  * 'Refresh' on each tab to avoid unnecessary queries against the full
  * portfolio. Tab 1 loads automatically on first visit as the default.
  *
- * Monetary values render in ₦ with 2dp. Dates render as-is in ISO.
+ * Monetary values render with the configured currency at 2dp. Dates render as-is in ISO.
  * CSV exports use headers matching the CBN field ordering convention.
  *
  * Gated by reports.cbn.
@@ -29,7 +30,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-cbn-returns',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -106,7 +107,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">Total Outstanding</div>
-              <div class="cx-cbn-summary-value tabular-nums">₦{{ d.summary.total_outstanding | number:'1.2-2' }}</div>
+              <div class="cx-cbn-summary-value tabular-nums">{{ d.summary.total_outstanding | money:2 }}</div>
             </div>
           </div>
           <div class="cx-cbn-table-wrap">
@@ -125,8 +126,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                     <td class="cx-cbn-mono">{{ r.bvn || '—' }}</td>
                     <td class="cx-cbn-mono">{{ r.nin || '—' }}</td>
                     <td>{{ r.product_name }}</td>
-                    <td class="cx-cbn-right tabular-nums">₦{{ r.amount_requested | number:'1.0-0' }}</td>
-                    <td class="cx-cbn-right tabular-nums">₦{{ r.outstanding_balance | number:'1.0-0' }}</td>
+                    <td class="cx-cbn-right tabular-nums">{{ r.amount_requested | money }}</td>
+                    <td class="cx-cbn-right tabular-nums">{{ r.outstanding_balance | money }}</td>
                     <td>{{ formatDate(r.disbursed_at) }}</td>
                     <td>{{ r.maturity_date || '—' }}</td>
                     <td><span class="cx-cbn-badge">{{ r.status }}</span></td>
@@ -147,11 +148,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">Total Outstanding</div>
-              <div class="cx-cbn-summary-value tabular-nums">₦{{ d.summary.total_npl_outstanding | number:'1.2-2' }}</div>
+              <div class="cx-cbn-summary-value tabular-nums">{{ d.summary.total_npl_outstanding | money:2 }}</div>
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">Provision Estimate</div>
-              <div class="cx-cbn-summary-value tabular-nums cx-cbn-danger">₦{{ d.summary.total_provision_estimate | number:'1.2-2' }}</div>
+              <div class="cx-cbn-summary-value tabular-nums cx-cbn-danger">{{ d.summary.total_provision_estimate | money:2 }}</div>
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">By Category</div>
@@ -186,8 +187,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         {{ r.provision_category }}
                       </span>
                     </td>
-                    <td class="cx-cbn-right tabular-nums">₦{{ r.outstanding_balance | number:'1.0-0' }}</td>
-                    <td class="cx-cbn-right tabular-nums cx-cbn-danger">₦{{ r.provision_amount | number:'1.0-0' }}</td>
+                    <td class="cx-cbn-right tabular-nums">{{ r.outstanding_balance | money }}</td>
+                    <td class="cx-cbn-right tabular-nums cx-cbn-danger">{{ r.provision_amount | money }}</td>
                     <td>{{ r.is_insider ? 'Yes' : 'No' }}</td>
                     <td>{{ r.product_name }}</td>
                   </tr>
@@ -206,7 +207,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">Total Outstanding</div>
-              <div class="cx-cbn-summary-value tabular-nums">₦{{ d.summary.total_outstanding | number:'1.2-2' }}</div>
+              <div class="cx-cbn-summary-value tabular-nums">{{ d.summary.total_outstanding | money:2 }}</div>
             </div>
             <div class="cx-cbn-summary-cell">
               <div class="cx-cbn-summary-label">By Relationship</div>
@@ -246,8 +247,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       <td class="cx-cbn-mono">{{ r.bvn || '—' }}</td>
                       <td>{{ r.insider_relationship || '—' }}</td>
                       <td>{{ r.product_name }}</td>
-                      <td class="cx-cbn-right tabular-nums">₦{{ r.amount_requested | number:'1.0-0' }}</td>
-                      <td class="cx-cbn-right tabular-nums">₦{{ r.outstanding_balance | number:'1.0-0' }}</td>
+                      <td class="cx-cbn-right tabular-nums">{{ r.amount_requested | money }}</td>
+                      <td class="cx-cbn-right tabular-nums">{{ r.outstanding_balance | money }}</td>
                       <td>{{ formatDate(r.disbursed_at) }}</td>
                       <td>{{ r.maturity_date || '—' }}</td>
                       <td>
@@ -277,17 +278,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-cbn-monthly-grid">
               <div class="cx-cbn-monthly-card">
                 <div class="cx-cbn-monthly-label">New Disbursements</div>
-                <div class="cx-cbn-monthly-value tabular-nums">₦{{ d.new_disbursements.total_amount | number:'1.2-2' }}</div>
+                <div class="cx-cbn-monthly-value tabular-nums">{{ d.new_disbursements.total_amount | money:2 }}</div>
                 <div class="cx-cbn-monthly-meta">{{ d.new_disbursements.count }} loan{{ d.new_disbursements.count === 1 ? '' : 's' }}</div>
               </div>
               <div class="cx-cbn-monthly-card">
                 <div class="cx-cbn-monthly-label">Repayments Collected</div>
-                <div class="cx-cbn-monthly-value tabular-nums">₦{{ d.repayments.total_amount | number:'1.2-2' }}</div>
+                <div class="cx-cbn-monthly-value tabular-nums">{{ d.repayments.total_amount | money:2 }}</div>
                 <div class="cx-cbn-monthly-meta">{{ d.repayments.count }} payment{{ d.repayments.count === 1 ? '' : 's' }}</div>
               </div>
               <div class="cx-cbn-monthly-card">
                 <div class="cx-cbn-monthly-label">Portfolio Outstanding</div>
-                <div class="cx-cbn-monthly-value tabular-nums">₦{{ d.portfolio_as_of_end.total_outstanding | number:'1.2-2' }}</div>
+                <div class="cx-cbn-monthly-value tabular-nums">{{ d.portfolio_as_of_end.total_outstanding | money:2 }}</div>
                 <div class="cx-cbn-monthly-meta">{{ d.portfolio_as_of_end.total_loans }} loan{{ d.portfolio_as_of_end.total_loans === 1 ? '' : 's' }}</div>
               </div>
               <div class="cx-cbn-monthly-card">
@@ -298,7 +299,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   {{ d.portfolio_as_of_end.par30_pct | number:'1.2-2' }}%
                 </div>
                 <div class="cx-cbn-monthly-meta tabular-nums">
-                  ₦{{ d.portfolio_as_of_end.par30_outstanding | number:'1.0-0' }}
+                  {{ d.portfolio_as_of_end.par30_outstanding | money }}
                 </div>
               </div>
               <div class="cx-cbn-monthly-card">
@@ -308,7 +309,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   {{ d.portfolio_as_of_end.npl_pct | number:'1.2-2' }}%
                 </div>
                 <div class="cx-cbn-monthly-meta tabular-nums">
-                  ₦{{ d.portfolio_as_of_end.npl_outstanding | number:'1.0-0' }}
+                  {{ d.portfolio_as_of_end.npl_outstanding | money }}
                 </div>
               </div>
             </div>

@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { SettingsService } from '../../core/services/settings.service';
 @Component({
   selector: 'app-penalty-rules', standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
@@ -54,7 +55,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           </div>
           <div>
             <label class="cx-label">
-              {{ form.calculation_type === 'percentage' ? 'Fraction *' : 'Amount (₦) *' }}
+              {{ form.calculation_type === 'percentage' ? 'Fraction *' : 'Amount (' + settings.currencySymbol() + ') *' }}
             </label>
             <input class="cx-input" type="number"
                    [attr.step]="form.calculation_type === 'percentage' ? '0.0001' : '1'"
@@ -80,7 +81,7 @@ export class PenaltyRulesComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};
   products = signal<any[]>([]);
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
   ngOnInit() { this.load(); this.api.get('/loan-products',{per_page:100}).subscribe({next:r=>this.products.set(r.data||[])}); }
   load(p?:any) { this.loading.set(true); this.api.get('/penalty-rules',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
   onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }

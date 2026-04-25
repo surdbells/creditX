@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Period Close admin page — list of months with status (Open/Closed)
@@ -29,7 +30,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-period-close',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -89,9 +90,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <td class="cx-pc-right tabular-nums">
                     @if (p.net_income_posted != null) {
                       @if (+p.net_income_posted >= 0) {
-                        ₦{{ p.net_income_posted | number:'1.2-2' }}
+                        {{ p.net_income_posted | money:2 }}
                       } @else {
-                        (₦{{ (-p.net_income_posted) | number:'1.2-2' }})
+                        ({{ (-p.net_income_posted) | money:2 }})
                       }
                     } @else {
                       —

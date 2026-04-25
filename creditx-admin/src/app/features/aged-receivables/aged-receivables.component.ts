@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Aged Receivables — buckets overdue installments by days past due.
@@ -19,7 +20,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-aged-receivables',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -61,27 +62,27 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <div class="cx-ar-buckets">
           <div class="cx-ar-bucket cx-ar-bucket-current">
             <div class="cx-ar-bucket-label">Current (not due)</div>
-            <div class="cx-ar-bucket-amount tabular-nums">₦{{ d.buckets.current.amount | number:'1.2-2' }}</div>
+            <div class="cx-ar-bucket-amount tabular-nums">{{ d.buckets.current.amount | money:2 }}</div>
             <div class="cx-ar-bucket-count">{{ d.buckets.current.count }} instalments</div>
           </div>
           <div class="cx-ar-bucket cx-ar-bucket-1-30">
             <div class="cx-ar-bucket-label">1–30 days</div>
-            <div class="cx-ar-bucket-amount tabular-nums">₦{{ d.buckets.days_1_30.amount | number:'1.2-2' }}</div>
+            <div class="cx-ar-bucket-amount tabular-nums">{{ d.buckets.days_1_30.amount | money:2 }}</div>
             <div class="cx-ar-bucket-count">{{ d.buckets.days_1_30.count }} instalments</div>
           </div>
           <div class="cx-ar-bucket cx-ar-bucket-31-60">
             <div class="cx-ar-bucket-label">31–60 days</div>
-            <div class="cx-ar-bucket-amount tabular-nums">₦{{ d.buckets.days_31_60.amount | number:'1.2-2' }}</div>
+            <div class="cx-ar-bucket-amount tabular-nums">{{ d.buckets.days_31_60.amount | money:2 }}</div>
             <div class="cx-ar-bucket-count">{{ d.buckets.days_31_60.count }} instalments</div>
           </div>
           <div class="cx-ar-bucket cx-ar-bucket-61-90">
             <div class="cx-ar-bucket-label">61–90 days</div>
-            <div class="cx-ar-bucket-amount tabular-nums">₦{{ d.buckets.days_61_90.amount | number:'1.2-2' }}</div>
+            <div class="cx-ar-bucket-amount tabular-nums">{{ d.buckets.days_61_90.amount | money:2 }}</div>
             <div class="cx-ar-bucket-count">{{ d.buckets.days_61_90.count }} instalments</div>
           </div>
           <div class="cx-ar-bucket cx-ar-bucket-90-plus">
             <div class="cx-ar-bucket-label">90+ days</div>
-            <div class="cx-ar-bucket-amount tabular-nums">₦{{ d.buckets.days_90_plus.amount | number:'1.2-2' }}</div>
+            <div class="cx-ar-bucket-amount tabular-nums">{{ d.buckets.days_90_plus.amount | money:2 }}</div>
             <div class="cx-ar-bucket-count">{{ d.buckets.days_90_plus.count }} instalments</div>
           </div>
         </div>
@@ -90,11 +91,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <div class="cx-ar-totals">
           <div class="cx-ar-totals-cell">
             <div class="cx-ar-totals-label">Total Outstanding</div>
-            <div class="cx-ar-totals-value tabular-nums">₦{{ d.totals.outstanding | number:'1.2-2' }}</div>
+            <div class="cx-ar-totals-value tabular-nums">{{ d.totals.outstanding | money:2 }}</div>
           </div>
           <div class="cx-ar-totals-cell">
             <div class="cx-ar-totals-label">Overdue (1+ days)</div>
-            <div class="cx-ar-totals-value tabular-nums cx-ar-danger">₦{{ d.totals.overdue | number:'1.2-2' }}</div>
+            <div class="cx-ar-totals-value tabular-nums cx-ar-danger">{{ d.totals.overdue | money:2 }}</div>
           </div>
           <div class="cx-ar-totals-cell">
             <div class="cx-ar-totals-label">Overdue %</div>
@@ -129,12 +130,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                   <tr>
                     <td class="cx-ar-label">{{ b.label }}</td>
                     <td class="cx-ar-right tabular-nums">{{ b.loan_count }}</td>
-                    <td class="cx-ar-right tabular-nums cx-ar-muted">₦{{ b.current_amount | number:'1.0-0' }}</td>
-                    <td class="cx-ar-right tabular-nums">₦{{ b.days_1_30_amount | number:'1.0-0' }}</td>
-                    <td class="cx-ar-right tabular-nums">₦{{ b.days_31_60_amount | number:'1.0-0' }}</td>
-                    <td class="cx-ar-right tabular-nums">₦{{ b.days_61_90_amount | number:'1.0-0' }}</td>
-                    <td class="cx-ar-right tabular-nums cx-ar-danger">₦{{ b.days_90_plus_amount | number:'1.0-0' }}</td>
-                    <td class="cx-ar-right tabular-nums"><strong>₦{{ b.outstanding_amount | number:'1.0-0' }}</strong></td>
+                    <td class="cx-ar-right tabular-nums cx-ar-muted">{{ b.current_amount | money }}</td>
+                    <td class="cx-ar-right tabular-nums">{{ b.days_1_30_amount | money }}</td>
+                    <td class="cx-ar-right tabular-nums">{{ b.days_31_60_amount | money }}</td>
+                    <td class="cx-ar-right tabular-nums">{{ b.days_61_90_amount | money }}</td>
+                    <td class="cx-ar-right tabular-nums cx-ar-danger">{{ b.days_90_plus_amount | money }}</td>
+                    <td class="cx-ar-right tabular-nums"><strong>{{ b.outstanding_amount | money }}</strong></td>
                     <td class="cx-ar-right tabular-nums"
                         [class.cx-ar-danger]="b.overdue_pct > 10"
                         [class.cx-ar-warning]="b.overdue_pct > 5 && b.overdue_pct <= 10">

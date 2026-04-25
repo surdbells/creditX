@@ -13,10 +13,12 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { SettingsService } from '../../core/services/settings.service';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 @Component({
   selector: 'app-loan-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       @if (!embedded) {
@@ -117,7 +119,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                           · {{ (fee.base_value * 100) | number:'1.0-2' }}%
                         }
                       </td>
-                      <td class="cx-dash-right tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</td>
+                      <td class="cx-dash-right tabular-nums">{{ fee.amount | money:2 }}</td>
                     </tr>
                   }
                 </tbody>
@@ -149,10 +151,10 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                     <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors">
                       <td class="px-4 py-3 text-xs font-mono text-[var(--cx-text-muted)]">{{ s.installment_number || ($index + 1) }}</td>
                       <td class="px-4 py-3 text-xs">{{ s.due_date | date:'mediumDate' }}</td>
-                      <td class="px-4 py-3 text-xs text-right font-mono">₦{{ s.principal_amount || s.principal || 0 | number:'1.2-2' }}</td>
-                      <td class="px-4 py-3 text-xs text-right font-mono">₦{{ s.interest_amount || s.interest || 0 | number:'1.2-2' }}</td>
-                      <td class="px-4 py-3 text-xs text-right font-mono font-medium">₦{{ s.total_amount || s.total || 0 | number:'1.2-2' }}</td>
-                      <td class="px-4 py-3 text-xs text-right font-mono">₦{{ s.outstanding_balance || s.balance || 0 | number:'1.2-2' }}</td>
+                      <td class="px-4 py-3 text-xs text-right font-mono">{{ s.principal_amount || s.principal || 0 | money:2 }}</td>
+                      <td class="px-4 py-3 text-xs text-right font-mono">{{ s.interest_amount || s.interest || 0 | money:2 }}</td>
+                      <td class="px-4 py-3 text-xs text-right font-mono font-medium">{{ s.total_amount || s.total || 0 | money:2 }}</td>
+                      <td class="px-4 py-3 text-xs text-right font-mono">{{ s.outstanding_balance || s.balance || 0 | money:2 }}</td>
                       <td class="px-4 py-3"><cx-status-badge [status]="s.status || 'pending'"></cx-status-badge></td>
                     </tr>
                   }
@@ -181,7 +183,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                     <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)]">
                       <td class="px-4 py-3 text-xs">{{ p.created_at | date:'mediumDate' }}</td>
                       <td class="px-4 py-3 text-xs font-mono text-[var(--cx-primary)]">{{ p.reference }}</td>
-                      <td class="px-4 py-3 text-xs text-right font-mono font-medium text-[var(--cx-success)]">₦{{ p.amount | number:'1.2-2' }}</td>
+                      <td class="px-4 py-3 text-xs text-right font-mono font-medium text-[var(--cx-success)]">{{ p.amount | money:2 }}</td>
                       <td class="px-4 py-3 text-xs">{{ p.payment_method }}</td>
                       <td class="px-4 py-3"><cx-status-badge [status]="p.status"></cx-status-badge></td>
                     </tr>
@@ -293,8 +295,8 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                         <th>Date</th>
                         <th>Narration</th>
                         <th>Reference</th>
-                        <th class="cx-ld-right">Debit (₦)</th>
-                        <th class="cx-ld-right">Credit (₦)</th>
+                        <th class="cx-ld-right">Debit ({{ settings.currencySymbol() }})</th>
+                        <th class="cx-ld-right">Credit ({{ settings.currencySymbol() }})</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -324,12 +326,12 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                     <tfoot>
                       <tr class="cx-ld-txn-total-row">
                         <td colspan="3">Total</td>
-                        <td class="cx-ld-right tabular-nums">₦{{ ledgerTotalDr() | number:'1.2-2' }}</td>
-                        <td class="cx-ld-right tabular-nums">₦{{ ledgerTotalCr() | number:'1.2-2' }}</td>
+                        <td class="cx-ld-right tabular-nums">{{ ledgerTotalDr() | money:2 }}</td>
+                        <td class="cx-ld-right tabular-nums">{{ ledgerTotalCr() | money:2 }}</td>
                       </tr>
                       <tr class="cx-ld-txn-balance-row">
                         <td colspan="4">Outstanding Balance</td>
-                        <td class="cx-ld-right tabular-nums">₦{{ ledgerBalance() | number:'1.2-2' }}</td>
+                        <td class="cx-ld-right tabular-nums">{{ ledgerBalance() | money:2 }}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -404,13 +406,13 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                 }
               </div>
               <div class="cx-dis-hero-value tabular-nums">
-                ₦{{ p.calculation?.net_disbursed | number:'1.0-0' }}
+                {{ p.calculation?.net_disbursed | money }}
               </div>
             </div>
             <div class="cx-dis-hero cx-dis-hero-gold">
               <div class="cx-dis-hero-label">Monthly Repayment</div>
               <div class="cx-dis-hero-value tabular-nums">
-                ₦{{ p.calculation?.mr_principal_interest | number:'1.0-0' }}
+                {{ p.calculation?.mr_principal_interest | money }}
               </div>
             </div>
           </div>
@@ -418,27 +420,27 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
           <div class="cx-dis-rows">
             <div class="cx-dis-row">
               <span>Gross Loan</span>
-              <span class="tabular-nums">₦{{ p.calculation?.gross_loan | number:'1.2-2' }}</span>
+              <span class="tabular-nums">{{ p.calculation?.gross_loan | money:2 }}</span>
             </div>
             <div class="cx-dis-row">
               <span>Total Fees</span>
-              <span class="tabular-nums">₦{{ p.calculation?.total_fees | number:'1.2-2' }}</span>
+              <span class="tabular-nums">{{ p.calculation?.total_fees | money:2 }}</span>
             </div>
             @if (p.calculation?.fee_details?.length) {
               @for (fee of p.calculation.fee_details; track fee.code) {
                 <div class="cx-dis-row cx-dis-row-sub">
                   <span>↳ {{ fee.name || fee.code }}</span>
-                  <span class="tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ fee.amount | money:2 }}</span>
                 </div>
               }
             }
             <div class="cx-dis-row">
               <span>Monthly Principal</span>
-              <span class="tabular-nums">₦{{ p.calculation?.mr_principal | number:'1.2-2' }}</span>
+              <span class="tabular-nums">{{ p.calculation?.mr_principal | money:2 }}</span>
             </div>
             <div class="cx-dis-row">
               <span>Monthly Interest</span>
-              <span class="tabular-nums">₦{{ p.calculation?.mr_interest | number:'1.2-2' }}</span>
+              <span class="tabular-nums">{{ p.calculation?.mr_interest | money:2 }}</span>
             </div>
             <div class="cx-dis-row">
               <span>Tenure</span>
@@ -460,9 +462,9 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                 @for (inst of p.calculation.schedule_preview; track $index) {
                   <div class="cx-dis-schedule-row">
                     <span class="tabular-nums">{{ $index + 1 }}</span>
-                    <span class="tabular-nums">₦{{ inst.principal | number:'1.2-2' }}</span>
-                    <span class="tabular-nums">₦{{ inst.interest | number:'1.2-2' }}</span>
-                    <span class="tabular-nums">₦{{ inst.total | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ inst.principal | money:2 }}</span>
+                    <span class="tabular-nums">{{ inst.interest | money:2 }}</span>
+                    <span class="tabular-nums">{{ inst.total | money:2 }}</span>
                   </div>
                 }
               </div>
@@ -1154,7 +1156,7 @@ export class LoanDetailComponent implements OnInit {
     { id: 'trail', label: 'Loan Trail' },
   ];
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit(): void {
     if (!this.id) return;
@@ -1414,9 +1416,9 @@ export class LoanDetailComponent implements OnInit {
     const l = this.loan();
     if (!l) return [];
     return [
-      { label: 'Amount', value: '₦' + this.fmt(l.amount_requested) },
-      { label: 'Gross Loan', value: '₦' + this.fmt(l.gross_loan || l.amount_requested) },
-      { label: 'Net Disbursed', value: '₦' + this.fmt(l.net_disbursed || l.amount_requested) },
+      { label: 'Amount', value: this.settings.formatMoney(l.amount_requested) },
+      { label: 'Gross Loan', value: this.settings.formatMoney(l.gross_loan || l.amount_requested) },
+      { label: 'Net Disbursed', value: this.settings.formatMoney(l.net_disbursed || l.amount_requested) },
       { label: 'Status', value: (l.status || '').replace(/_/g, ' ').toUpperCase(), color: l.status === 'active' || l.status === 'disbursed' ? 'text-[var(--cx-success)]' : l.status === 'overdue' ? 'text-[var(--cx-danger)]' : '' },
       { label: 'Tenure', value: l.tenure + ' months' },
     ];

@@ -8,6 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { environment } from '../../../environments/environment';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Bank Reconciliation — list + detail workflow.
@@ -25,7 +26,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-reconciliation',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -92,14 +93,14 @@ import { environment } from '../../../environments/environment';
                         {{ r.status | titlecase }}
                       </span>
                     </td>
-                    <td class="cx-re-right tabular-nums">₦{{ r.bank_total | number:'1.2-2' }}</td>
-                    <td class="cx-re-right tabular-nums">₦{{ r.system_total | number:'1.2-2' }}</td>
+                    <td class="cx-re-right tabular-nums">{{ r.bank_total | money:2 }}</td>
+                    <td class="cx-re-right tabular-nums">{{ r.system_total | money:2 }}</td>
                     <td class="cx-re-right tabular-nums"
                         [class.cx-re-pos]="+r.difference > 0"
                         [class.cx-re-neg]="+r.difference < 0">
-                      @if (+r.difference === 0) { ₦0.00 }
-                      @else if (+r.difference > 0) { +₦{{ r.difference | number:'1.2-2' }} }
-                      @else { −₦{{ (-r.difference) | number:'1.2-2' }} }
+                      @if (+r.difference === 0) { {{ 0 | money:2 }} }
+                      @else if (+r.difference > 0) { +{{ r.difference | money:2 }} }
+                      @else { −{{ (-r.difference) | money:2 }} }
                     </td>
                     <td class="cx-re-right tabular-nums">{{ r.item_count }}</td>
                     <td class="cx-re-small">{{ r.created_at | date:'MMM d, y · HH:mm' }}</td>
@@ -123,20 +124,20 @@ import { environment } from '../../../environments/environment';
         <div class="cx-re-summary">
           <div class="cx-re-stat">
             <div class="cx-re-stat-label">Bank Total</div>
-            <div class="cx-re-stat-value tabular-nums">₦{{ d.bank_total | number:'1.2-2' }}</div>
+            <div class="cx-re-stat-value tabular-nums">{{ d.bank_total | money:2 }}</div>
           </div>
           <div class="cx-re-stat">
             <div class="cx-re-stat-label">System Total</div>
-            <div class="cx-re-stat-value tabular-nums">₦{{ d.system_total | number:'1.2-2' }}</div>
+            <div class="cx-re-stat-value tabular-nums">{{ d.system_total | money:2 }}</div>
           </div>
           <div class="cx-re-stat cx-re-stat-emphasis"
                [class.cx-re-stat-ok]="+d.difference === 0"
                [class.cx-re-stat-warn]="+d.difference !== 0">
             <div class="cx-re-stat-label">Difference</div>
             <div class="cx-re-stat-value tabular-nums">
-              @if (+d.difference === 0) { ₦0.00 }
-              @else if (+d.difference > 0) { +₦{{ d.difference | number:'1.2-2' }} }
-              @else { −₦{{ (-d.difference) | number:'1.2-2' }} }
+              @if (+d.difference === 0) { {{ 0 | money:2 }} }
+              @else if (+d.difference > 0) { +{{ d.difference | money:2 }} }
+              @else { −{{ (-d.difference) | money:2 }} }
             </div>
             <div class="cx-re-stat-hint">
               @if (+d.difference === 0) { Perfectly balanced }
@@ -171,7 +172,7 @@ import { environment } from '../../../environments/environment';
                   <article class="cx-re-item" [class.is-resolved]="i.status === 'resolved'">
                     <div class="cx-re-item-head">
                       <div class="cx-re-item-ref cx-re-mono">{{ i.bank_reference || '—' }}</div>
-                      <div class="cx-re-item-amount tabular-nums">₦{{ i.bank_amount | number:'1.2-2' }}</div>
+                      <div class="cx-re-item-amount tabular-nums">{{ i.bank_amount | money:2 }}</div>
                     </div>
                     @if (i.status === 'resolved') {
                       <div class="cx-re-item-resolved">
@@ -216,19 +217,19 @@ import { environment } from '../../../environments/environment';
                       <div class="cx-re-item-side">
                         <div class="cx-re-item-sidelabel">Bank</div>
                         <div class="cx-re-mono">{{ i.bank_reference || '—' }}</div>
-                        <div class="tabular-nums">₦{{ i.bank_amount | number:'1.2-2' }}</div>
+                        <div class="tabular-nums">{{ i.bank_amount | money:2 }}</div>
                       </div>
                       <lucide-icon name="arrow-left-right" [size]="14" class="cx-re-item-linkicon"></lucide-icon>
                       <div class="cx-re-item-side">
                         <div class="cx-re-item-sidelabel">System</div>
                         <div class="cx-re-mono">{{ i.system_reference || '—' }}</div>
-                        <div class="tabular-nums">₦{{ i.system_amount | number:'1.2-2' }}</div>
+                        <div class="tabular-nums">{{ i.system_amount | money:2 }}</div>
                       </div>
                     </div>
                     <div class="cx-re-item-matchtype" [attr.data-type]="i.match_type">
                       {{ matchTypeLabel(i.match_type) }}
                       @if (+i.bank_amount !== +i.system_amount) {
-                        · Δ ₦{{ absDiff(i.bank_amount, i.system_amount) | number:'1.2-2' }}
+                        · Δ {{ absDiff(i.bank_amount, i.system_amount) | money:2 }}
                       }
                     </div>
                   </article>
@@ -254,7 +255,7 @@ import { environment } from '../../../environments/environment';
                   <article class="cx-re-item" [class.is-resolved]="i.status === 'resolved'">
                     <div class="cx-re-item-head">
                       <div class="cx-re-item-ref cx-re-mono">{{ i.system_reference || '—' }}</div>
-                      <div class="cx-re-item-amount tabular-nums">₦{{ i.system_amount | number:'1.2-2' }}</div>
+                      <div class="cx-re-item-amount tabular-nums">{{ i.system_amount | money:2 }}</div>
                     </div>
                     @if (i.status === 'resolved') {
                       <div class="cx-re-item-resolved">
@@ -352,7 +353,7 @@ import { environment } from '../../../environments/environment';
             <h2 class="cx-re-modal-title">Pair bank row with system transaction</h2>
             <div class="cx-re-modal-sub">
               Matching <strong class="cx-re-mono">{{ matchTarget()?.bank_reference || '—' }}</strong>
-              · <strong class="tabular-nums">₦{{ matchTarget()?.bank_amount | number:'1.2-2' }}</strong>.
+              · <strong class="tabular-nums">{{ matchTarget()?.bank_amount | money:2 }}</strong>.
               Candidates within ±1% of the bank amount in the same period,
               sorted by closest amount.
             </div>
@@ -386,10 +387,10 @@ import { environment } from '../../../environments/environment';
                                [checked]="selectedCandidate() === c.id"
                                (change)="selectedCandidate.set(c.id)" /></td>
                     <td class="cx-re-mono">{{ c.reference }}</td>
-                    <td class="cx-re-right tabular-nums">₦{{ c.amount | number:'1.2-2' }}</td>
+                    <td class="cx-re-right tabular-nums">{{ c.amount | money:2 }}</td>
                     <td class="cx-re-right tabular-nums" [class.cx-re-muted]="+c.amount_diff === 0">
                       @if (+c.amount_diff === 0) { exact }
-                      @else { ₦{{ c.amount_diff | number:'1.2-2' }} }
+                      @else { {{ c.amount_diff | money:2 }} }
                     </td>
                     <td class="cx-re-small">{{ c.trans_date }}</td>
                     <td class="cx-re-small cx-re-truncate">{{ c.narration }}</td>

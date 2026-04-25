@@ -9,10 +9,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 @Component({
   selector: 'app-customer-detail', standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent],
+  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -114,9 +115,9 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                     <tr class="border-b border-[var(--cx-border)] hover:bg-[var(--cx-surface-hover)] transition-colors">
                       <td class="px-4 py-3 font-mono text-xs text-[var(--cx-primary)] font-medium">{{ loan.application_id }}</td>
                       <td class="px-4 py-3 text-sm">{{ loan.product_name }}</td>
-                      <td class="px-4 py-3 text-sm text-right font-medium">₦{{ loan.amount_disbursed || loan.amount_requested | number:'1.0-0' }}</td>
+                      <td class="px-4 py-3 text-sm text-right font-medium">{{ (loan.amount_disbursed || loan.amount_requested ) | money }}</td>
                       <td class="px-4 py-3 text-sm text-right font-medium" [class]="(loan.outstanding_balance || 0) > 0 ? 'text-[var(--cx-danger)]' : 'text-[var(--cx-success)]'">
-                        ₦{{ loan.outstanding_balance || 0 | number:'1.0-0' }}
+                        {{ (loan.outstanding_balance || 0 ) | money }}
                       </td>
                       <td class="px-4 py-3"><cx-status-badge [status]="loan.status"></cx-status-badge></td>
                       <td class="px-4 py-3 text-xs text-[var(--cx-text-muted)]">{{ loan.created_at | date:'mediumDate' }}</td>
@@ -149,16 +150,16 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
               </div>
               <div class="cx-card !p-4">
                 <div class="text-[10px] font-bold text-[var(--cx-text-muted)] uppercase tracking-wider">Disbursed</div>
-                <div class="text-lg font-bold text-[var(--cx-text)] mt-1">₦{{ selectedLoan.amount_disbursed || selectedLoan.amount_requested | number:'1.0-0' }}</div>
+                <div class="text-lg font-bold text-[var(--cx-text)] mt-1">{{ (selectedLoan.amount_disbursed || selectedLoan.amount_requested ) | money }}</div>
               </div>
               <div class="cx-card !p-4">
                 <div class="text-[10px] font-bold text-[var(--cx-text-muted)] uppercase tracking-wider">Total Repaid</div>
-                <div class="text-lg font-bold text-[var(--cx-success)] mt-1">₦{{ totalCredit | number:'1.0-0' }}</div>
+                <div class="text-lg font-bold text-[var(--cx-success)] mt-1">{{ totalCredit | money }}</div>
               </div>
               <div class="cx-card !p-4">
                 <div class="text-[10px] font-bold text-[var(--cx-text-muted)] uppercase tracking-wider">Outstanding</div>
                 <div class="text-lg font-bold mt-1" [class]="(selectedLoan.outstanding_balance || 0) > 0 ? 'text-[var(--cx-danger)]' : 'text-[var(--cx-success)]'">
-                  ₦{{ selectedLoan.outstanding_balance || 0 | number:'1.0-0' }}
+                  {{ (selectedLoan.outstanding_balance || 0 ) | money }}
                 </div>
               </div>
             </div>
@@ -190,21 +191,21 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
                         <td class="px-4 py-3 text-xs font-mono text-[var(--cx-primary)]">{{ entry.reference || entry.trans_callback || '—' }}</td>
                         <td class="px-4 py-3 text-sm text-[var(--cx-text)]">{{ entry.narration || entry.description || '—' }}</td>
                         <td class="px-4 py-3 text-sm text-right font-medium text-[var(--cx-danger)]">
-                          @if ((entry.debit_amount || entry.debit || 0) > 0) { ₦{{ entry.debit_amount || entry.debit | number:'1.2-2' }} }
+                          @if ((entry.debit_amount || entry.debit || 0) > 0) { {{ (entry.debit_amount || entry.debit ) | money:2 }} }
                         </td>
                         <td class="px-4 py-3 text-sm text-right font-medium text-[var(--cx-success)]">
-                          @if ((entry.credit_amount || entry.credit || 0) > 0) { ₦{{ entry.credit_amount || entry.credit | number:'1.2-2' }} }
+                          @if ((entry.credit_amount || entry.credit || 0) > 0) { {{ (entry.credit_amount || entry.credit ) | money:2 }} }
                         </td>
-                        <td class="px-4 py-3 text-sm text-right font-bold">₦{{ runningBalance(i) | number:'1.2-2' }}</td>
+                        <td class="px-4 py-3 text-sm text-right font-bold">{{ runningBalance(i) | money:2 }}</td>
                       </tr>
                     }
                   </tbody>
                   <tfoot>
                     <tr class="bg-[var(--cx-surface-hover)] font-bold border-t-2 border-[var(--cx-border)]">
                       <td class="px-4 py-3" colspan="3">Totals</td>
-                      <td class="px-4 py-3 text-right text-[var(--cx-danger)]">₦{{ totalDebit | number:'1.2-2' }}</td>
-                      <td class="px-4 py-3 text-right text-[var(--cx-success)]">₦{{ totalCredit | number:'1.2-2' }}</td>
-                      <td class="px-4 py-3 text-right">₦{{ (totalDebit - totalCredit) | number:'1.2-2' }}</td>
+                      <td class="px-4 py-3 text-right text-[var(--cx-danger)]">{{ totalDebit | money:2 }}</td>
+                      <td class="px-4 py-3 text-right text-[var(--cx-success)]">{{ totalCredit | money:2 }}</td>
+                      <td class="px-4 py-3 text-right">{{ (totalDebit - totalCredit) | money:2 }}</td>
                     </tr>
                   </tfoot>
                 </table>

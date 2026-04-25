@@ -11,6 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
 import { BatchConfirmDialogComponent } from '../../shared/components/batch-confirm-dialog/batch-confirm-dialog.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Maker-Checker queue — dedicated page for users with maker_checker.check.
@@ -30,7 +31,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
 @Component({
   selector: 'app-maker-checker',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -125,40 +126,40 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                   <div class="cx-mc-hero cx-mc-hero-primary">
                     <div class="cx-mc-hero-label">Net Disbursed</div>
                     <div class="cx-mc-hero-value tabular-nums">
-                      ₦{{ p.calculation?.net_disbursed | number:'1.0-0' }}
+                      {{ p.calculation?.net_disbursed | money }}
                     </div>
                   </div>
                   <div class="cx-mc-hero cx-mc-hero-gold">
                     <div class="cx-mc-hero-label">Monthly Repayment</div>
                     <div class="cx-mc-hero-value tabular-nums">
-                      ₦{{ p.calculation?.mr_principal_interest | number:'1.0-0' }}
+                      {{ p.calculation?.mr_principal_interest | money }}
                     </div>
                   </div>
                 </div>
                 <div class="cx-mc-rows">
                   <div class="cx-mc-row">
                     <span>Gross Loan</span>
-                    <span class="tabular-nums">₦{{ p.calculation?.gross_loan | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ p.calculation?.gross_loan | money:2 }}</span>
                   </div>
                   <div class="cx-mc-row">
                     <span>Total Fees</span>
-                    <span class="tabular-nums">₦{{ p.calculation?.total_fees | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ p.calculation?.total_fees | money:2 }}</span>
                   </div>
                   @if (p.calculation?.fee_details?.length) {
                     @for (fee of p.calculation.fee_details; track fee.code) {
                       <div class="cx-mc-row cx-mc-row-sub">
                         <span>↳ {{ fee.name || fee.code }}</span>
-                        <span class="tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                        <span class="tabular-nums">{{ fee.amount | money:2 }}</span>
                       </div>
                     }
                   }
                   <div class="cx-mc-row">
                     <span>Monthly Principal</span>
-                    <span class="tabular-nums">₦{{ p.calculation?.mr_principal | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ p.calculation?.mr_principal | money:2 }}</span>
                   </div>
                   <div class="cx-mc-row">
                     <span>Monthly Interest</span>
-                    <span class="tabular-nums">₦{{ p.calculation?.mr_interest | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ p.calculation?.mr_interest | money:2 }}</span>
                   </div>
                 </div>
               </div>
@@ -188,7 +189,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                 </div>
                 <div class="cx-mc-row">
                   <span>Amount Requested</span>
-                  <span class="tabular-nums">₦{{ p.loan?.amount_requested | number:'1.2-2' }}</span>
+                  <span class="tabular-nums">{{ p.loan?.amount_requested | money:2 }}</span>
                 </div>
                 <div class="cx-mc-row">
                   <span>Tenure</span>
@@ -207,7 +208,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                 @if (p.loan?.top_up_balance) {
                   <div class="cx-mc-row">
                     <span>Captured Top-up</span>
-                    <span class="tabular-nums">₦{{ p.loan?.top_up_balance | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ p.loan?.top_up_balance | money:2 }}</span>
                   </div>
                 }
                 @if (p.loan?.branch_name) {

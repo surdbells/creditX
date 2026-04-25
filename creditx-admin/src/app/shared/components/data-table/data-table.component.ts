@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, signal, computed, ContentChild,
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Search, ChevronLeft, ChevronRight, Columns3, SlidersHorizontal, Download, ChevronUp, ChevronDown } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 export interface TableColumn {
   key: string;
@@ -38,7 +39,7 @@ export interface TableQueryEvent {
 @Component({
   selector: 'cx-data-table',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MoneyPipe],
   template: `
     <div class="cx-dtable">
       <!-- Toolbar -->
@@ -151,7 +152,7 @@ export interface TableQueryEvent {
                           {{ col.badgeMap[row[col.key]]?.label || row[col.key] }}
                         </span>
                       } @else if (col.type === 'currency') {
-                        <span class="cx-dtable-currency tabular-nums">₦{{ row[col.key] | number:'1.0-0' }}</span>
+                        <span class="cx-dtable-currency tabular-nums">{{ row[col.key] | money }}</span>
                       } @else if (col.type === 'date') {
                         <span class="cx-dtable-date">{{ row[col.key] | date:'mediumDate' }}</span>
                       } @else if (col.type === 'custom' && cellTemplate) {

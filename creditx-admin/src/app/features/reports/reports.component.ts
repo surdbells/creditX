@@ -9,6 +9,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 interface DrillLevel { label: string; key: string; value?: string; }
 
@@ -635,6 +636,7 @@ export class ReportsComponent implements OnInit {
     private toast: ToastService,
     private route: ActivatedRoute,
     private router: Router,
+    public settings: SettingsService,
   ) {}
 
   ngOnInit() {
@@ -861,15 +863,15 @@ export class ReportsComponent implements OnInit {
 
     // Generic (portfolio, PAR, etc.)
     if (k.total_loans !== undefined)       kpis.push({ label: 'Total Loans', value: k.total_loans, format: '1.0-0' });
-    if (k.total_amount !== undefined)      kpis.push({ label: 'Total Amount', value: k.total_amount, prefix: '₦', format: '1.0-0' });
-    if (k.outstanding !== undefined)       kpis.push({ label: 'Outstanding', value: k.outstanding, prefix: '₦', format: '1.0-0' });
+    if (k.total_amount !== undefined)      kpis.push({ label: 'Total Amount', value: k.total_amount, prefix: this.settings.currencySymbol(), format: '1.0-0' });
+    if (k.outstanding !== undefined)       kpis.push({ label: 'Outstanding', value: k.outstanding, prefix: this.settings.currencySymbol(), format: '1.0-0' });
     if (k.collection_rate !== undefined)   kpis.push({ label: 'Collection Rate', value: k.collection_rate, suffix: '%', format: '1.1-1' });
     if (k.par_ratio !== undefined)         kpis.push({ label: 'PAR Ratio', value: k.par_ratio, suffix: '%', format: '1.2-2', color: k.par_ratio > 5 ? '#ef4444' : '#10b981' });
 
     // Performance-specific
-    if (k.total_disbursed !== undefined && kpis.length < 4) kpis.push({ label: 'Total Disbursed', value: k.total_disbursed, prefix: '₦', format: '1.0-0' });
+    if (k.total_disbursed !== undefined && kpis.length < 4) kpis.push({ label: 'Total Disbursed', value: k.total_disbursed, prefix: this.settings.currencySymbol(), format: '1.0-0' });
     if (k.approval_rate !== undefined && kpis.length < 4)   kpis.push({ label: 'Approval Rate', value: k.approval_rate, suffix: '%', format: '1.1-1' });
-    if (k.avg_ticket_size !== undefined && kpis.length < 4) kpis.push({ label: 'Avg Ticket', value: k.avg_ticket_size, prefix: '₦', format: '1.0-0' });
+    if (k.avg_ticket_size !== undefined && kpis.length < 4) kpis.push({ label: 'Avg Ticket', value: k.avg_ticket_size, prefix: this.settings.currencySymbol(), format: '1.0-0' });
     if (k.active_agents !== undefined && kpis.length < 4)   kpis.push({ label: 'Active Agents', value: k.active_agents, format: '1.0-0' });
     if (k.active_branches !== undefined && kpis.length < 4) kpis.push({ label: 'Active Branches', value: k.active_branches, format: '1.0-0' });
     if (k.active_products !== undefined && kpis.length < 4) kpis.push({ label: 'Active Products', value: k.active_products, format: '1.0-0' });

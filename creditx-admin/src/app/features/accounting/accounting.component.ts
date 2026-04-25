@@ -10,10 +10,12 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-accounting', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -68,7 +70,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                       <td class="cx-acc-name">{{ a.account_name }}</td>
                       <td><span class="cx-acc-type-chip" [attr.data-type]="a.account_type?.toLowerCase()">{{ a.account_type }}</span></td>
                       <td class="cx-acc-ledger">{{ a.ledger_type }}</td>
-                      <td class="cx-acc-right cx-acc-balance tabular-nums">₦{{ (a.balance || 0) | number:'1.2-2' }}</td>
+                      <td class="cx-acc-right cx-acc-balance tabular-nums">{{ (a.balance || 0) | money:2 }}</td>
                       <td class="cx-acc-actions-col">
                         <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openCoaForm(a)" title="Edit">
                           <lucide-icon name="pencil" [size]="14"></lucide-icon>
@@ -97,8 +99,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                   <tr>
                     <th>Code</th>
                     <th>Account Name</th>
-                    <th class="cx-acc-right">Debit (₦)</th>
-                    <th class="cx-acc-right">Credit (₦)</th>
+                    <th class="cx-acc-right">Debit ({{ settings.currencySymbol() }})</th>
+                    <th class="cx-acc-right">Credit ({{ settings.currencySymbol() }})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -114,8 +116,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                 <tfoot>
                   <tr class="cx-acc-total-row">
                     <td colspan="2">Total</td>
-                    <td class="cx-acc-right tabular-nums">₦{{ trialTotalDebit | number:'1.2-2' }}</td>
-                    <td class="cx-acc-right tabular-nums">₦{{ trialTotalCredit | number:'1.2-2' }}</td>
+                    <td class="cx-acc-right tabular-nums">{{ trialTotalDebit | money:2 }}</td>
+                    <td class="cx-acc-right tabular-nums">{{ trialTotalCredit | money:2 }}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -164,10 +166,10 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                         <span>{{ t.gl_name || '—' }}</span>
                       </td>
                       <td class="cx-acc-right tabular-nums cx-acc-debit">
-                        @if (t.trans_type === 'DR') { ₦{{ t.trans_amount | number:'1.2-2' }} } @else { — }
+                        @if (t.trans_type === 'DR') { {{ t.trans_amount | money:2 }} } @else { — }
                       </td>
                       <td class="cx-acc-right tabular-nums cx-acc-credit">
-                        @if (t.trans_type === 'CR') { ₦{{ t.trans_amount | number:'1.2-2' }} } @else { — }
+                        @if (t.trans_type === 'CR') { {{ t.trans_amount | money:2 }} } @else { — }
                       </td>
                     </tr>
                   }
@@ -361,7 +363,7 @@ export class AccountingComponent implements OnInit {
   txnRows = signal<any[]>([]); txnLoading = signal(true); txnSearch = ''; txnFrom = ''; txnTo = '';
   private txnTimer: any;
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() { this.loadCoa(); }
 

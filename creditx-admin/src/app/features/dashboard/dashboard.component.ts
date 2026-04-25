@@ -10,6 +10,8 @@ import { StatCardComponent } from '../../shared/components/stat-card/stat-card.c
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SettingsService } from '../../core/services/settings.service';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Home dashboard with five SVG chart visualisations.
@@ -46,7 +48,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CommonModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <div class="cx-dash cx-animate-in">
       <!-- ─── Hero greeting + agent-accepting toggle ─── -->
@@ -91,13 +93,13 @@ type ProductChartItem = { label: string; value: number; amount: number };
         </cx-stat-card>
         <cx-stat-card
           label="Total Disbursed"
-          [value]="loading() ? '—' : '₦' + formatNum(portfolio?.total_disbursed)"
+          [value]="loading() ? '—' : settings.formatMoney(portfolio?.total_disbursed)"
           icon="banknote"
           iconBg="var(--cx-success-50)" iconColor="var(--cx-primary-700)">
         </cx-stat-card>
         <cx-stat-card
           label="Total Collected"
-          [value]="loading() ? '—' : '₦' + formatNum(portfolio?.total_collected)"
+          [value]="loading() ? '—' : settings.formatMoney(portfolio?.total_collected)"
           icon="credit-card"
           iconBg="var(--cx-info-50)" iconColor="var(--cx-info)">
         </cx-stat-card>
@@ -226,7 +228,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
                   <tr>
                     <td><span class="cx-dash-app-id">{{ loan.application_id }}</span></td>
                     <td class="cx-dash-customer">{{ loan.customer_name }}</td>
-                    <td class="cx-dash-right tabular-nums cx-dash-amount">₦{{ loan.amount_requested | number:'1.0-0' }}</td>
+                    <td class="cx-dash-right tabular-nums cx-dash-amount">{{ loan.amount_requested | money }}</td>
                     <td><cx-status-badge [status]="loan.status"></cx-status-badge></td>
                   </tr>
                 }
@@ -488,7 +490,7 @@ export class DashboardComponent implements OnInit {
     return this.chartPalette[i % this.chartPalette.length];
   }
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private sanitizer: DomSanitizer) {
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private sanitizer: DomSanitizer, public settings: SettingsService) {
     const h = new Date().getHours();
     this.greeting = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
     this.today = new Date().toLocaleDateString('en-NG', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -540,17 +542,12 @@ export class DashboardComponent implements OnInit {
   }
 
   /**
-   * Compact money formatter for chart axis labels — ₦1.2M / ₦450K /
-   * ₦8,500. Y-axis labels need to fit in narrow gutters so abbreviated
-   * forms keep them readable across all magnitudes.
+   * Compact money formatter for chart axis labels. Delegates to
+   * SettingsService.formatMoneyCompact so chart axes track the
+   * configured currency symbol — same source of truth as money pipe.
    */
   formatMoney(v: any): string {
-    if (v === null || v === undefined || v === 0) return '0';
-    const n = typeof v === 'number' ? v : parseFloat(v);
-    if (isNaN(n)) return '0';
-    if (n >= 1_000_000) return '₦' + (n / 1_000_000).toFixed(1) + 'M';
-    if (n >= 1_000) return '₦' + (n / 1_000).toFixed(0) + 'K';
-    return '₦' + Math.round(n).toLocaleString();
+    return this.settings.formatMoneyCompact(v);
   }
 
   toggleAgentAccepting(): void {

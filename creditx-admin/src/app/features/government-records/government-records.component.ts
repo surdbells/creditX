@@ -8,10 +8,12 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-government-records', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -126,7 +128,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
                     <td class="cx-gr-org">{{ row.organization || '—' }}</td>
                     <td class="cx-gr-grade">{{ row.grade_level || '—' }}</td>
                     <td class="cx-gr-pay tabular-nums">
-                      @if (row.gross_pay) { ₦{{ row.gross_pay | number:'1.0-0' }} } @else { — }
+                      @if (row.gross_pay) { {{ row.gross_pay | money }} } @else { — }
                     </td>
                     <td>
                       <span class="cx-status-badge" [attr.data-tone]="row.is_active ? 'success' : 'neutral'">
@@ -214,8 +216,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
         <!-- Compensation -->
         <h4 class="cx-form-section-title">Compensation</h4>
         <div class="cx-form-row cx-form-row-2">
-          <div><label class="cx-label">Gross Pay (₦)</label><input class="cx-input" type="number" [(ngModel)]="form.gross_pay" placeholder="0.00" /></div>
-          <div><label class="cx-label">Net Pay (₦)</label><input class="cx-input" type="number" [(ngModel)]="form.net_pay" placeholder="0.00" /></div>
+          <div><label class="cx-label">Gross Pay ({{ settings.currencySymbol() }})</label><input class="cx-input" type="number" [(ngModel)]="form.gross_pay" placeholder="0.00" /></div>
+          <div><label class="cx-label">Net Pay ({{ settings.currencySymbol() }})</label><input class="cx-input" type="number" [(ngModel)]="form.net_pay" placeholder="0.00" /></div>
         </div>
 
         <!-- Banking -->
@@ -435,7 +437,7 @@ export class GovernmentRecordsComponent implements OnInit {
   exportOpen = false;
   private filterTimeout: any;
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit(): void {
     this.load();

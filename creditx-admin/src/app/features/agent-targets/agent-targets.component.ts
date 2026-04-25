@@ -11,6 +11,8 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { SettingsService } from '../../core/services/settings.service';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Agent Targets
@@ -48,7 +50,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
   imports: [
     CommonModule, FormsModule, RouterLink, LucideAngularModule,
     PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent,
-    FormDialogComponent, ConfirmDialogComponent,
+    FormDialogComponent, ConfirmDialogComponent, MoneyPipe,
   ],
   template: `
     <div class="cx-animate-in">
@@ -207,7 +209,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
                     @if (editingId() === user.id && !isMobile()) {
                       <!-- Desktop inline edit -->
                       <div class="cx-at-inline-edit">
-                        <span class="cx-at-naira">₦</span>
+                        <span class="cx-at-naira">{{ settings.currencySymbol() }}</span>
                         <input
                           type="number"
                           class="cx-at-inline-input tabular-nums"
@@ -334,7 +336,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
             <div>
               <label class="cx-label">Monthly target (naira)</label>
               <div class="cx-at-dlg-target-input">
-                <span class="cx-at-naira">₦</span>
+                <span class="cx-at-naira">{{ settings.currencySymbol() }}</span>
                 <input
                   type="number"
                   class="cx-input tabular-nums"
@@ -371,7 +373,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
         <div>
           <label class="cx-label">Monthly target (naira)</label>
           <div class="cx-at-dlg-target-input">
-            <span class="cx-at-naira">₦</span>
+            <span class="cx-at-naira">{{ settings.currencySymbol() }}</span>
             <input
               type="number"
               class="cx-input tabular-nums"
@@ -485,6 +487,7 @@ export class AgentTargetsComponent implements OnInit {
     public auth: AuthService,
     private api: ApiService,
     private toast: ToastService,
+    public settings: SettingsService,
   ) {}
 
   ngOnInit(): void {
@@ -860,11 +863,18 @@ export class AgentTargetsComponent implements OnInit {
     return (f + l).toUpperCase() || '?';
   }
 
-  /** Formats a decimal-string or number as ₦1,234,567 (no decimals). */
+  /**
+   * Format a decimal-string or number with the configured currency
+   * symbol. Delegates to SettingsService.formatMoney so the symbol
+   * tracks admin-configured general.currency_symbol. Returns '—' for
+   * null/undefined/empty/NaN — preserved from the prior behavior since
+   * this method is used in display contexts where 0 vs missing are
+   * meaningfully different.
+   */
   formatNaira(value: string | number | null | undefined): string {
     if (value === null || value === undefined || value === '') return '—';
     const n = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(n)) return '—';
-    return '₦' + Math.round(n).toLocaleString('en-NG');
+    return this.settings.formatMoney(Math.round(n));
   }
 }

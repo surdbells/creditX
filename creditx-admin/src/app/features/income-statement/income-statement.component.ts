@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Income Statement (P&L) report.
@@ -25,7 +26,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-income-statement',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -80,13 +81,13 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <div class="cx-is-hero">
           <div class="cx-is-hero-cell cx-is-hero-income">
             <div class="cx-is-hero-label">Total Revenue</div>
-            <div class="cx-is-hero-value tabular-nums">₦{{ d.revenue.total | number:'1.2-2' }}</div>
+            <div class="cx-is-hero-value tabular-nums">{{ d.revenue.total | money:2 }}</div>
             <div class="cx-is-hero-meta">{{ d.revenue.accounts.length }} income account{{ d.revenue.accounts.length === 1 ? '' : 's' }}</div>
           </div>
           <div class="cx-is-hero-arrow">−</div>
           <div class="cx-is-hero-cell cx-is-hero-expense">
             <div class="cx-is-hero-label">Total Expenses</div>
-            <div class="cx-is-hero-value tabular-nums">₦{{ d.expenses.total | number:'1.2-2' }}</div>
+            <div class="cx-is-hero-value tabular-nums">{{ d.expenses.total | money:2 }}</div>
             <div class="cx-is-hero-meta">{{ d.expenses.accounts.length }} expense account{{ d.expenses.accounts.length === 1 ? '' : 's' }}</div>
           </div>
           <div class="cx-is-hero-arrow">=</div>
@@ -96,9 +97,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-is-hero-label">Net Income</div>
             <div class="cx-is-hero-value tabular-nums">
               @if (+d.net_income >= 0) {
-                ₦{{ d.net_income | number:'1.2-2' }}
+                {{ d.net_income | money:2 }}
               } @else {
-                (₦{{ (-d.net_income) | number:'1.2-2' }})
+                ({{ (-d.net_income) | money:2 }})
               }
             </div>
             <div class="cx-is-hero-meta">
@@ -134,15 +135,15 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       <span class="cx-is-acct-code">{{ a.code }}</span>
                       <span>{{ a.name }}</span>
                     </td>
-                    <td class="cx-is-right tabular-nums cx-is-muted">₦{{ a.total_dr | number:'1.2-2' }}</td>
-                    <td class="cx-is-right tabular-nums cx-is-muted">₦{{ a.total_cr | number:'1.2-2' }}</td>
-                    <td class="cx-is-right tabular-nums"><strong>₦{{ a.balance | number:'1.2-2' }}</strong></td>
+                    <td class="cx-is-right tabular-nums cx-is-muted">{{ a.total_dr | money:2 }}</td>
+                    <td class="cx-is-right tabular-nums cx-is-muted">{{ a.total_cr | money:2 }}</td>
+                    <td class="cx-is-right tabular-nums"><strong>{{ a.balance | money:2 }}</strong></td>
                   </tr>
                 }
               }
               <tr class="cx-is-subtotal-row">
                 <td colspan="3">Total Revenue</td>
-                <td class="cx-is-right tabular-nums cx-is-income">₦{{ d.revenue.total | number:'1.2-2' }}</td>
+                <td class="cx-is-right tabular-nums cx-is-income">{{ d.revenue.total | money:2 }}</td>
               </tr>
 
               <!-- Expenses section -->
@@ -160,15 +161,15 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                       <span class="cx-is-acct-code">{{ a.code }}</span>
                       <span>{{ a.name }}</span>
                     </td>
-                    <td class="cx-is-right tabular-nums cx-is-muted">₦{{ a.total_dr | number:'1.2-2' }}</td>
-                    <td class="cx-is-right tabular-nums cx-is-muted">₦{{ a.total_cr | number:'1.2-2' }}</td>
-                    <td class="cx-is-right tabular-nums"><strong>₦{{ a.balance | number:'1.2-2' }}</strong></td>
+                    <td class="cx-is-right tabular-nums cx-is-muted">{{ a.total_dr | money:2 }}</td>
+                    <td class="cx-is-right tabular-nums cx-is-muted">{{ a.total_cr | money:2 }}</td>
+                    <td class="cx-is-right tabular-nums"><strong>{{ a.balance | money:2 }}</strong></td>
                   </tr>
                 }
               }
               <tr class="cx-is-subtotal-row">
                 <td colspan="3">Total Expenses</td>
-                <td class="cx-is-right tabular-nums cx-is-expense">₦{{ d.expenses.total | number:'1.2-2' }}</td>
+                <td class="cx-is-right tabular-nums cx-is-expense">{{ d.expenses.total | money:2 }}</td>
               </tr>
 
               <!-- Net Income -->
@@ -178,9 +179,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                     [class.cx-is-profit]="+d.net_income >= 0"
                     [class.cx-is-loss]="+d.net_income < 0">
                   @if (+d.net_income >= 0) {
-                    ₦{{ d.net_income | number:'1.2-2' }}
+                    {{ d.net_income | money:2 }}
                   } @else {
-                    (₦{{ (-d.net_income) | number:'1.2-2' }})
+                    ({{ (-d.net_income) | money:2 }})
                   }
                 </td>
               </tr>

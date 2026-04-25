@@ -11,6 +11,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
 import { BatchConfirmDialogComponent } from '../../shared/components/batch-confirm-dialog/batch-confirm-dialog.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 /**
  * Approval queue + inline review modal.
@@ -32,7 +34,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
  */
 @Component({
   selector: 'app-approval-queue', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -134,7 +136,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                 @if (activeRow()?.amount_requested) {
                   <div class="cx-aq-quick-row">
                     <span>Amount</span>
-                    <span class="tabular-nums">₦{{ activeRow()?.amount_requested | number:'1.2-2' }}</span>
+                    <span class="tabular-nums">{{ activeRow()?.amount_requested | money:2 }}</span>
                   </div>
                 }
                 @if (activeRow()?.product_name) {
@@ -170,7 +172,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                 </div>
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Amount Requested</span>
-                  <span class="cx-aq-field-value tabular-nums">₦{{ l.amount_requested | number:'1.2-2' }}</span>
+                  <span class="cx-aq-field-value tabular-nums">{{ l.amount_requested | money:2 }}</span>
                 </div>
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Tenure</span>
@@ -182,11 +184,11 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                 </div>
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Gross Loan</span>
-                  <span class="cx-aq-field-value tabular-nums">₦{{ l.gross_loan | number:'1.2-2' }}</span>
+                  <span class="cx-aq-field-value tabular-nums">{{ l.gross_loan | money:2 }}</span>
                 </div>
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Net Disbursed</span>
-                  <span class="cx-aq-field-value tabular-nums">₦{{ l.net_disbursed | number:'1.2-2' }}</span>
+                  <span class="cx-aq-field-value tabular-nums">{{ l.net_disbursed | money:2 }}</span>
                 </div>
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Branch</span>
@@ -233,7 +235,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                   <div class="cx-aq-field">
                     <span class="cx-aq-field-label">Gross Pay</span>
                     <span class="cx-aq-field-value tabular-nums">
-                      {{ c.gross_pay ? ('₦' + (c.gross_pay | number:'1.2-2')) : '—' }}
+                      {{ c.gross_pay ? (c.gross_pay | money:2) : '—' }}
                     </span>
                   </div>
                   <div class="cx-aq-field">
@@ -264,7 +266,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                   @for (fee of l.fee_breakdowns; track fee.id) {
                     <div class="cx-aq-fee-row">
                       <span class="cx-aq-fee-name">{{ fee.fee_type_name || fee.fee_type_code }}</span>
-                      <span class="cx-aq-fee-amount tabular-nums">₦{{ fee.amount | number:'1.2-2' }}</span>
+                      <span class="cx-aq-fee-amount tabular-nums">{{ fee.amount | money:2 }}</span>
                     </div>
                   }
                 </div>
@@ -359,7 +361,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                     }
                   </label>
                   <div class="cx-aq-topup-row">
-                    <span class="cx-aq-topup-currency">₦</span>
+                    <span class="cx-aq-topup-currency">{{ settings.currencySymbol() }}</span>
                     <input id="aq-topup" class="cx-aq-topup-input" type="number" step="0.01" min="0"
                            placeholder="0.00"
                            [(ngModel)]="topUpBalance"
@@ -368,7 +370,7 @@ import { BatchConfirmDialogComponent } from '../../shared/components/batch-confi
                   <div class="cx-aq-topup-hint">
                     @if (previousOutstandingInfo(); as p) {
                       @if (p.has_previous) {
-                        Previous loan {{ p.previous_application_id }} — outstanding ₦{{ p.outstanding | number:'1.2-2' }} across {{ p.unpaid_count }} unpaid schedule(s).
+                        Previous loan {{ p.previous_application_id }} — outstanding {{ p.outstanding | money:2 }} across {{ p.unpaid_count }} unpaid schedule(s).
                       } @else {
                         No previous loan on file — type the top-up balance manually if one applies.
                       }
@@ -1066,7 +1068,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   private sanitizer = inject(DomSanitizer);
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() { this.load(); }
 

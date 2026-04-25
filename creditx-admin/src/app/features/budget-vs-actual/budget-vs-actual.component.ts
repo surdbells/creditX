@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Budget vs Actual report.
@@ -26,7 +27,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-budget-vs-actual',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -71,9 +72,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-bv-sum-label">Budgeted Net Income</div>
             <div class="cx-bv-sum-value tabular-nums">
               @if (+d.summary.net_budget_income >= 0) {
-                ₦{{ d.summary.net_budget_income | number:'1.2-2' }}
+                {{ d.summary.net_budget_income | money:2 }}
               } @else {
-                (₦{{ (-d.summary.net_budget_income) | number:'1.2-2' }})
+                ({{ (-d.summary.net_budget_income) | money:2 }})
               }
             </div>
           </div>
@@ -81,9 +82,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="cx-bv-sum-label">Actual Net Income</div>
             <div class="cx-bv-sum-value tabular-nums">
               @if (+d.summary.net_actual_income >= 0) {
-                ₦{{ d.summary.net_actual_income | number:'1.2-2' }}
+                {{ d.summary.net_actual_income | money:2 }}
               } @else {
-                (₦{{ (-d.summary.net_actual_income) | number:'1.2-2' }})
+                ({{ (-d.summary.net_actual_income) | money:2 }})
               }
             </div>
           </div>
@@ -93,9 +94,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                  [class.cx-bv-good]="+d.summary.net_variance >= 0"
                  [class.cx-bv-bad]="+d.summary.net_variance < 0">
               @if (+d.summary.net_variance >= 0) {
-                +₦{{ d.summary.net_variance | number:'1.2-2' }}
+                +{{ d.summary.net_variance | money:2 }}
               } @else {
-                −₦{{ (-d.summary.net_variance) | number:'1.2-2' }}
+                −{{ (-d.summary.net_variance) | money:2 }}
               }
             </div>
           </div>
@@ -109,12 +110,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <div class="cx-bv-section-head">
             <h3>Revenue</h3>
             <div class="cx-bv-section-totals">
-              <span>Budget: <strong class="tabular-nums">₦{{ d.income.totals.budget | number:'1.0-0' }}</strong></span>
-              <span>Actual: <strong class="tabular-nums">₦{{ d.income.totals.actual | number:'1.0-0' }}</strong></span>
+              <span>Budget: <strong class="tabular-nums">{{ d.income.totals.budget | money }}</strong></span>
+              <span>Actual: <strong class="tabular-nums">{{ d.income.totals.actual | money }}</strong></span>
               <span [class.cx-bv-good]="+d.income.totals.variance >= 0" [class.cx-bv-bad]="+d.income.totals.variance < 0">
                 Variance: <strong class="tabular-nums">
-                  @if (+d.income.totals.variance >= 0) { +₦{{ d.income.totals.variance | number:'1.0-0' }} }
-                  @else { −₦{{ (-d.income.totals.variance) | number:'1.0-0' }} }
+                  @if (+d.income.totals.variance >= 0) { +{{ d.income.totals.variance | money }} }
+                  @else { −{{ (-d.income.totals.variance) | money }} }
                 </strong>
                 @if (d.income.totals.variance_pct != null) {
                   ({{ d.income.totals.variance_pct > 0 ? '+' : '' }}{{ d.income.totals.variance_pct | number:'1.1-1' }}%)
@@ -145,13 +146,13 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         <span class="cx-bv-unbudgeted">Unbudgeted</span>
                       }
                     </td>
-                    <td class="cx-bv-right tabular-nums">₦{{ r.budget | number:'1.2-2' }}</td>
-                    <td class="cx-bv-right tabular-nums">₦{{ r.actual | number:'1.2-2' }}</td>
+                    <td class="cx-bv-right tabular-nums">{{ r.budget | money:2 }}</td>
+                    <td class="cx-bv-right tabular-nums">{{ r.actual | money:2 }}</td>
                     <td class="cx-bv-right tabular-nums"
                         [class.cx-bv-good]="+r.variance >= 0"
                         [class.cx-bv-bad]="+r.variance < 0">
-                      @if (+r.variance >= 0) { +₦{{ r.variance | number:'1.2-2' }} }
-                      @else { −₦{{ (-r.variance) | number:'1.2-2' }} }
+                      @if (+r.variance >= 0) { +{{ r.variance | money:2 }} }
+                      @else { −{{ (-r.variance) | money:2 }} }
                     </td>
                     <td class="cx-bv-right tabular-nums">
                       @if (r.variance_pct != null) {
@@ -172,13 +173,13 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           <div class="cx-bv-section-head cx-bv-section-expense">
             <h3>Expenses</h3>
             <div class="cx-bv-section-totals">
-              <span>Budget: <strong class="tabular-nums">₦{{ d.expense.totals.budget | number:'1.0-0' }}</strong></span>
-              <span>Actual: <strong class="tabular-nums">₦{{ d.expense.totals.actual | number:'1.0-0' }}</strong></span>
+              <span>Budget: <strong class="tabular-nums">{{ d.expense.totals.budget | money }}</strong></span>
+              <span>Actual: <strong class="tabular-nums">{{ d.expense.totals.actual | money }}</strong></span>
               <!-- For expense: positive variance = overspent = BAD -->
               <span [class.cx-bv-bad]="+d.expense.totals.variance > 0" [class.cx-bv-good]="+d.expense.totals.variance <= 0">
                 Variance: <strong class="tabular-nums">
-                  @if (+d.expense.totals.variance >= 0) { +₦{{ d.expense.totals.variance | number:'1.0-0' }} }
-                  @else { −₦{{ (-d.expense.totals.variance) | number:'1.0-0' }} }
+                  @if (+d.expense.totals.variance >= 0) { +{{ d.expense.totals.variance | money }} }
+                  @else { −{{ (-d.expense.totals.variance) | money }} }
                 </strong>
                 @if (d.expense.totals.variance_pct != null) {
                   ({{ d.expense.totals.variance_pct > 0 ? '+' : '' }}{{ d.expense.totals.variance_pct | number:'1.1-1' }}%)
@@ -209,14 +210,14 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         <span class="cx-bv-unbudgeted">Unbudgeted</span>
                       }
                     </td>
-                    <td class="cx-bv-right tabular-nums">₦{{ r.budget | number:'1.2-2' }}</td>
-                    <td class="cx-bv-right tabular-nums">₦{{ r.actual | number:'1.2-2' }}</td>
+                    <td class="cx-bv-right tabular-nums">{{ r.budget | money:2 }}</td>
+                    <td class="cx-bv-right tabular-nums">{{ r.actual | money:2 }}</td>
                     <!-- Expense: positive variance is overspending, colour inverted -->
                     <td class="cx-bv-right tabular-nums"
                         [class.cx-bv-bad]="+r.variance > 0"
                         [class.cx-bv-good]="+r.variance <= 0">
-                      @if (+r.variance >= 0) { +₦{{ r.variance | number:'1.2-2' }} }
-                      @else { −₦{{ (-r.variance) | number:'1.2-2' }} }
+                      @if (+r.variance >= 0) { +{{ r.variance | money:2 }} }
+                      @else { −{{ (-r.variance) | money:2 }} }
                     </td>
                     <td class="cx-bv-right tabular-nums">
                       @if (r.variance_pct != null) {

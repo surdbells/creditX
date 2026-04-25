@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 /**
  * Journal Entries — global view of every LedgerTransaction across the
@@ -14,7 +16,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
  * scoped transaction views by letting users answer questions that
  * don't start with 'which account?':
  *
- *   - 'Show me every journal entry over ₦500k this month'
+ *   - 'Show me every journal entry over the configured currency threshold this month'
  *   - 'What were all the postings for callback DISB-LN0042-...?'
  *   - 'List every reversal today' (trans_narration LIKE '%REVERSAL%')
  *
@@ -35,7 +37,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 @Component({
   selector: 'app-journal-entries',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -79,14 +81,14 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
           </select>
         </div>
         <div class="cx-je-filter-group">
-          <label class="cx-je-filter-label">Min Amount (₦)</label>
+          <label class="cx-je-filter-label">Min Amount ({{ settings.currencySymbol() }})</label>
           <input type="number" class="cx-input cx-je-filter-input tabular-nums"
                  [(ngModel)]="filters.min_amount"
                  (change)="applyFilters()"
                  placeholder="0" />
         </div>
         <div class="cx-je-filter-group">
-          <label class="cx-je-filter-label">Max Amount (₦)</label>
+          <label class="cx-je-filter-label">Max Amount ({{ settings.currencySymbol() }})</label>
           <input type="number" class="cx-input cx-je-filter-input tabular-nums"
                  [(ngModel)]="filters.max_amount"
                  (change)="applyFilters()"
@@ -115,11 +117,11 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
           </div>
           <div class="cx-je-summary-cell">
             <div class="cx-je-summary-label">Total Debit (page)</div>
-            <div class="cx-je-summary-value cx-je-summary-dr tabular-nums">₦{{ pageTotalDr() | number:'1.2-2' }}</div>
+            <div class="cx-je-summary-value cx-je-summary-dr tabular-nums">{{ pageTotalDr() | money:2 }}</div>
           </div>
           <div class="cx-je-summary-cell">
             <div class="cx-je-summary-label">Total Credit (page)</div>
-            <div class="cx-je-summary-value cx-je-summary-cr tabular-nums">₦{{ pageTotalCr() | number:'1.2-2' }}</div>
+            <div class="cx-je-summary-value cx-je-summary-cr tabular-nums">{{ pageTotalCr() | money:2 }}</div>
           </div>
         </div>
       }
@@ -193,7 +195,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
               </div>
               <div class="cx-je-meta-row">
                 <span>Amount</span>
-                <span class="tabular-nums cx-je-amount-big">₦{{ activeRow()?.trans_amount | number:'1.2-2' }}</span>
+                <span class="tabular-nums cx-je-amount-big">{{ activeRow()?.trans_amount | money:2 }}</span>
               </div>
               <div class="cx-je-meta-row">
                 <span>Narration</span>
@@ -291,10 +293,10 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                         </td>
                         <td class="cx-je-narration">{{ s.trans_narration }}</td>
                         <td class="cx-je-right tabular-nums">
-                          @if (s.trans_type === 'DR') { ₦{{ s.trans_amount | number:'1.2-2' }} }
+                          @if (s.trans_type === 'DR') { {{ s.trans_amount | money:2 }} }
                         </td>
                         <td class="cx-je-right tabular-nums">
-                          @if (s.trans_type === 'CR') { ₦{{ s.trans_amount | number:'1.2-2' }} }
+                          @if (s.trans_type === 'CR') { {{ s.trans_amount | money:2 }} }
                         </td>
                       </tr>
                     }
@@ -302,14 +304,14 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
                   <tfoot>
                     <tr class="cx-je-siblings-total">
                       <td colspan="2">Totals</td>
-                      <td class="cx-je-right tabular-nums">₦{{ siblingsTotalDr() | number:'1.2-2' }}</td>
-                      <td class="cx-je-right tabular-nums">₦{{ siblingsTotalCr() | number:'1.2-2' }}</td>
+                      <td class="cx-je-right tabular-nums">{{ siblingsTotalDr() | money:2 }}</td>
+                      <td class="cx-je-right tabular-nums">{{ siblingsTotalCr() | money:2 }}</td>
                     </tr>
                     @if (!isBalanced()) {
                       <tr class="cx-je-siblings-unbalanced">
                         <td colspan="4">
                           <lucide-icon name="info" [size]="12"></lucide-icon>
-                          Entries in view do not balance — ₦{{ imbalance() | number:'1.2-2' }}
+                          Entries in view do not balance — {{ imbalance() | money:2 }}
                           difference. This may indicate the journal is still
                           being posted or this query hides some entries.
                         </td>
@@ -660,7 +662,7 @@ export class JournalEntriesComponent implements OnInit {
   siblings = signal<any[]>([]);
   siblingsLoading = signal(false);
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() {
     this.loadGlAccounts();
