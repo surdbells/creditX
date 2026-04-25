@@ -10,18 +10,22 @@ declare(strict_types=1);
  * Phase 2.1. The script is idempotent — re-running it is safe.
  *
  * What it does:
- *   1. Insert the four granular permissions if they don't exist
- *      (reports.performance.agents / .branches / .products / .approvers).
+ *   1. Insert the granular report permissions if they don't exist
+ *      (reports.performance.agents / .branches / .products / .approvers
+ *      and reports.general_loans).
  *   2. For every role currently holding 'reports.performance', grant
- *      all four new permissions.
+ *      all four performance permissions.
  *   3. Delete the old 'reports.performance' permission (cascades to
  *      role_permissions via FK, but we explicitly clean role_permissions
  *      first for drivers that don't cascade).
- *   4. Also grants the 'approvers' permission to any role that already
- *      has all THREE of the other granular keys (agents, branches,
- *      products) — treats those roles as operationally-qualified to
- *      see the approver report too. Skipped otherwise so the permission
- *      assignment stays intentional.
+ *   4. Backfills:
+ *        (a) approvers — granted to any role that already has all three
+ *            of agents/branches/products.
+ *        (b) general_loans — granted to any role that already has all
+ *            FOUR granular performance keys (agents/branches/products/
+ *            approvers). Treats those roles as full-access reporting
+ *            users qualified for the wider general loan report.
+ *      Skipped otherwise so permission assignment stays intentional.
  *
  * Usage:
  *   cd /www/wwwroot/creditx/backend
@@ -57,6 +61,7 @@ $newPerms = [
     ['reports.performance.branches',  'View Branch Performance Report'],
     ['reports.performance.products',  'View Product Performance Report'],
     ['reports.performance.approvers', 'View Approver Performance Report'],
+    ['reports.general_loans',         'View General Loan Report'],
 ];
 
 // ─── Step 1: insert new permissions if missing ───
@@ -130,23 +135,31 @@ if ($oldPermId) {
     echo "  - Already absent\n";
 }
 
-// ─── Step 4: backfill approvers permission for roles that already ───
+// ─── Step 4: backfill new permissions for roles that already ───
 // ─── migrated to the granular three but haven't been re-seeded.      ───
-// On a system where Phase 2.1 ran and Commit 4 is now landing, the
-// three granular permissions exist and some roles hold them. That
-// doesn't automatically grant the new 'approvers' key — the first
-// migration run didn't know about it. This step handles it.
 //
-// Condition to auto-grant: role holds ALL three of (agents, branches,
-// products). If yes, grant approvers too. Anything less means the role
-// is intentionally scoped and we don't override that.
-echo "\n[4/4] Backfilling approvers permission for qualified roles...\n";
-$approversId = $newIds['reports.performance.approvers'];
-$agentsId    = $newIds['reports.performance.agents'];
-$branchesId  = $newIds['reports.performance.branches'];
-$productsId  = $newIds['reports.performance.products'];
+// Two backfills happen here:
+//
+//   (a) approvers: roles holding ALL three of agents/branches/products
+//       qualify for approvers. (Original Phase 4a logic.)
+//
+//   (b) general_loans: roles holding ALL FOUR granular keys (agents,
+//       branches, products, approvers) qualify for general_loans —
+//       these are full-access reporting users and the general loan
+//       report is an extension of that scope.
+//
+// Anything less means the role is intentionally scoped and we don't
+// override that. Operators wanting a more permissive default should
+// edit the role via the UI.
+echo "\n[4/4] Backfilling new permissions for qualified roles...\n";
+$approversId    = $newIds['reports.performance.approvers'];
+$agentsId       = $newIds['reports.performance.agents'];
+$branchesId     = $newIds['reports.performance.branches'];
+$productsId     = $newIds['reports.performance.products'];
+$generalLoansId = $newIds['reports.general_loans'];
 
-$qualifiedRoles = $conn->fetchFirstColumn(
+// (a) Backfill approvers: holds agents+branches+products
+$qualifiedForApprovers = $conn->fetchFirstColumn(
     "SELECT rp1.role_id
      FROM role_permissions rp1
      INNER JOIN role_permissions rp2 ON rp1.role_id = rp2.role_id
@@ -157,22 +170,51 @@ $qualifiedRoles = $conn->fetchFirstColumn(
     [$agentsId, $branchesId, $productsId]
 );
 
-$granted = 0;
-foreach ($qualifiedRoles as $roleId) {
-    $alreadyHasApprovers = $conn->fetchOne(
+$grantedApprovers = 0;
+foreach ($qualifiedForApprovers as $roleId) {
+    $alreadyHas = $conn->fetchOne(
         'SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ?',
         [$roleId, $approversId]
     );
-    if ($alreadyHasApprovers) continue;
+    if ($alreadyHas) continue;
     $conn->insert('role_permissions', [
         'role_id'       => $roleId,
         'permission_id' => $approversId,
     ]);
-    $granted++;
+    $grantedApprovers++;
 }
 
-if ($granted > 0) {
-    echo "  + Granted approvers permission to {$granted} qualified role(s)\n";
+// (b) Backfill general_loans: holds agents+branches+products+approvers
+$qualifiedForGeneral = $conn->fetchFirstColumn(
+    "SELECT rp1.role_id
+     FROM role_permissions rp1
+     INNER JOIN role_permissions rp2 ON rp1.role_id = rp2.role_id
+     INNER JOIN role_permissions rp3 ON rp1.role_id = rp3.role_id
+     INNER JOIN role_permissions rp4 ON rp1.role_id = rp4.role_id
+     WHERE rp1.permission_id = ?
+       AND rp2.permission_id = ?
+       AND rp3.permission_id = ?
+       AND rp4.permission_id = ?",
+    [$agentsId, $branchesId, $productsId, $approversId]
+);
+
+$grantedGeneral = 0;
+foreach ($qualifiedForGeneral as $roleId) {
+    $alreadyHas = $conn->fetchOne(
+        'SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ?',
+        [$roleId, $generalLoansId]
+    );
+    if ($alreadyHas) continue;
+    $conn->insert('role_permissions', [
+        'role_id'       => $roleId,
+        'permission_id' => $generalLoansId,
+    ]);
+    $grantedGeneral++;
+}
+
+if ($grantedApprovers > 0 || $grantedGeneral > 0) {
+    if ($grantedApprovers > 0) echo "  + Granted approvers permission to {$grantedApprovers} qualified role(s)\n";
+    if ($grantedGeneral > 0)   echo "  + Granted general_loans permission to {$grantedGeneral} qualified role(s)\n";
 } else {
     echo "  - No backfill needed\n";
 }
