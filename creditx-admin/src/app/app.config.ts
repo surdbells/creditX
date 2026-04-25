@@ -1,4 +1,4 @@
-import { ApplicationConfig, importProvidersFrom, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, importProvidersFrom, provideAppInitializer, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, inject } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
@@ -16,6 +16,7 @@ import { LucideAngularModule,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { SettingsService } from './core/services/settings.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,6 +25,11 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimations(),
+    // Hydrate user-facing settings (currency symbol, company name, etc.)
+    // before the first component renders. Failures inside SettingsService
+    // are swallowed and fall back to hardcoded defaults — the app boots
+    // regardless of whether the settings endpoint is reachable.
+    provideAppInitializer(() => inject(SettingsService).load()),
     importProvidersFrom(
       LucideAngularModule.pick({
         LayoutDashboard, Users, Shield, MapPin, Settings, ScrollText, Database,

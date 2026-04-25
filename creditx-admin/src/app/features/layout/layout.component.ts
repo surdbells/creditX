@@ -7,6 +7,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { ToastContainerComponent } from '../../shared/components/toast/toast.component';
 import { ChatBubbleComponent } from '../../shared/components/chat-bubble/chat-bubble.component';
 import { FontScaleControlComponent } from '../../shared/components/font-scale-control/font-scale-control.component';
@@ -124,7 +125,7 @@ export class LayoutComponent {
     { label: 'Menu', icon: 'menu', route: '' },
   ];
 
-  constructor(public auth: AuthService, public theme: ThemeService, private router: Router, private api: ApiService, private toast: ToastService, private _fontScale: FontScaleService) {}
+  constructor(public auth: AuthService, public theme: ThemeService, public settings: SettingsService, private router: Router, private api: ApiService, private toast: ToastService, private _fontScale: FontScaleService) {}
 
   get filteredGroups(): NavGroup[] {
     return this.navGroups.map(g => ({ ...g, items: g.items.filter(i => this.isItemAccessible(i)) })).filter(g => g.items.length > 0);

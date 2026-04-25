@@ -83,6 +83,7 @@ return function (App $app): void {
 
     // ─── Public utility endpoints ───
     $app->get('/api/banks', ListBanksAction::class);
+    $app->get('/api/settings/public', Setting\PublicSettingsAction::class);
 
     // ─── Authenticated routes ───
     $app->group('/api', function (RouteCollectorProxy $api) {

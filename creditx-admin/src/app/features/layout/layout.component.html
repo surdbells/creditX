@@ -65,7 +65,7 @@
     <div class="mobile-overlay" (click)="mobileMenuOpen.set(false)">
       <aside class="mobile-menu cx-animate-in" (click)="$event.stopPropagation()">
         <div class="flex items-center justify-between p-4 border-b border-[var(--cx-border)]">
-          <span class="text-lg font-bold text-[var(--cx-primary)]">CreditX</span>
+          <span class="text-lg font-bold text-[var(--cx-primary)]">{{ settings.companyName() }}</span>
           <button class="cx-btn cx-btn-ghost cx-btn-icon" (click)="mobileMenuOpen.set(false)">
             <lucide-icon name="x" [size]="20"></lucide-icon>
           </button>
