@@ -1123,7 +1123,7 @@ export class ReportsComponent implements OnInit {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `CreditX_approver-timeline_${this.filterGranularity}_${ts}.csv`;
+        a.download = `${this.settings.brandSlug()}_approver-timeline_${this.filterGranularity}_${ts}.csv`;
         a.click();
         URL.revokeObjectURL(url);
         this.toast.success('Timeline CSV exported');
@@ -1159,7 +1159,7 @@ export class ReportsComponent implements OnInit {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `CreditX_${this.activeReport()}_${params.view}_${ts}.csv`;
+          a.download = `${this.settings.brandSlug()}_${this.activeReport()}_${params.view}_${ts}.csv`;
           a.click();
           URL.revokeObjectURL(url);
           this.toast.success('CSV exported');
@@ -1185,7 +1185,7 @@ export class ReportsComponent implements OnInit {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `CreditX_${this.activeReport()}_${ts}.csv`;
+      a.download = `${this.settings.brandSlug()}_${this.activeReport()}_${ts}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       this.toast.success('CSV exported');

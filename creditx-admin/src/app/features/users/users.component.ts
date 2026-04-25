@@ -12,6 +12,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-users', standalone: true,
@@ -719,7 +720,7 @@ export class UsersComponent implements OnInit {
 
   apiUrl = environment.apiUrl.replace('/api', '');
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private http: HttpClient) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private http: HttpClient, public settings: SettingsService) {}
 
   ngOnInit(): void {
     this.load();
@@ -839,7 +840,7 @@ export class UsersComponent implements OnInit {
         const data = res.data || [];
         if (data.length === 0) { this.toast.error('No data to export'); return; }
         const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const filename = `CreditX_Users_${ts}`;
+        const filename = `${this.settings.brandSlug()}_Users_${ts}`;
 
         if (format === 'csv') {
           const headers = ['Full Name', 'Email', 'Phone', 'Role', 'Department', 'Team', 'Status', 'Joined'];
@@ -860,8 +861,8 @@ export class UsersComponent implements OnInit {
           // Generate printable HTML and trigger print
           const printWin = window.open('', '_blank');
           if (!printWin) return;
-          let html = `<html><head><title>CreditX Users Report</title><style>body{font-family:Arial,sans-serif;margin:20px}h1{color:#0A4F2A;font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px;font-size:11px;text-align:left}th{background:#0A4F2A;color:white}tr:nth-child(even){background:#f9f9f9}.meta{color:#666;font-size:11px;margin-top:4px}</style></head><body>`;
-          html += `<h1>CreditX — User Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Total: ${data.length} users</p>`;
+          let html = `<html><head><title>${this.settings.companyName()} Users Report</title><style>body{font-family:Arial,sans-serif;margin:20px}h1{color:#0A4F2A;font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px;font-size:11px;text-align:left}th{background:#0A4F2A;color:white}tr:nth-child(even){background:#f9f9f9}.meta{color:#666;font-size:11px;margin-top:4px}</style></head><body>`;
+          html += `<h1>${this.settings.companyName()} — User Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Total: ${data.length} users</p>`;
           html += '<table><tr><th>Full Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Department</th><th>Team</th><th>Status</th><th>Joined</th></tr>';
           for (const r of data) {
             html += `<tr><td>${r.full_name}</td><td>${r.email}</td><td>${r.phone || ''}</td><td>${r.roles?.[0]?.name || ''}</td><td>${r.department_name || ''}</td><td>${r.team_name || ''}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;

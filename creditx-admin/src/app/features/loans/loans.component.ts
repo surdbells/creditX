@@ -9,6 +9,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-loans', standalone: true,
@@ -167,7 +168,7 @@ export class LoansComponent implements OnInit {
   filters: any = { search: '', status: '', product_id: '' };
   totalRecords = 0; exportOpen = false; private q: any = {}; private filterTimeout: any;
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
   ngOnInit() {
     this.load();
     this.api.get('/loan-products', { per_page: 50 }).subscribe({ next: r => this.products.set(r.data || []) });
@@ -197,7 +198,7 @@ export class LoansComponent implements OnInit {
         const data = res.data || [];
         if (!data.length) { this.toast.error('No data'); return; }
         const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const fn = `CreditX_Loans_${ts}`;
+        const fn = `${this.settings.brandSlug()}_Loans_${ts}`;
         const h = ['App ID','Customer','Product','Amount','Tenor','Status','Applied'];
         if (format === 'csv') {
           const rows = [h.join(','), ...data.map((r: any) => [r.application_id, `"${r.customer_name}"`, `"${r.product_name||''}"`, r.amount_requested, r.tenure, r.status, r.created_at].join(','))];
@@ -209,7 +210,7 @@ export class LoansComponent implements OnInit {
         } else if (format === 'pdf') {
           const w = window.open('', '_blank'); if (!w) return;
           let html = `<html><head><title>Loans</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px;font-size:10px}th{background:#0A4F2A;color:white}.meta{color:#666;font-size:10px}</style></head><body>`;
-          html += `<h1>CreditX — Loan Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | ${data.length} loans</p><table><tr>` + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
+          html += `<h1>${this.settings.companyName()} — Loan Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | ${data.length} loans</p><table><tr>` + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
           for (const r of data) html += `<tr><td>${r.application_id}</td><td>${r.customer_name}</td><td>${r.product_name||''}</td><td>${r.amount_requested}</td><td>${r.tenure}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
           w.document.write(html + '</table></body></html>'); w.document.close(); w.onload = () => w.print();
         }

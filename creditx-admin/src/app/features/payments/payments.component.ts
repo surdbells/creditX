@@ -324,7 +324,7 @@ export class PaymentsComponent implements OnInit {
     const csv = 'loan_application_id,amount,payment_method,reference,payment_date,narration\nLOAN-001,50000,bank_transfer,TXN123,2026-04-18,April payment\nLOAN-002,75000,deduction,SAL-APR,2026-04-18,Salary deduction';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'CreditX_BulkRepayment_Template.csv'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `${this.settings.brandSlug()}_BulkRepayment_Template.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -335,7 +335,7 @@ export class PaymentsComponent implements OnInit {
         const data = res.data || [];
         if (!data.length) { this.toast.error('No data'); return; }
         const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const fn = `CreditX_Payments_${ts}`;
+        const fn = `${this.settings.brandSlug()}_Payments_${ts}`;
         const h = ['Reference','Customer','Loan','Amount','Method','Status','Date'];
         if (format === 'csv') {
           const rows = [h.join(','), ...data.map((r: any) => [r.reference, `"${r.customer_name||''}"`, r.loan_application_id, r.amount, r.payment_method, r.status, r.created_at].join(','))];
@@ -347,7 +347,7 @@ export class PaymentsComponent implements OnInit {
         } else if (format === 'pdf') {
           const w = window.open('', '_blank'); if (!w) return;
           let html = `<html><head><title>Payments</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px;font-size:10px}th{background:#0A4F2A;color:white}</style></head><body>`;
-          html += `<h1>CreditX — Payment Report</h1><p style="color:#666;font-size:10px">Generated: ${new Date().toLocaleString()} | ${data.length} payments</p><table><tr>` + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
+          html += `<h1>${this.settings.companyName()} — Payment Report</h1><p style="color:#666;font-size:10px">Generated: ${new Date().toLocaleString()} | ${data.length} payments</p><table><tr>` + h.map(c => `<th>${c}</th>`).join('') + '</tr>';
           for (const r of data) html += `<tr><td>${r.reference}</td><td>${r.customer_name||''}</td><td>${r.loan_application_id||''}</td><td>${r.amount}</td><td>${r.payment_method||''}</td><td>${r.status}</td><td>${r.created_at}</td></tr>`;
           w.document.write(html + '</table></body></html>'); w.document.close(); w.onload = () => w.print();
         }

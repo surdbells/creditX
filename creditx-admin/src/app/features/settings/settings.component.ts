@@ -9,6 +9,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-settings', standalone: true,
@@ -17,7 +18,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
     <div class="cx-animate-in">
       <cx-page-header
         title="System Settings"
-        subtitle="Configure how CreditX behaves across your organization"
+        [subtitle]="'Configure how ' + settings.companyName() + ' behaves across your organization'"
         eyebrow="Configuration">
         @if (auth.hasPermission('settings.create')) {
           <button class="cx-btn cx-btn-primary" (click)="openForm()">
@@ -284,7 +285,7 @@ export class SettingsComponent implements OnInit {
   allCategories = ['', 'general', 'security', 'notification', 'approval', 'penalty', 'payment', 'accounting'];
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {};
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
   ngOnInit() { this.load(); }
 
   load() {

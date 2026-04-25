@@ -158,4 +158,28 @@ export class SettingsService {
     if (n >= 1_000) return `${symbol}${(n / 1_000).toFixed(0)}K`;
     return `${symbol}${Math.round(n).toLocaleString()}`;
   }
+
+  /**
+   * Filesystem-safe slug derived from the company name. Used in
+   * export filenames so a CSV's name still identifies the operator
+   * after rebranding ("Acme Lending Co." -> "Acme_Lending_Co").
+   *
+   * Sanitization:
+   *   - Strip diacritics so non-Latin chars map to ASCII where
+   *     possible ("Café Crédit" -> "Cafe_Credit")
+   *   - Replace any run of non-alphanumeric chars with a single
+   *     underscore
+   *   - Trim leading/trailing underscores
+   *   - Fall back to "Export" if the result is empty (e.g. company
+   *     name is all punctuation)
+   *
+   * The output is ASCII-only so it won't break Windows filename rules
+   * or shell quoting in download flows.
+   */
+  brandSlug(): string {
+    const name = this.companyName();
+    const ascii = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const slug = ascii.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return slug || 'Export';
+  }
 }

@@ -10,6 +10,7 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
 import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-customer-detail', standalone: true,
@@ -486,7 +487,7 @@ export class CustomerDetailComponent implements OnInit {
     { id: 'documents', label: 'Documents' },
   ];
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, public settings: SettingsService) {}
 
   ngOnInit(): void {
     if (this.id) {
@@ -558,7 +559,7 @@ export class CustomerDetailComponent implements OnInit {
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `CreditX_Ledger_${this.selectedLoan?.application_id}_${ts}.csv`; a.click();
+    a.download = `${this.settings.brandSlug()}_Ledger_${this.selectedLoan?.application_id}_${ts}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 

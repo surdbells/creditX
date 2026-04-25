@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-audit-logs', standalone: true,
@@ -515,7 +516,7 @@ export class AuditLogsComponent implements OnInit {
   exportOpen = false; detailRow: any = null;
   private filterTimeout: any;
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
   ngOnInit(): void {
     this.load();
     this.api.get('/users', { per_page: 500, sort_by: 'firstName', sort_dir: 'ASC' }).subscribe({ next: r => this.users.set(r.data || []) });
@@ -586,7 +587,7 @@ export class AuditLogsComponent implements OnInit {
         const data = res.data || [];
         if (!data.length) { this.toast.error('No data to export'); return; }
         const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const filename = `CreditX_AuditTrail_${ts}`;
+        const filename = `${this.settings.brandSlug()}_AuditTrail_${ts}`;
 
         if (format === 'csv') {
           const h = ['Timestamp', 'User', 'Action', 'Entity Type', 'Entity ID', 'IP Address', 'Description'];
@@ -599,7 +600,7 @@ export class AuditLogsComponent implements OnInit {
         } else if (format === 'pdf') {
           const w = window.open('', '_blank'); if (!w) return;
           let html = `<html><head><title>Audit Trail</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px;font-size:10px}th{background:#0A4F2A;color:white}.meta{color:#666;font-size:10px}</style></head><body>`;
-          html += `<h1>CreditX — Audit Trail Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Records: ${data.length}</p>`;
+          html += `<h1>${this.settings.companyName()} — Audit Trail Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Records: ${data.length}</p>`;
           html += '<table><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Entity</th><th>Entity ID</th><th>IP</th></tr>';
           for (const r of data) html += `<tr><td>${r.created_at}</td><td>${r.user_name || 'System'}</td><td>${r.action}</td><td>${r.entity_type}</td><td>${r.entity_id}</td><td>${r.ip_address || ''}</td></tr>`;
           w.document.write(html + '</table></body></html>'); w.document.close(); w.onload = () => w.print();

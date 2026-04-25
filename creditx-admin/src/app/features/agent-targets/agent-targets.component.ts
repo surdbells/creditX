@@ -12,7 +12,6 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SettingsService } from '../../core/services/settings.service';
-import { MoneyPipe } from '../../shared/pipes/money.pipe';
 
 /**
  * Agent Targets
@@ -50,7 +49,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   imports: [
     CommonModule, FormsModule, RouterLink, LucideAngularModule,
     PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent,
-    FormDialogComponent, ConfirmDialogComponent, MoneyPipe,
+    FormDialogComponent, ConfirmDialogComponent,
   ],
   template: `
     <div class="cx-animate-in">

@@ -541,7 +541,7 @@ export class GovernmentRecordsComponent implements OnInit {
         const data = res.data || [];
         if (data.length === 0) { this.toast.error('No records to export'); return; }
         const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
-        const filename = `CreditX_GovRecords_${ts}`;
+        const filename = `${this.settings.brandSlug()}_GovRecords_${ts}`;
         const headers = ['Staff ID','Employee Name','Record Type','Job Title','Organization','Grade','Step','Gross Pay','Net Pay','Gender','Status'];
 
         if (format === 'csv') {
@@ -563,7 +563,7 @@ export class GovernmentRecordsComponent implements OnInit {
         } else if (format === 'pdf') {
           const w = window.open('', '_blank'); if (!w) return;
           let html = `<html><head><title>Government Records</title><style>body{font-family:Arial;margin:20px}h1{color:#0A4F2A;font-size:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:5px;font-size:9px}th{background:#0A4F2A;color:white}.meta{color:#666;font-size:10px}</style></head><body>`;
-          html += `<h1>CreditX — Government Records Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Records: ${data.length}</p><table><tr>`;
+          html += `<h1>${this.settings.companyName()} — Government Records Report</h1><p class="meta">Generated: ${new Date().toLocaleString()} | Records: ${data.length}</p><table><tr>`;
           for (const h of headers) html += `<th>${h}</th>`;
           html += '</tr>';
           for (const r of data) {
