@@ -1116,4 +1116,201 @@ final class ReportingService
         ";
         return $conn->fetchAllAssociative($sql, $params);
     }
+
+    /**
+     * Dashboard charts — five aggregations bundled for the home page.
+     *
+     * Returns everything the home dashboard's chart grid needs in a
+     * single round-trip. Co-located here rather than in a dedicated
+     * service because every query is loan/payment-centric and reuses
+     * fragments from existing report methods.
+     *
+     * Charts (J decision):
+     *   1. portfolio_by_status — count + amount per LoanStatus.
+     *      Drives the donut. Reuses logic from portfolioDashboard's
+     *      status_breakdown but keeps its own copy here so a future
+     *      change to either doesn't accidentally couple them.
+     *
+     *   2. disbursement_trend — last 12 months, sum of net_disbursed
+     *      per month. Densified: every month appears even if zero.
+     *      Drives the bar chart. Anchored to first-day-of-current-
+     *      month minus 11 months so partial months render correctly.
+     *
+     *   3. collection_trend — last 12 months, sum of successful
+     *      payments per month. Same densification as #2. Drives
+     *      the line chart. NOT 'collection rate' (which would need
+     *      expected-vs-actual per month and is harder); just absolute
+     *      collection volume — what hit the bank account.
+     *
+     *   4. overdue_aging — current/1-30/31-60/61-90/90+ buckets with
+     *      outstanding amounts. Drives the horizontal bar. Reuses the
+     *      same bucket logic as parReport but excludes the 'current'
+     *      bucket from the chart since the dashboard is about the
+     *      problem set (overdue), not the healthy set.
+     *
+     *   5. top_products — top 5 products by disbursed loan count.
+     *      Drives the bar. Volume is also returned so the chart can
+     *      show count or amount on hover.
+     *
+     * No filters — the dashboard is unfiltered tenant-wide. Operators
+     * wanting filtered views go to /reports.
+     *
+     * @return array<string, mixed>
+     */
+    public function dashboardCharts(): array
+    {
+        $conn = $this->em->getConnection();
+
+        // ── 1. portfolio_by_status ──
+        $statusRows = $conn->fetchAllAssociative(
+            "SELECT l.status::text AS status,
+                    COUNT(*) AS count,
+                    COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) AS amount
+             FROM loans l
+             WHERE l.status NOT IN ('draft','cancelled')
+             GROUP BY l.status
+             ORDER BY count DESC"
+        );
+        $portfolioByStatus = array_map(
+            fn(array $r): array => [
+                'label'  => strtoupper((string) $r['status']),
+                'value'  => (int) $r['count'],
+                'amount' => (float) $r['amount'],
+            ],
+            $statusRows
+        );
+
+        // ── 2. disbursement_trend (12-month rolling) ──
+        $now = new \DateTimeImmutable('now');
+        $start = $now->modify('first day of -11 months')->setTime(0, 0, 0);
+        $disbRows = $conn->fetchAllAssociative(
+            "SELECT TO_CHAR(DATE_TRUNC('month', l.disbursed_at), 'YYYY-MM') AS month_key,
+                    COALESCE(SUM(CAST(l.net_disbursed AS NUMERIC)), 0) AS value,
+                    COUNT(*) AS count
+             FROM loans l
+             WHERE l.disbursed_at IS NOT NULL
+               AND l.disbursed_at >= :start
+             GROUP BY month_key
+             ORDER BY month_key ASC",
+            ['start' => $start->format('Y-m-d')]
+        );
+        $disbByMonth = [];
+        foreach ($disbRows as $r) {
+            $disbByMonth[$r['month_key']] = [
+                'value' => (float) $r['value'],
+                'count' => (int) $r['count'],
+            ];
+        }
+        $disbursementTrend = [];
+        for ($i = 0; $i < 12; $i++) {
+            $m = $start->modify("+{$i} months");
+            $key = $m->format('Y-m');
+            $disbursementTrend[] = [
+                'label' => $m->format('M Y'),
+                'value' => $disbByMonth[$key]['value'] ?? 0.0,
+                'count' => $disbByMonth[$key]['count'] ?? 0,
+            ];
+        }
+
+        // ── 3. collection_trend (12-month rolling) ──
+        $payRows = $conn->fetchAllAssociative(
+            "SELECT TO_CHAR(DATE_TRUNC('month', p.created_at), 'YYYY-MM') AS month_key,
+                    COALESCE(SUM(CAST(p.amount AS NUMERIC)), 0) AS value
+             FROM payments p
+             WHERE p.status = 'success'
+               AND p.created_at >= :start
+             GROUP BY month_key
+             ORDER BY month_key ASC",
+            ['start' => $start->format('Y-m-d')]
+        );
+        $payByMonth = [];
+        foreach ($payRows as $r) {
+            $payByMonth[$r['month_key']] = (float) $r['value'];
+        }
+        $collectionTrend = [];
+        for ($i = 0; $i < 12; $i++) {
+            $m = $start->modify("+{$i} months");
+            $key = $m->format('Y-m');
+            $collectionTrend[] = [
+                'label' => $m->format('M Y'),
+                'value' => $payByMonth[$key] ?? 0.0,
+            ];
+        }
+
+        // ── 4. overdue_aging ──
+        // Reuses parReport's bucket logic minus the 'current' bucket.
+        // Densifies missing buckets to zero so the chart always renders
+        // four bars even when a bucket has no loans.
+        $agingRows = $conn->fetchAllAssociative(
+            "SELECT
+                CASE
+                    WHEN CURRENT_DATE - rs.due_date BETWEEN 1 AND 30 THEN '1_30'
+                    WHEN CURRENT_DATE - rs.due_date BETWEEN 31 AND 60 THEN '31_60'
+                    WHEN CURRENT_DATE - rs.due_date BETWEEN 61 AND 90 THEN '61_90'
+                    WHEN CURRENT_DATE - rs.due_date > 90 THEN '90_plus'
+                    ELSE NULL
+                END AS bucket,
+                COUNT(DISTINCT l.id) AS loan_count,
+                COALESCE(SUM(CAST(rs.total_amount AS NUMERIC) - CAST(rs.paid_amount AS NUMERIC)), 0) AS outstanding
+            FROM repayment_schedules rs
+            INNER JOIN loans l ON rs.loan_id = l.id
+            WHERE rs.status IN ('pending','partial','overdue')
+              AND l.status IN ('active','overdue')
+              AND rs.due_date < CURRENT_DATE
+            GROUP BY bucket
+            HAVING bucket IS NOT NULL
+            ORDER BY bucket"
+        );
+        $agingByBucket = [];
+        foreach ($agingRows as $r) {
+            $agingByBucket[$r['bucket']] = $r;
+        }
+        $bucketLabels = [
+            '1_30'    => '1–30 days',
+            '31_60'   => '31–60 days',
+            '61_90'   => '61–90 days',
+            '90_plus' => '90+ days',
+        ];
+        $overdueAging = [];
+        foreach ($bucketLabels as $key => $label) {
+            $row = $agingByBucket[$key] ?? null;
+            $overdueAging[] = [
+                'label'       => $label,
+                'value'       => $row !== null ? (float) $row['outstanding'] : 0.0,
+                'count'       => $row !== null ? (int) $row['loan_count'] : 0,
+            ];
+        }
+
+        // ── 5. top_products (top 5 by disbursed loan count) ──
+        // Uses 'disbursed-or-after' status set so the chart reflects
+        // products that actually moved money, not products with lots
+        // of approvals stuck in disbursement queue.
+        $productRows = $conn->fetchAllAssociative(
+            "SELECT lp.id AS product_id, lp.name AS product_name,
+                    COUNT(*) AS count,
+                    COALESCE(SUM(CAST(l.net_disbursed AS NUMERIC)), 0) AS amount
+             FROM loans l
+             INNER JOIN loan_products lp ON l.product_id = lp.id
+             WHERE l.status IN ('disbursed','active','overdue','closed','restructured')
+             GROUP BY lp.id, lp.name
+             ORDER BY count DESC
+             LIMIT 5"
+        );
+        $topProducts = array_map(
+            fn(array $r): array => [
+                'label'  => (string) $r['product_name'],
+                'value'  => (int) $r['count'],
+                'amount' => (float) $r['amount'],
+            ],
+            $productRows
+        );
+
+        return [
+            'portfolio_by_status' => $portfolioByStatus,
+            'disbursement_trend'  => $disbursementTrend,
+            'collection_trend'    => $collectionTrend,
+            'overdue_aging'       => $overdueAging,
+            'top_products'        => $topProducts,
+        ];
+    }
 }
