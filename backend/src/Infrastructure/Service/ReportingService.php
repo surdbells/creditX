@@ -1241,25 +1241,34 @@ final class ReportingService
         // Reuses parReport's bucket logic minus the 'current' bucket.
         // Densifies missing buckets to zero so the chart always renders
         // four bars even when a bucket has no loans.
+        // The HAVING clause references the 'bucket' alias, which Postgres
+        // doesn't bind until after HAVING is evaluated. Wrapping the
+        // bucketing CASE in a subquery puts the alias in the outer scope
+        // where the WHERE filter (cleaner than HAVING here) can use it.
         $agingRows = $conn->fetchAllAssociative(
-            "SELECT
-                CASE
-                    WHEN CURRENT_DATE - rs.due_date BETWEEN 1 AND 30 THEN '1_30'
-                    WHEN CURRENT_DATE - rs.due_date BETWEEN 31 AND 60 THEN '31_60'
-                    WHEN CURRENT_DATE - rs.due_date BETWEEN 61 AND 90 THEN '61_90'
-                    WHEN CURRENT_DATE - rs.due_date > 90 THEN '90_plus'
-                    ELSE NULL
-                END AS bucket,
-                COUNT(DISTINCT l.id) AS loan_count,
-                COALESCE(SUM(CAST(rs.total_amount AS NUMERIC) - CAST(rs.paid_amount AS NUMERIC)), 0) AS outstanding
-            FROM repayment_schedules rs
-            INNER JOIN loans l ON rs.loan_id = l.id
-            WHERE rs.status IN ('pending','partial','overdue')
-              AND l.status IN ('active','overdue')
-              AND rs.due_date < CURRENT_DATE
-            GROUP BY bucket
-            HAVING bucket IS NOT NULL
-            ORDER BY bucket"
+            "SELECT bucket,
+                    COUNT(DISTINCT loan_id) AS loan_count,
+                    COALESCE(SUM(outstanding), 0) AS outstanding
+             FROM (
+                 SELECT
+                    CASE
+                        WHEN CURRENT_DATE - rs.due_date BETWEEN 1 AND 30 THEN '1_30'
+                        WHEN CURRENT_DATE - rs.due_date BETWEEN 31 AND 60 THEN '31_60'
+                        WHEN CURRENT_DATE - rs.due_date BETWEEN 61 AND 90 THEN '61_90'
+                        WHEN CURRENT_DATE - rs.due_date > 90 THEN '90_plus'
+                        ELSE NULL
+                    END AS bucket,
+                    l.id AS loan_id,
+                    CAST(rs.total_amount AS NUMERIC) - CAST(rs.paid_amount AS NUMERIC) AS outstanding
+                 FROM repayment_schedules rs
+                 INNER JOIN loans l ON rs.loan_id = l.id
+                 WHERE rs.status IN ('pending','partial','overdue')
+                   AND l.status IN ('active','overdue')
+                   AND rs.due_date < CURRENT_DATE
+             ) AS aged
+             WHERE bucket IS NOT NULL
+             GROUP BY bucket
+             ORDER BY bucket"
         );
         $agingByBucket = [];
         foreach ($agingRows as $r) {
