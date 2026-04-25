@@ -295,6 +295,14 @@ final class GeneralLoanReportService
      * Five chart series. Each entry is a small array of {label, value}
      * tuples ready for the front-end SVG renderer.
      *
+     * All charts respect the same filter set as the table — when the
+     * operator narrows the date range, the charts update too. The
+     * monthly_disbursement chart is the one exception: it ignores
+     * date_from/date_to and always shows the trailing 12 months
+     * relative to today, because a date-bound chart wouldn't show
+     * any "trend" (the filter tail-clips the data). Operators looking
+     * at the monthly view want the full year.
+     *
      * @param array<string, mixed> $filters
      * @return array{
      *   monthly_disbursement: array<int, array{label: string, value: float}>,
@@ -306,13 +314,213 @@ final class GeneralLoanReportService
      */
     public function chartData(array $filters): array
     {
-        // Phase 3.1.d will implement.
         return [
-            'monthly_disbursement' => [],
-            'status_distribution'  => [],
-            'top_agents'           => [],
-            'product_mix'          => [],
-            'branch_performance'   => [],
+            'monthly_disbursement' => $this->chartMonthlyDisbursement($filters),
+            'status_distribution'  => $this->chartStatusDistribution($filters),
+            'top_agents'           => $this->chartTopAgents($filters),
+            'product_mix'          => $this->chartProductMix($filters),
+            'branch_performance'   => $this->chartBranchPerformance($filters),
         ];
+    }
+
+    /**
+     * Last 12 months of disbursement volume, oldest-first.
+     *
+     * The series is dense — months with zero disbursements still get a
+     * row so the line renders as a continuous trend rather than skipping
+     * gaps. We generate the 12 month labels in PHP and LEFT JOIN against
+     * the SQL aggregation, filling in zeros for empty buckets.
+     *
+     * Filter behaviour: respects branch/product/agent/loan_type/status
+     * but DELIBERATELY IGNORES date_from/date_to — see chartData() doc.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label: string, value: float}>
+     */
+    private function chartMonthlyDisbursement(array $filters): array
+    {
+        $conn = $this->em->getConnection();
+
+        $localFilters = $filters;
+        unset($localFilters['date_from'], $localFilters['date_to']);
+        [$where, $params] = $this->buildWhereClause($localFilters);
+
+        // 12-month rolling window anchored to the start of the current
+        // month so partial months still appear (operators looking at the
+        // chart on Apr 25 expect to see April with whatever's accrued).
+        $now = new \DateTimeImmutable('now');
+        $start = $now->modify('first day of -11 months')->setTime(0, 0, 0);
+        $params['chart_start'] = $start->format('Y-m-d');
+
+        $sql = "
+            SELECT TO_CHAR(DATE_TRUNC('month', l.disbursed_at), 'YYYY-MM') AS month_key,
+                   COALESCE(SUM(CAST(l.net_disbursed AS NUMERIC)), 0) AS value
+            FROM loans l
+            WHERE {$where}
+              AND l.disbursed_at IS NOT NULL
+              AND l.disbursed_at >= :chart_start
+            GROUP BY month_key
+            ORDER BY month_key ASC
+        ";
+
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        $byMonth = [];
+        foreach ($rows as $r) {
+            $byMonth[$r['month_key']] = (float) $r['value'];
+        }
+
+        // Densify — emit a row for every month in the window so the
+        // frontend line/bar chart shows a continuous timeline.
+        $out = [];
+        for ($i = 0; $i < 12; $i++) {
+            $m = $start->modify("+{$i} months");
+            $key = $m->format('Y-m');
+            $out[] = [
+                'label' => $m->format('M Y'),
+                'value' => $byMonth[$key] ?? 0.0,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Count of loans per status — fuels the status distribution donut.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label: string, value: int}>
+     */
+    private function chartStatusDistribution(array $filters): array
+    {
+        $conn = $this->em->getConnection();
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        $sql = "
+            SELECT l.status::text AS status, COUNT(*) AS value
+            FROM loans l
+            WHERE {$where}
+            GROUP BY l.status
+            ORDER BY value DESC
+        ";
+
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        return array_map(
+            fn(array $r): array => [
+                'label' => strtoupper((string) $r['status']),
+                'value' => (int) $r['value'],
+            ],
+            $rows
+        );
+    }
+
+    /**
+     * Top 10 agents by loan count, biggest first.
+     *
+     * Returns count, not amount, since the legacy CSV's "DSA" column
+     * tracks who originated the loan; operators want to see who's
+     * pushing volume. If the same operator wants amount-weighted
+     * ranking later, we'll surface that as a separate toggle.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label: string, value: int}>
+     */
+    private function chartTopAgents(array $filters): array
+    {
+        $conn = $this->em->getConnection();
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        $sql = "
+            SELECT u.email AS agent_email,
+                   u.first_name || ' ' || u.last_name AS agent_name,
+                   COUNT(*) AS value
+            FROM loans l
+            INNER JOIN users u ON l.agent_id = u.id
+            WHERE {$where}
+            GROUP BY u.id, u.email, u.first_name, u.last_name
+            ORDER BY value DESC
+            LIMIT 10
+        ";
+
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        return array_map(
+            fn(array $r): array => [
+                // Prefer name; fall back to email if name parts are blank
+                // (some seed/test users have empty names).
+                'label' => trim((string) $r['agent_name']) !== ''
+                    ? (string) $r['agent_name']
+                    : (string) $r['agent_email'],
+                'value' => (int) $r['value'],
+            ],
+            $rows
+        );
+    }
+
+    /**
+     * Loan count per product. Drives the product-mix pie.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label: string, value: int}>
+     */
+    private function chartProductMix(array $filters): array
+    {
+        $conn = $this->em->getConnection();
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        $sql = "
+            SELECT lp.name AS product_name, COUNT(*) AS value
+            FROM loans l
+            INNER JOIN loan_products lp ON l.product_id = lp.id
+            WHERE {$where}
+            GROUP BY lp.id, lp.name
+            ORDER BY value DESC
+        ";
+
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        return array_map(
+            fn(array $r): array => [
+                'label' => (string) $r['product_name'],
+                'value' => (int) $r['value'],
+            ],
+            $rows
+        );
+    }
+
+    /**
+     * Branch performance — both count and disbursed volume per branch,
+     * sorted by volume descending. The frontend chart picks one axis
+     * (typically value=volume for the bar height, with count as a
+     * secondary tooltip).
+     *
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label: string, value: float, count: int}>
+     */
+    private function chartBranchPerformance(array $filters): array
+    {
+        $conn = $this->em->getConnection();
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        $sql = "
+            SELECT loc.name AS branch_name,
+                   COUNT(*) AS count,
+                   COALESCE(SUM(CASE
+                       WHEN l.status IN ('disbursed','active','overdue','closed')
+                       THEN CAST(l.net_disbursed AS NUMERIC)
+                       ELSE 0
+                   END), 0) AS value
+            FROM loans l
+            INNER JOIN locations loc ON l.branch_id = loc.id
+            WHERE {$where}
+            GROUP BY loc.id, loc.name
+            ORDER BY value DESC, count DESC
+        ";
+
+        $rows = $conn->fetchAllAssociative($sql, $params);
+        return array_map(
+            fn(array $r): array => [
+                'label' => (string) $r['branch_name'],
+                'value' => (float) $r['value'],
+                'count' => (int) $r['count'],
+            ],
+            $rows
+        );
     }
 }
