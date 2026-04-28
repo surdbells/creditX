@@ -26,6 +26,7 @@ final class DisbursementService
         private readonly LoanCalculationService $calcService,
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
+        private readonly LedgerService $ledgerService,
     ) {
     }
 
@@ -401,6 +402,12 @@ final class DisbursementService
             $loan->addTrail($trail);
 
             $this->em->flush();
+            // Phase-1 invariant: every posting transaction must leave
+            // its batch balanced (debits == credits across the whole
+            // callback group). Throws if the carefully-orchestrated
+            // postEntry() pairs above have a bug; the catch below
+            // handles rollback. See LedgerService::validateBatchBalance.
+            $this->ledgerService->validateBatchBalance($callback);
             $this->em->commit();
 
             return [

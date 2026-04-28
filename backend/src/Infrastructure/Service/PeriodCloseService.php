@@ -48,6 +48,7 @@ final class PeriodCloseService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly JournalReversalService $reversalService,
+        private readonly LedgerService $ledgerService,
     ) {}
 
     /**
@@ -176,6 +177,12 @@ final class PeriodCloseService
             if ($notes !== null && $notes !== '') $period->setNotes($notes);
 
             $this->em->flush();
+            // Phase-1 invariant. The closing journal is a paired DR/CR
+            // for each non-zero income/expense account, all swept into
+            // Retained Earnings. By construction the batch balances —
+            // this validates that property as a defense against future
+            // changes to the close logic.
+            $this->ledgerService->validateBatchBalance($callback);
             $this->em->commit();
 
             return [
@@ -317,6 +324,12 @@ final class PeriodCloseService
         $entry->setTransCallback($callback);
         $entry->setTransDate($year, $month, $day);
         $entry->setPostedBy($userId);
+        // Mark as a closing entry so date-range reports (Income
+        // Statement, Trial Balance) can filter these out — otherwise
+        // the closing CRs/DRs cancel the period's actual income/expense
+        // within the same date range and the closed period reads as
+        // a flat zero P&L.
+        $entry->setIsClosingEntry(true);
         $this->em->persist($entry);
     }
 

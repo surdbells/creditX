@@ -68,6 +68,7 @@ final class ProvisionService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PeriodGuardService $periodGuard,
+        private readonly LedgerService $ledgerService,
     ) {}
 
     /**
@@ -196,6 +197,7 @@ final class ProvisionService
             $originals = $this->em->getRepository(LedgerTransaction::class)
                 ->findBy(['transCallback' => $callback]);
 
+            $reversalCb = null;
             if (!empty($originals)) {
                 $reversalCb = 'REV-' . $callback . '-' . date('YmdHis');
                 [$y, $m, $d] = explode('-', date('Y-m-d'));
@@ -227,6 +229,14 @@ final class ProvisionService
             $run->setReversalReason($reason);
 
             $this->em->flush();
+            // Phase-1 invariant: reversal entries must mirror originals
+            // exactly (same amount, swapped DR/CR), so the batch sums
+            // to zero by construction. validateBatchBalance is a
+            // belt-and-braces check that the swap loop didn't drop
+            // an entry. No-op when no originals existed.
+            if ($reversalCb !== null) {
+                $this->ledgerService->validateBatchBalance($reversalCb);
+            }
             $this->em->commit();
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) {
@@ -396,6 +406,13 @@ final class ProvisionService
 
             $this->em->persist($run);
             $this->em->flush();
+            // Phase-1 invariant: validate the batch we just emitted
+            // (if any). Zero-delta runs don't post any entries — and
+            // validateBatchBalance handles empty callback gracefully.
+            $cb = $run->getCallbackRef();
+            if ($cb !== null && $cb !== '') {
+                $this->ledgerService->validateBatchBalance($cb);
+            }
             $this->em->commit();
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) {

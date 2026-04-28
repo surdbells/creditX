@@ -19,7 +19,13 @@ final class TrialBalanceAction
 
         $conn = $this->em->getConnection();
 
-        $where = "lt.trans_year = :y";
+        // Filter out period-end closing entries — see IncomeStatementAction
+        // for full background. A closed period's Trial Balance otherwise
+        // shows zero income/expense because closing CRs/DRs cancel
+        // originals within the same date range. is_closing_entry is
+        // set true by PeriodCloseService::postEntry; everything else
+        // posts with the default false.
+        $where = "lt.trans_year = :y AND lt.is_closing_entry = false";
         $qParams = ['y' => $year];
         if ($month) { $where .= " AND lt.trans_month = :m"; $qParams['m'] = str_pad($month, 2, '0', STR_PAD_LEFT); }
 

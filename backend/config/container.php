@@ -9,6 +9,7 @@ use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BranchScopeService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
+use App\Infrastructure\Service\LedgerService;
 use App\Infrastructure\Service\LoanLifecycleService;
 use App\Infrastructure\Service\MakerCheckerExecutionService;
 use App\Infrastructure\Service\NotificationDispatchService;
@@ -247,10 +248,17 @@ return [
             $c->get(EntityManagerInterface::class),
         );
     },
+    LedgerService::class => function (ContainerInterface $c): LedgerService {
+        return new LedgerService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(SettingsCacheService::class),
+        );
+    },
     ProvisionService::class => function (ContainerInterface $c): ProvisionService {
         return new ProvisionService(
             $c->get(EntityManagerInterface::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
@@ -261,6 +269,7 @@ return [
             $c->get(LoanCalculationService::class),
             $c->get(SettingsCacheService::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     RepaymentService::class => function (ContainerInterface $c): RepaymentService {
@@ -271,6 +280,7 @@ return [
             $c->get(RepaymentScheduleRepository::class),
             $c->get(SettingsCacheService::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     BulkRepaymentService::class => function (ContainerInterface $c): BulkRepaymentService {
@@ -292,6 +302,7 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(NotificationDispatchService::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     LoanLifecycleService::class => function (ContainerInterface $c): LoanLifecycleService {
@@ -302,6 +313,7 @@ return [
             $c->get(RepaymentScheduleRepository::class),
             $c->get(LoanCalculationService::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     NotificationDispatchService::class => function (ContainerInterface $c): NotificationDispatchService {
@@ -338,6 +350,7 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(LedgerTransactionRepository::class),
             $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
         );
     },
     LedgerTransactionEnricher::class => function (ContainerInterface $c): LedgerTransactionEnricher {
@@ -349,6 +362,7 @@ return [
         return new PeriodCloseService(
             $c->get(EntityManagerInterface::class),
             $c->get(JournalReversalService::class),
+            $c->get(LedgerService::class),
         );
     },
     MakerCheckerExecutionService::class => function (ContainerInterface $c): MakerCheckerExecutionService {

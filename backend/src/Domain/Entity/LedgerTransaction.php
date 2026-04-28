@@ -64,6 +64,23 @@ class LedgerTransaction
     #[ORM\Column(type: 'string', length: 36, nullable: true)]
     private ?string $reversalOfId = null;
 
+    /**
+     * Whether this entry was posted by PeriodCloseService as part
+     * of a period-end closing journal (zeroing P&L accounts into
+     * Retained Earnings).
+     *
+     * Date-range financial reports (Income Statement, Trial Balance)
+     * filter `is_closing_entry = false` so a closed period still
+     * shows the period's actual income/expense activity rather than
+     * being silently cancelled out by the closing CRs/DRs.
+     *
+     * Default false; PeriodCloseService is the only writer that
+     * sets this true. Backfilled to true for historical closing
+     * entries via the migrate-closing-entries.php script.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isClosingEntry = false;
+
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
@@ -102,6 +119,8 @@ class LedgerTransaction
     public function setPostedBy(?string $v): void { $this->postedBy = $v; }
     public function getReversalOfId(): ?string { return $this->reversalOfId; }
     public function setReversalOfId(?string $v): void { $this->reversalOfId = $v; }
+    public function isClosingEntry(): bool { return $this->isClosingEntry; }
+    public function setIsClosingEntry(bool $v): void { $this->isClosingEntry = $v; }
 
     public function toArray(): array
     {
@@ -119,6 +138,7 @@ class LedgerTransaction
             'trans_callback'     => $this->transCallback,
             'trans_date'         => "{$this->transYear}-{$this->transMonth}-{$this->transDay}",
             'is_repayment'       => $this->isRepayment,
+            'is_closing_entry'   => $this->isClosingEntry,
             'posted_by'          => $this->postedBy,
             'reversal_of_id'     => $this->reversalOfId,
             'created_at'         => $this->createdAt->format('Y-m-d H:i:s'),

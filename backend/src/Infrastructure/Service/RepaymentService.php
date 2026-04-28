@@ -30,6 +30,7 @@ final class RepaymentService
         private readonly RepaymentScheduleRepository $scheduleRepo,
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
+        private readonly LedgerService $ledgerService,
     ) {
     }
 
@@ -220,6 +221,8 @@ final class RepaymentService
             $loan->addTrail($trail);
 
             $this->em->flush();
+            // Phase-1 invariant — see DisbursementService for context.
+            $this->ledgerService->validateBatchBalance($callback);
             $this->em->commit();
 
             return $payment;

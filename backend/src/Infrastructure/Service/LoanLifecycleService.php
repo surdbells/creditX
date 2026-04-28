@@ -26,6 +26,7 @@ final class LoanLifecycleService
         private readonly RepaymentScheduleRepository $scheduleRepo,
         private readonly LoanCalculationService $calcService,
         private readonly PeriodGuardService $periodGuard,
+        private readonly LedgerService $ledgerService,
     ) {
     }
 
@@ -104,6 +105,8 @@ final class LoanLifecycleService
             $loan->addTrail($trail);
 
             $this->em->flush();
+            // Phase-1 invariant — see DisbursementService for context.
+            $this->ledgerService->validateBatchBalance($callback);
             $this->em->commit();
 
             return ['loan_id' => $loan->getId(), 'status' => 'written_off', 'outstanding_written_off' => $outstanding];

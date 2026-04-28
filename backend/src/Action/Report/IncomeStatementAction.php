@@ -98,6 +98,13 @@ final class IncomeStatementAction
         // Sub-select gets the per-account DR/CR totals within the
         // date range. We join against general_ledgers to keep accounts
         // that have never posted out of the listing.
+        //
+        // Period-end closing entries (DR each income account / CR
+        // retained earnings, etc.) are filtered out via is_closing_entry
+        // — without this filter, a closed period's IS reads as a flat
+        // zero P&L because the closing entries cancel the originals
+        // within the same date range. See Phase-1 accounting hotfix
+        // commit for full background.
         $sql = "
             SELECT
                 gl.id,
@@ -108,6 +115,7 @@ final class IncomeStatementAction
             FROM general_ledgers gl
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type = :type
+              AND t.is_closing_entry = false
               AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) >= :fromDate
               AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) <= :toDate
             GROUP BY gl.id, gl.account_code, gl.account_name

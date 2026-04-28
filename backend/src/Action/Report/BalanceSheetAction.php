@@ -77,10 +77,26 @@ final class BalanceSheetAction
         $liabilities = $this->accountsOfType(AccountType::LIABILITY, $asOf);
         $equityAccts = $this->accountsOfType(AccountType::EQUITY, $asOf);
 
-        // Retained Earnings: cumulative income - expense up through as_of.
-        // Treated as an implicit equity component since we don't have an
-        // explicit closing journal posting the net to a retained-earnings
-        // GL yet (commit AF will add that workflow).
+        // Retained Earnings on the BS is computed as cumulative
+        // income − expense through asOf. This works correctly with
+        // both closed and unclosed periods because:
+        //
+        //   - For a closed period: the closing journal posts DR each
+        //     income account + CR Retained Earnings (and the mirror
+        //     for expenses). The DRs cancel the original CRs within
+        //     the cumulative sum, so accountsOfType(INCOME) returns
+        //     ONLY the unclosed activity. The closed activity is
+        //     reflected in the RETEARN equity account balance instead
+        //     (already counted in $equityAccts).
+        //
+        //   - For an unclosed period: the income/expense GLs hold
+        //     the full activity (no offsetting close DRs/CRs yet),
+        //     RETEARN GL balance is zero for that period, and the
+        //     computed RE picks up the full net income. No double-
+        //     count because no close has happened.
+        //
+        // Net result: equityTotal correctly reflects all retained
+        // earnings (closed + unclosed) without double-counting.
         $incomeThroughAsOf  = $this->accountsOfType(AccountType::INCOME,  $asOf);
         $expenseThroughAsOf = $this->accountsOfType(AccountType::EXPENSE, $asOf);
         $retainedEarnings = bcsub($incomeThroughAsOf['total'], $expenseThroughAsOf['total'], 2);

@@ -285,6 +285,9 @@ $settingsDef = [
     ['general.max_customer_age', '57', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum customer age for eligibility'],
     ['general.max_service_years', '33', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum years of service for eligibility'],
     ['agent.monthly_target', '1000000', SettingType::INTEGER, SettingCategory::GENERAL, 'Default monthly disbursement target (naira) for agents without an individual target set'],
+
+    // Accounting settings
+    ['accounting.batch_validation_cutoff_at', '', SettingType::STRING, SettingCategory::ACCOUNTING, 'ISO timestamp; ledger batches whose oldest row predates this cutoff are exempt from balance validation. Set to NOW() after running the Phase-1 hotfix migrations on tenants with historical data.'],
 ];
 
 $settingCount = 0;
@@ -430,16 +433,19 @@ $glDef = [
     ['Loan Receivable', '1001', 'LR', AccountType::ASSET, LedgerType::GENERAL, 'Total loan portfolio receivable'],
     ['Customer Balance', '1002', 'CUBGL', AccountType::ASSET, LedgerType::CUSTOMER, 'Customer loan balance accounts'],
     ['Bank/Cash', '1003', 'BANK', AccountType::ASSET, LedgerType::GENERAL, 'Bank and cash accounts'],
+    ['Settlement Account', '1004', 'SETTLE', AccountType::ASSET, LedgerType::GENERAL, 'Loan settlement disbursement account'],
+    ['Allowance for Loan Losses', '1005', 'ALLOW', AccountType::ASSET, LedgerType::GENERAL, 'Contra-asset for loan loss provisioning (CR-normal)'],
+    ['Top-Up Balance', '2001', 'TUGL', AccountType::LIABILITY, LedgerType::GENERAL, 'Previous loan balance carried forward'],
+    ['Retained Earnings', '3001', 'RETEARN', AccountType::EQUITY, LedgerType::GENERAL, 'Cumulative net income closed from prior periods'],
     ['Insurance Income', '4001', 'IA', AccountType::INCOME, LedgerType::GENERAL, 'Insurance fee income'],
     ['Admin Fee Income', '4002', 'AA', AccountType::INCOME, LedgerType::GENERAL, 'Administrative fee income'],
     ['Management Fee Income', '4003', 'MFA', AccountType::INCOME, LedgerType::GENERAL, 'Management fee income'],
     ['Bank Statement Fee Income', '4004', 'BSA', AccountType::INCOME, LedgerType::GENERAL, 'Bank statement fee income'],
     ['Interest Income', '4005', 'II', AccountType::INCOME, LedgerType::GENERAL, 'Loan interest income'],
     ['Penalty Income', '4006', 'PI', AccountType::INCOME, LedgerType::GENERAL, 'Late payment penalty income'],
-    ['Top-Up Balance', '2001', 'TUGL', AccountType::LIABILITY, LedgerType::GENERAL, 'Previous loan balance carried forward'],
-    ['Bad Debt Expense', '5001', 'BDE', AccountType::EXPENSE, LedgerType::GENERAL, 'Written-off loan expense'],
     ['Processing Fee Income', '4007', 'PFI', AccountType::INCOME, LedgerType::GENERAL, 'Processing fee income'],
-    ['Settlement Account', '1004', 'SETTLE', AccountType::ASSET, LedgerType::GENERAL, 'Loan settlement disbursement account'],
+    ['Bad Debt Expense', '5001', 'BDE', AccountType::EXPENSE, LedgerType::GENERAL, 'Written-off loan expense'],
+    ['Loan Loss Provision', '5002', 'LLP', AccountType::EXPENSE, LedgerType::GENERAL, 'Loan loss provision expense (CBN prudential)'],
 ];
 
 $glCount = 0;

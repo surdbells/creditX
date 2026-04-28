@@ -14,6 +14,7 @@ final class JournalReversalService
         private readonly EntityManagerInterface $em,
         private readonly LedgerTransactionRepository $txRepo,
         private readonly PeriodGuardService $periodGuard,
+        private readonly LedgerService $ledgerService,
     ) {}
 
     /**
@@ -71,6 +72,10 @@ final class JournalReversalService
         }
 
         $this->em->flush();
+        // Phase-1 invariant: reversals mirror originals, so the batch
+        // sums to zero by construction. Validate as a backstop in case
+        // a future change to the swap loop drops or duplicates an entry.
+        $this->ledgerService->validateBatchBalance($reversalCallback);
 
         return [
             'reversal_callback' => $reversalCallback,

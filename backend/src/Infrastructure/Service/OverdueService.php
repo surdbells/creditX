@@ -26,6 +26,7 @@ final class OverdueService
         private readonly SettingsCacheService $settings,
         private readonly ?NotificationDispatchService $notifService = null,
         private readonly ?PeriodGuardService $periodGuard = null,
+        private readonly ?LedgerService $ledgerService = null,
     ) {
     }
 
@@ -53,6 +54,11 @@ final class OverdueService
         $overdueSchedules = $this->scheduleRepo->findOverdue();
         $processedLoans = [];
         $penaltiesApplied = 0;
+        // Track callbacks emitted this run so we can validate each
+        // batch's balance after the single bulk flush. Each penalty
+        // gets its own callback ('PEN-LN0042-20260423' style); we
+        // validate them all at once after persistence.
+        $emittedCallbacks = [];
 
         $penaltyGl = $this->glRepo->findByCode('PI');
         $today = new \DateTime('today');
@@ -108,6 +114,7 @@ final class OverdueService
                 }
 
                 $callback = 'PEN-' . $loan->getApplicationId() . '-' . date('Ymd');
+                $emittedCallbacks[$callback] = true;
                 $dateParts = [date('Y'), date('m'), date('d')];
 
                 // DR Penalty Receivable (customer ledger)
@@ -141,6 +148,16 @@ final class OverdueService
         }
 
         $this->em->flush();
+
+        // Phase-1 invariant: every callback batch emitted this run
+        // must balance. Optional-injection pattern preserves
+        // backward compat with callers (older CLI scripts, tests)
+        // that construct without LedgerService.
+        if ($this->ledgerService !== null) {
+            foreach (array_keys($emittedCallbacks) as $cb) {
+                $this->ledgerService->validateBatchBalance($cb);
+            }
+        }
 
         // Dispatch overdue notifications (Gap 8)
         if ($this->notifService !== null) {
