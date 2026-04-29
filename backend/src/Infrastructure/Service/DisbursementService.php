@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\CustomerLedger;
-use App\Domain\Entity\LedgerTransaction;
 use App\Domain\Entity\Loan;
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Entity\RepaymentSchedule;
 use App\Domain\Enum\CustomerLedgerStatus;
+use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\LoanStatus;
 use App\Domain\Enum\TransactionType;
 use App\Domain\Exception\DomainException;
@@ -182,62 +182,39 @@ final class DisbursementService
                 throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
             }
 
-            // ─── 2. DR Loan Receivable + CR gross loan to customer ledger ───
-            // Gross loan = application amount + ADDS_TO_GROSS fees.
-            // This is what the customer owes the business.
-            $this->postEntry(
-                $lrGl, null, TransactionType::DR,
-                $transaction->getGrossLoan(), 'LOAN DISBURSEMENT APPROVED - ' . $customerName,
-                $callback, $effectiveDate, $userId
-            );
-            $this->postEntry(
-                $customerGl, $customerLedger, TransactionType::CR,
-                $transaction->getGrossLoan(), 'LOAN DISBURSEMENT APPROVED',
-                $callback, $effectiveDate, $userId
-            );
+            // ─── 2-6. Assemble all journal lines ───
+            //
+            // Phase-2.5 D.1 refactor: previously each step called
+            // $this->postEntry() which built a LedgerTransaction inline.
+            // Now we collect every line into an array and submit once
+            // via LedgerService::postJournal(), which creates a
+            // JournalEntry header, persists all lines linked to it,
+            // flushes, and validates the batch balance.
+            //
+            // Why collect-then-submit instead of incremental persist:
+            // postJournal needs to see the complete line set up front
+            // for its pre-flight balance check (faster than flush +
+            // ROLLBACK on imbalance). It also creates the header in
+            // the same call, so all lines share one journal_entry_id.
+            $lines = [];
 
-            // ─── 3. DR each fee from customer ledger + CR fee GL ───
+            // Step 2: DR LR + CR CUBGL for gross loan
+            $lines[] = ['gl' => $lrGl, 'type' => TransactionType::DR,
+                'amount' => $transaction->getGrossLoan(),
+                'narration' => 'LOAN DISBURSEMENT APPROVED - ' . $customerName];
+            $lines[] = ['gl' => $customerGl, 'customerLedger' => $customerLedger,
+                'type' => TransactionType::CR,
+                'amount' => $transaction->getGrossLoan(),
+                'narration' => 'LOAN DISBURSEMENT APPROVED'];
+
+            // Step 3: per-fee DR customer ledger + CR fee GL
             //
             // Both ADDS_TO_GROSS fees (admin, insurance) and
             // DEDUCTED_FROM_DISBURSEMENT fees (management, bank statement)
-            // are DR'd from the customer ledger here, and CR'd to their
-            // respective fee GLs as income recognition.
+            // post the same way. See the long-form comment below the
+            // amount-zero guard for the full balance-math justification.
             //
-            // Why both types post the same way:
-            //
-            //   Model A (Customer ledger must balance to zero at disbursement
-            //   — standard loan accounting):
-            //
-            //     Step 2 CR'd gross_loan = app_amount + ADDS_TO_GROSS fees.
-            //     To balance, every fee amount baked into gross_loan must be
-            //     DR'd out. Combined with the DR of net_disbursed (which is
-            //     app_amount minus DEDUCTED fees), the customer ledger nets
-            //     to zero:
-            //
-            //       CR gross_loan (500 + 2 admin + 10 insurance = 512)
-            //       DR admin fee  (2)
-            //       DR insurance  (10)
-            //       DR mgmt fee   (10)   — was DEDUCTED, still posts here
-            //       DR net_disb   (490)  — 500 - 10 mgmt
-            //       ─────────────
-            //       net balance = 0
-            //
-            //     Fee GL accounts (admin, insurance, mgmt, etc.) each get
-            //     a CR for their fee amount, recognising them as income at
-            //     disbursement time. This matches standard Nigerian loan
-            //     accounting: fees are front-loaded income, while interest
-            //     is amortised as it accrues.
-            //
-            // Regression fix: a prior revision of this method filtered
-            //   with `if (!\$fb->isDeducted() || ...) continue;` which
-            //   skipped ADDS_TO_GROSS fees entirely, leaving them as a
-            //   permanent CR on the customer ledger (never DR'd out).
-            //   Customers looked like they owed the full ADDS_TO_GROSS
-            //   total the moment the loan disbursed — before any
-            //   repayments came due.
-            //
-            // Amount guard kept: fees with zero amount are still skipped
-            //   to avoid no-op journal rows cluttering the ledger.
+            // Amount guard: skip zero-amount fees to avoid no-op rows.
             $feeBreakdowns = $loan->getFeeBreakdowns();
             foreach ($feeBreakdowns as $fb) {
                 if (bccomp($fb->getAmount(), '0.00', 2) <= 0) {
@@ -245,11 +222,10 @@ final class DisbursementService
                 }
 
                 // DR from customer ledger (reduces gross_loan credit)
-                $this->postEntry(
-                    $customerGl, $customerLedger, TransactionType::DR,
-                    $fb->getAmount(), strtoupper($fb->getFeeType()->getName()),
-                    $callback, $effectiveDate, $userId
-                );
+                $lines[] = ['gl' => $customerGl, 'customerLedger' => $customerLedger,
+                    'type' => TransactionType::DR,
+                    'amount' => $fb->getAmount(),
+                    'narration' => strtoupper($fb->getFeeType()->getName())];
 
                 // CR to fee type's GL (recognises income)
                 $feeGl = null;
@@ -260,74 +236,43 @@ final class DisbursementService
                     $feeGl = $this->glRepo->findByCode($fb->getFeeType()->getCode());
                 }
                 if ($feeGl !== null) {
-                    $this->postEntry(
-                        $feeGl, null, TransactionType::CR,
-                        $fb->getAmount(), $customerName . ' - ' . $fb->getFeeType()->getName(),
-                        $callback, $effectiveDate, $userId
-                    );
+                    $lines[] = ['gl' => $feeGl, 'type' => TransactionType::CR,
+                        'amount' => $fb->getAmount(),
+                        'narration' => $customerName . ' - ' . $fb->getFeeType()->getName()];
                 }
             }
 
-            // ─── 4. DR top-up balance if applicable ───
-            // Top-up mechanics: when a customer takes a new loan while
-            // an old one is outstanding, the old loan's remaining
-            // balance (top-up) gets rolled into the new loan's gross.
-            //
-            // The NEW customer ledger has already been CR'd for the
-            // gross (step 2). We now DR it for the top-up (reducing
-            // what the new loan 'owes') and CR the OLD customer ledger
-            // by the same amount — which zeroes out the old ledger's
-            // outstanding position. Net effect: old loan's debt is
-            // transferred into the new loan's gross, accounted for
-            // via the sub-ledgers.
-            //
-            // ## Previous bug (pre-fix)
-            //
-            // The CR used to post to the parent GL with
-            // customer_ledger_id=NULL. This produced an 'orphan
-            // posting' — a direct hit on CUBGL that bypassed any
-            // sub-ledger. The GL reconciliation report flagged
-            // this as a discrepancy on every top-up disbursement.
-            //
-            // Now the CR is scoped to the previous loan's customer
-            // ledger, so the parent CUBGL has no direct postings and
-            // the sub-ledger aggregate is authoritative.
-            //
-            // Fallback: if we can't resolve the previous loan's
-            // customer ledger (data inconsistency, or top-up entered
-            // without a previous_loan_id — which shouldn't happen but
-            // did in some legacy data), skip the CR entirely. Better
-            // to under-account than to leak an orphan. Operators will
-            // see the extra balance on the new customer ledger and
-            // can investigate.
+            // Step 4: top-up balance handling. See full comment below
+            // for the orphan-posting bug history.
             $topUpBalance = $transaction->getTopUpBalance();
             if (bccomp($topUpBalance, '0.00', 2) > 0) {
-                $this->postEntry(
-                    $customerGl, $customerLedger, TransactionType::DR,
-                    $topUpBalance, 'PREVIOUS BALANCE B/F',
-                    $callback, $effectiveDate, $userId
-                );
+                $lines[] = ['gl' => $customerGl, 'customerLedger' => $customerLedger,
+                    'type' => TransactionType::DR,
+                    'amount' => $topUpBalance,
+                    'narration' => 'PREVIOUS BALANCE B/F'];
 
-                // Resolve the previous loan's ledger so we can close
-                // out its balance via the sub-ledger.
                 $previousLedger = null;
                 if ($loan->getPreviousLoanId()) {
                     $previousLedger = $this->clRepo->findByLoan($loan->getPreviousLoanId());
                 }
 
                 if ($previousLedger !== null) {
-                    $this->postEntry(
-                        $customerGl, $previousLedger, TransactionType::CR,
-                        $topUpBalance, 'PREVIOUS LOAN CLOSED VIA TOP-UP - ' . $customerName,
-                        $callback, $effectiveDate, $userId
-                    );
+                    $lines[] = ['gl' => $customerGl, 'customerLedger' => $previousLedger,
+                        'type' => TransactionType::CR,
+                        'amount' => $topUpBalance,
+                        'narration' => 'PREVIOUS LOAN CLOSED VIA TOP-UP - ' . $customerName];
                 } else {
                     // No previous ledger resolvable — log for
-                    // operator attention. This path used to post an
-                    // orphan to the parent GL; now we skip the CR
-                    // and the operator sees the imbalance on the
-                    // NEW customer ledger (a DR with no matching CR)
-                    // rather than on the parent account.
+                    // operator attention. Posting nothing here means
+                    // postJournal's balance pre-check will refuse the
+                    // batch (lines won't sum to zero), and the operator
+                    // sees a clear error rather than a silent orphan.
+                    //
+                    // Note: this is more aggressive than the pre-2.5
+                    // behaviour (which silently produced an unbalanced
+                    // batch). It's the right behaviour: if we can't
+                    // close the previous loan, we shouldn't proceed
+                    // with the new disbursement.
                     error_log(sprintf(
                         'DisbursementService: top-up CR skipped — no previous ledger for loan %s (previous_loan_id=%s)',
                         $loan->getId(),
@@ -336,18 +281,35 @@ final class DisbursementService
                 }
             }
 
-            // ─── 5. DR net disbursed from customer ledger ───
-            $this->postEntry(
-                $customerGl, $customerLedger, TransactionType::DR,
-                $transaction->getNetDisbursed(), 'NET DISBURSED',
-                $callback, $effectiveDate, $userId
-            );
+            // Step 5+6: DR customer ledger for net + CR settlement
+            $lines[] = ['gl' => $customerGl, 'customerLedger' => $customerLedger,
+                'type' => TransactionType::DR,
+                'amount' => $transaction->getNetDisbursed(),
+                'narration' => 'NET DISBURSED'];
+            $lines[] = ['gl' => $settlementGl, 'type' => TransactionType::CR,
+                'amount' => $transaction->getNetDisbursed(),
+                'narration' => 'LOAN SETTLEMENT - ' . $customerName];
 
-            // ─── 6. CR settlement GL ───
-            $this->postEntry(
-                $settlementGl, null, TransactionType::CR,
-                $transaction->getNetDisbursed(), 'LOAN SETTLEMENT - ' . $customerName,
-                $callback, $effectiveDate, $userId
+            // Filter zero-amount lines (preserves the prior postEntry
+            // guard that silently skipped them). postJournal would
+            // reject them with a validation error otherwise.
+            $lines = array_values(array_filter(
+                $lines,
+                fn(array $l) => bccomp((string) $l['amount'], '0.00', 2) > 0
+            ));
+
+            // Submit the journal — postJournal builds the header,
+            // persists all lines linked to it, flushes, and validates
+            // batch balance. Throws DomainException if anything's
+            // wrong (unbalanced, malformed line, etc.).
+            $this->ledgerService->postJournal(
+                entryType: JournalEntryType::DISBURSEMENT,
+                postingDate: $effectiveDate,
+                narration: 'Loan disbursement — ' . $loan->getApplicationId() . ' (' . $customerName . ')',
+                postedBy: $userId,
+                lines: $lines,
+                legacyCallback: $callback,
+                reference: $loan->getApplicationId(),
             );
 
             // ─── 7. Update loan status ───
@@ -402,12 +364,11 @@ final class DisbursementService
             $loan->addTrail($trail);
 
             $this->em->flush();
-            // Phase-1 invariant: every posting transaction must leave
-            // its batch balanced (debits == credits across the whole
-            // callback group). Throws if the carefully-orchestrated
-            // postEntry() pairs above have a bug; the catch below
-            // handles rollback. See LedgerService::validateBatchBalance.
-            $this->ledgerService->validateBatchBalance($callback);
+            // Phase-2.5 D.1: postJournal() above already validated the
+            // batch balance via validateBatchBalanceByHeader. The flush
+            // here commits any non-journal writes (loan status update,
+            // trail, repayment schedule rows) atomically with the
+            // journal that postJournal already flushed.
             $this->em->commit();
 
             return [
@@ -424,37 +385,6 @@ final class DisbursementService
             $this->em->rollback();
             throw new DomainException('Disbursement failed: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Post a single ledger entry.
-     */
-    private function postEntry(
-        \App\Domain\Entity\GeneralLedger $gl,
-        ?CustomerLedger $customerLedger,
-        TransactionType $type,
-        string $amount,
-        string $narration,
-        string $callback,
-        string $effectiveDate,
-        ?string $userId,
-    ): void {
-        if (bccomp($amount, '0.00', 2) <= 0) {
-            return;
-        }
-
-        $dateParts = explode('-', $effectiveDate);
-        $entry = new LedgerTransaction();
-        $entry->setGeneralLedger($gl);
-        $entry->setCustomerLedger($customerLedger);
-        $entry->setTransType($type);
-        $entry->setTransAmount($amount);
-        $entry->setTransNarration($narration);
-        $entry->setTransCallback($callback);
-        $entry->setTransDate($dateParts[0] ?? date('Y'), $dateParts[1] ?? date('m'), $dateParts[2] ?? date('d'));
-        $entry->setPostedBy($userId);
-
-        $this->em->persist($entry);
     }
 
     /**
