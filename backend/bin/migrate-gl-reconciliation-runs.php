@@ -44,10 +44,13 @@ $em = \App\Infrastructure\Persistence\DoctrineEntityManagerFactory::create();
 $conn = $em->getConnection();
 
 // Step 1: create the table. Postgres CREATE TABLE IF NOT EXISTS makes
-// this idempotent. Schema mirrors the GlReconciliationRun entity.
+// this idempotent. Schema mirrors the GlReconciliationRun entity,
+// which uses TimestampsTrait — that trait provides created_at,
+// updated_at, AND created_by, updated_by columns (last two are
+// audit-trail user IDs, nullable).
 //
-// The 'details' column stores the per-account scan output as JSONB
-// (Postgres native JSON with indexing) — same data the HTTP endpoint
+// The 'details' column stores the per-account scan output as JSON
+// (Postgres native, indexable) — same data the HTTP endpoint
 // returns, persisted verbatim so audit reviewers can reconstruct
 // the exact state at scan time.
 $conn->executeStatement(
@@ -60,10 +63,32 @@ $conn->executeStatement(
         total_discrepancy numeric(15,2) NOT NULL DEFAULT '0.00',
         details json NOT NULL DEFAULT '[]',
         created_at timestamp(0) without time zone NOT NULL,
-        updated_at timestamp(0) without time zone NOT NULL
+        updated_at timestamp(0) without time zone NOT NULL,
+        created_by varchar(36) DEFAULT NULL,
+        updated_by varchar(36) DEFAULT NULL
     )"
 );
 echo "✓ Table gl_reconciliation_runs present\n";
+
+// Step 1b: backfill the audit columns on tables created by an earlier
+// version of this script (which omitted created_by/updated_by). IF NOT
+// EXISTS makes both ALTER calls no-ops on tables that already have them.
+//
+// Why this is here: the prior version of this migration created the
+// table without the audit columns. Doctrine's INSERT path includes
+// them per the entity mapping (TimestampsTrait), so persisting a
+// GlReconciliationRun threw 42703 'column created_by does not exist'.
+// This step is the corrective ALTER for tenants who ran the buggy
+// version.
+$conn->executeStatement(
+    "ALTER TABLE gl_reconciliation_runs
+     ADD COLUMN IF NOT EXISTS created_by varchar(36) DEFAULT NULL"
+);
+$conn->executeStatement(
+    "ALTER TABLE gl_reconciliation_runs
+     ADD COLUMN IF NOT EXISTS updated_by varchar(36) DEFAULT NULL"
+);
+echo "✓ Audit columns (created_by, updated_by) present\n";
 
 $conn->executeStatement(
     "CREATE INDEX IF NOT EXISTS idx_glr_started ON gl_reconciliation_runs(started_at)"
