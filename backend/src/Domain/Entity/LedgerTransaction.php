@@ -30,6 +30,28 @@ class LedgerTransaction
     #[ORM\JoinColumn(name: 'customer_ledger_id', referencedColumnName: 'id', nullable: true)]
     private ?CustomerLedger $customerLedger = null;
 
+    /**
+     * Phase-2.5 aggregate FK. Every line belongs to exactly one
+     * JournalEntry header.
+     *
+     * Sub-phase A (this commit): nullable. Existing lines and the
+     * unmigrated posting services produce lines without a header
+     * — those rows have journal_entry_id = NULL until sub-phase B's
+     * backfill populates them.
+     *
+     * Sub-phase C will ALTER the column to NOT NULL after backfill
+     * is verified, and after the posting services are migrated to
+     * always create a header.
+     *
+     * Nullable with onDelete: CASCADE so deleting a JournalEntry
+     * deletes all its lines (defense in depth — services should
+     * never delete journals, but if it ever happens, orphan lines
+     * would corrupt the GL).
+     */
+    #[ORM\ManyToOne(targetEntity: JournalEntry::class)]
+    #[ORM\JoinColumn(name: 'journal_entry_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
+    private ?JournalEntry $journalEntry = null;
+
     #[ORM\Column(type: 'string', length: 5, enumType: TransactionType::class)]
     private TransactionType $transType;
 
@@ -130,6 +152,15 @@ class LedgerTransaction
     public function setGeneralLedger(GeneralLedger $v): void { $this->generalLedger = $v; }
     public function getCustomerLedger(): ?CustomerLedger { return $this->customerLedger; }
     public function setCustomerLedger(?CustomerLedger $v): void { $this->customerLedger = $v; }
+
+    /**
+     * Phase-2.5 aggregate accessor. Returns null for lines created
+     * before sub-phase B's backfill ran, or by posting services not
+     * yet migrated in sub-phase D. Will be guaranteed non-null after
+     * sub-phase C's NOT NULL constraint lands.
+     */
+    public function getJournalEntry(): ?JournalEntry { return $this->journalEntry; }
+    public function setJournalEntry(?JournalEntry $v): void { $this->journalEntry = $v; }
     public function getTransType(): TransactionType { return $this->transType; }
     public function setTransType(TransactionType $v): void { $this->transType = $v; }
     public function getTransAmount(): string { return $this->transAmount; }
@@ -174,6 +205,7 @@ class LedgerTransaction
     {
         return [
             'id'                 => $this->id,
+            'journal_entry_id'   => $this->journalEntry?->getId(),
             'gl_id'              => $this->generalLedger->getId(),
             'gl_name'            => $this->generalLedger->getAccountName(),
             'gl_code'            => $this->generalLedger->getAccountCode(),
