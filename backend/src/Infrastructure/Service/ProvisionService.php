@@ -194,34 +194,67 @@ final class ProvisionService
 
         $this->em->beginTransaction();
         try {
-            // Reverse every ledger entry under this run's callback.
+            // Find every original line under this run's callback. After
+            // sub-phase B's backfill, all originals share one
+            // journal_entry_id (their JournalEntry header).
             $originals = $this->em->getRepository(LedgerTransaction::class)
                 ->findBy(['transCallback' => $callback]);
 
             $reversalCb = null;
             if (!empty($originals)) {
                 $reversalCb = 'REV-' . $callback . '-' . date('YmdHis');
-                [$y, $m, $d] = explode('-', date('Y-m-d'));
-                foreach ($originals as $orig) {
-                    $rev = new LedgerTransaction();
-                    $rev->setGeneralLedger($orig->getGeneralLedger());
-                    $rev->setCustomerLedger($orig->getCustomerLedger());
-                    // Swap DR/CR
-                    $rev->setTransType(
-                        $orig->getTransType() === TransactionType::DR
-                            ? TransactionType::CR : TransactionType::DR,
+
+                // Resolve the original JournalEntry header from the
+                // first line. All lines share the same header by
+                // construction (D.5 emits one journal per run); we
+                // assert that here as a defense against legacy data
+                // missing the FK. Sub-phase B's backfill should have
+                // populated it; if not, this throws cleanly rather
+                // than silently posting an orphan reversal.
+                $originalHeader = $originals[0]->getJournalEntry();
+                if ($originalHeader === null) {
+                    throw new DomainException(
+                        "Provision run callback '{$callback}' has lines without "
+                      . "a JournalEntry header. Sub-phase B's backfill "
+                      . "(migrate-backfill-journal-entries.php) must run before "
+                      . "reversals on legacy provision runs can complete."
                     );
-                    $rev->setTransAmount($orig->getTransAmount());
-                    $rev->setTransNarration(
-                        'REVERSAL: ' . ($reason ? "{$reason} — " : '')
-                        . $orig->getTransNarration(),
-                    );
-                    $rev->setTransCallback($reversalCb);
-                    $rev->setTransDate($y, $m, $d);
-                    $rev->setPostedBy($userId);
-                    $rev->setReversalOfId($orig->getId());
-                    $this->em->persist($rev);
                 }
+                $originalHeaderId = $originalHeader->getId();
+
+                // Build mirror lines: swap DR/CR, preserve amount and
+                // GL/customerLedger refs. Line-level reversalOfLineId
+                // gives forensic traceability per row, supplementing
+                // the header-level reversal_of_id link.
+                $reversalLines = [];
+                foreach ($originals as $orig) {
+                    $reversalLines[] = [
+                        'gl' => $orig->getGeneralLedger(),
+                        'customerLedger' => $orig->getCustomerLedger(),
+                        'type' => $orig->getTransType() === TransactionType::DR
+                            ? TransactionType::CR
+                            : TransactionType::DR,
+                        'amount' => $orig->getTransAmount(),
+                        'narration' => 'REVERSAL: ' . ($reason ? "{$reason} — " : '')
+                            . $orig->getTransNarration(),
+                        'reversalOfLineId' => $orig->getId(),
+                    ];
+                }
+
+                // Phase-2.5 D.6: post the reversal via the helper.
+                // entryType=REVERSAL, isReversal=true, reversalOfId
+                // points at the original journal header.
+                $this->ledgerService->postJournal(
+                    entryType: JournalEntryType::REVERSAL,
+                    postingDate: date('Y-m-d'),
+                    narration: 'Reversal of provision run ' . $callback
+                        . ($reason ? " — {$reason}" : ''),
+                    postedBy: $userId,
+                    lines: $reversalLines,
+                    legacyCallback: $reversalCb,
+                    isReversal: true,
+                    reversalOfId: $originalHeaderId,
+                );
             }
 
             $run->setStatus(ProvisionStatus::REVERSED);
@@ -230,14 +263,9 @@ final class ProvisionService
             $run->setReversalReason($reason);
 
             $this->em->flush();
-            // Phase-1 invariant: reversal entries must mirror originals
-            // exactly (same amount, swapped DR/CR), so the batch sums
-            // to zero by construction. validateBatchBalance is a
-            // belt-and-braces check that the swap loop didn't drop
-            // an entry. No-op when no originals existed.
-            if ($reversalCb !== null) {
-                $this->ledgerService->validateBatchBalance($reversalCb);
-            }
+            // Phase-2.5 D.6: postJournal validated the reversal batch.
+            // The flush here commits the run-status updates atomically
+            // with the reversal journal.
             $this->em->commit();
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) {
@@ -500,28 +528,6 @@ final class ProvisionService
             "{$friendlyName} GL not found. Seed a GL with accountCode='{$code}' " .
             "(see seed-lite.php) before running provisioning."
         );
-    }
-
-    private function post(
-        GeneralLedger $gl,
-        TransactionType $type,
-        string $amount,
-        string $narration,
-        string $callback,
-        string $year,
-        string $month,
-        string $day,
-        ?string $userId,
-    ): void {
-        $entry = new LedgerTransaction();
-        $entry->setGeneralLedger($gl);
-        $entry->setTransType($type);
-        $entry->setTransAmount($amount);
-        $entry->setTransNarration($narration);
-        $entry->setTransCallback($callback);
-        $entry->setTransDate($year, $month, $day);
-        $entry->setPostedBy($userId);
-        $this->em->persist($entry);
     }
 
     private function assertValidDate(string $date): void

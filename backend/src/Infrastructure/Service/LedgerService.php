@@ -382,6 +382,14 @@ final class LedgerService
             $entry->setPostedBy($postedBy);
             $entry->setIsRepayment((bool) ($line['isRepayment'] ?? false));
             $entry->setIsClosingEntry($isClosingEntry);
+            // Phase-2.5: reversalOfLineId points at the original LINE
+            // being reversed (LedgerTransaction.id, not JournalEntry.id).
+            // Used by reversal flows that mirror DR/CR per line — line-
+            // level traceability supplements the header-level
+            // reversal_of_id (which points at the original journal).
+            if (isset($line['reversalOfLineId']) && $line['reversalOfLineId'] !== null) {
+                $entry->setReversalOfId((string) $line['reversalOfLineId']);
+            }
             $this->em->persist($entry);
         }
 
