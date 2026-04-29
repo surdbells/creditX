@@ -172,6 +172,9 @@ return [
     LedgerTransactionRepository::class => function (ContainerInterface $c): LedgerTransactionRepository {
         return new LedgerTransactionRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\JournalEntryRepository::class => function (ContainerInterface $c): \App\Domain\Repository\JournalEntryRepository {
+        return new \App\Domain\Repository\JournalEntryRepository($c->get(EntityManagerInterface::class));
+    },
     RepaymentScheduleRepository::class => function (ContainerInterface $c): RepaymentScheduleRepository {
         return new RepaymentScheduleRepository($c->get(EntityManagerInterface::class));
     },

@@ -341,6 +341,17 @@ return function (App $app): void {
         $api->get('/journal-entries', Accounting\ListJournalEntriesAction::class)
             ->add(new RbacMiddleware('accounting.view'));
 
+        // Phase-2.5 sub-phase E. Header-rooted view of journals,
+        // returning JournalEntry aggregates with their lines instead
+        // of flat LedgerTransaction rows. The redesigned Journal
+        // Entries page (sub-phase F) calls these endpoints; the
+        // legacy /journal-entries flat list stays for backward
+        // compatibility with consumers that haven't migrated yet.
+        $api->get('/accounting/journals', Accounting\ListJournalsAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->get('/accounting/journals/{id}', Accounting\GetJournalAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Accounting — GL Reconciliation Report ───
         // For every CUSTOMER-type parent GL, compares parent-only
         // balance vs sub-ledger aggregate and flags discrepancies.
