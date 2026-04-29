@@ -41,6 +41,7 @@ export const routes: Routes = [
       { path: 'gl-reconciliation', loadComponent: () => import('./features/gl-reconciliation/gl-reconciliation.component').then(m => m.GlReconciliationComponent) },
       { path: 'reports/income-statement', loadComponent: () => import('./features/income-statement/income-statement.component').then(m => m.IncomeStatementComponent) },
       { path: 'reports/balance-sheet', loadComponent: () => import('./features/balance-sheet/balance-sheet.component').then(m => m.BalanceSheetComponent) },
+      { path: 'reports/cash-flow', loadComponent: () => import('./features/cash-flow/cash-flow.component').then(m => m.CashFlowComponent) },
       { path: 'reports/aged-receivables', loadComponent: () => import('./features/aged-receivables/aged-receivables.component').then(m => m.AgedReceivablesComponent) },
       { path: 'reports/portfolio-at-risk', loadComponent: () => import('./features/portfolio-at-risk/portfolio-at-risk.component').then(m => m.PortfolioAtRiskComponent) },
       { path: 'period-close', loadComponent: () => import('./features/period-close/period-close.component').then(m => m.PeriodCloseComponent) },
