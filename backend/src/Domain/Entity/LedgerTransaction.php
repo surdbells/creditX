@@ -12,6 +12,7 @@ use Ramsey\Uuid\Uuid;
 #[ORM\Index(name: 'idx_lt_customer_ledger', columns: ['customer_ledger_id'])]
 #[ORM\Index(name: 'idx_lt_callback', columns: ['trans_callback'])]
 #[ORM\Index(name: 'idx_lt_year_month', columns: ['trans_year', 'trans_month'])]
+#[ORM\Index(name: 'idx_lt_posting_date', columns: ['posting_date'])]
 #[ORM\HasLifecycleCallbacks]
 class LedgerTransaction
 {
@@ -53,6 +54,41 @@ class LedgerTransaction
 
     #[ORM\Column(type: 'string', length: 2)]
     private string $transDay;
+
+    /**
+     * Postgres-generated date column derived from
+     * trans_year/trans_month/trans_day. Read-only from the application
+     * (insertable=false, updatable=false) — Postgres maintains it
+     * automatically via:
+     *
+     *   GENERATED ALWAYS AS
+     *     ((trans_year || '-' || trans_month || '-' || trans_day)::date)
+     *   STORED
+     *
+     * Why this exists: every date-range report (Income Statement,
+     * Balance Sheet, Trial Balance, Budget vs Actual, Period Close,
+     * GL summary, ListJournalEntries) used to filter dates with
+     *
+     *   CONCAT(trans_year, '-', trans_month, '-', trans_day) >= :date
+     *
+     * which can't use any index — Postgres has to scan the whole
+     * partition (or the whole table) to evaluate the expression. As
+     * ledger_transactions grows past ~1M rows that pattern degrades
+     * sharply.
+     *
+     * With posting_date + idx_lt_posting_date, the same range queries
+     * become indexable — Postgres uses the b-tree to seek directly
+     * to the start/end of the range. Phase-2 schema hardening
+     * migrates every report query to use this column directly.
+     *
+     * The 3 string columns are KEPT (not dropped). They're still the
+     * canonical write path, and dropping them would require an entity
+     * refactor that's out of scope for Phase 2. Phase 2.5+ may
+     * deprecate them after we've confirmed every consumer is on
+     * posting_date.
+     */
+    #[ORM\Column(name: 'posting_date', type: 'date_immutable', insertable: false, updatable: false, nullable: true)]
+    private ?\DateTimeImmutable $postingDate = null;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isRepayment = false;
@@ -112,6 +148,18 @@ class LedgerTransaction
         $this->transYear = $year;
         $this->transMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
         $this->transDay = str_pad($day, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Read-only access to the Postgres-generated posting_date column.
+     * Returns null only on freshly-instantiated (not-yet-flushed)
+     * entities — once the row has been persisted and re-fetched, the
+     * generated value is populated. Callers that need the date before
+     * flush should build it from getTransYear/Month/Day.
+     */
+    public function getPostingDate(): ?\DateTimeImmutable
+    {
+        return $this->postingDate;
     }
     public function isRepayment(): bool { return $this->isRepayment; }
     public function setIsRepayment(bool $v): void { $this->isRepayment = $v; }

@@ -52,10 +52,19 @@ final class ListPeriodsAction
         // listed as Open even if nobody's ever created an explicit
         // period record yet.
         $conn = $this->em->getConnection();
+        // Find the earliest posting_date so we know how far back to
+        // synthesise period rows. posting_date is the Postgres-generated
+        // column added in Phase 2 — replaces the prior
+        // MIN(CONCAT(trans_year, '-', trans_month)) pattern.
         $earliest = $conn->fetchAssociative(
-            "SELECT MIN(CONCAT(trans_year, '-', trans_month)) AS ym FROM ledger_transactions"
+            "SELECT MIN(posting_date) AS pd FROM ledger_transactions"
         );
-        $startLabel = $earliest['ym'] ?? date('Y-m');
+        // Format to 'YYYY-MM' for the cursor walk below. The query
+        // returns NULL when ledger_transactions is empty (greenfield
+        // tenant), in which case we fall back to today's month.
+        $startLabel = (!empty($earliest['pd']))
+            ? substr((string) $earliest['pd'], 0, 7)
+            : date('Y-m');
         $today = date('Y-m');
 
         $periods = [];

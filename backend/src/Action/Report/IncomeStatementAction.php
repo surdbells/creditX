@@ -105,6 +105,11 @@ final class IncomeStatementAction
         // zero P&L because the closing entries cancel the originals
         // within the same date range. See Phase-1 accounting hotfix
         // commit for full background.
+        //
+        // Date filter uses posting_date (Postgres-generated column,
+        // indexed via idx_lt_posting_date) — Phase-2 hotfix replaced
+        // the prior CONCAT(year, '-', month, '-', day) pattern which
+        // couldn't use any index.
         $sql = "
             SELECT
                 gl.id,
@@ -116,8 +121,8 @@ final class IncomeStatementAction
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type = :type
               AND t.is_closing_entry = false
-              AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) >= :fromDate
-              AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) <= :toDate
+              AND t.posting_date >= :fromDate
+              AND t.posting_date <= :toDate
             GROUP BY gl.id, gl.account_code, gl.account_name
             ORDER BY gl.account_code ASC
         ";

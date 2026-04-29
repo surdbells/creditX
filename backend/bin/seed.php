@@ -288,6 +288,7 @@ $settingsDef = [
 
     // Accounting settings
     ['accounting.batch_validation_cutoff_at', '', SettingType::STRING, SettingCategory::ACCOUNTING, 'ISO timestamp; ledger batches whose oldest row predates this cutoff are exempt from balance validation. Set to NOW() after running the Phase-1 hotfix migrations on tenants with historical data.'],
+    ['accounting.reconciliation_alert_threshold', '0.01', SettingType::STRING, SettingCategory::ACCOUNTING, 'Total-discrepancy threshold (naira) above which the daily GL reconciliation scan dispatches an in-app alert. 0 = alert on any non-zero discrepancy.'],
 ];
 
 $settingCount = 0;

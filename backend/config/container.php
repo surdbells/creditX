@@ -9,6 +9,7 @@ use App\Infrastructure\Service\AuditService;
 use App\Infrastructure\Service\BranchScopeService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
+use App\Infrastructure\Service\GlReconciliationService;
 use App\Infrastructure\Service\LedgerService;
 use App\Infrastructure\Service\LoanLifecycleService;
 use App\Infrastructure\Service\MakerCheckerExecutionService;
@@ -252,6 +253,13 @@ return [
         return new LedgerService(
             $c->get(EntityManagerInterface::class),
             $c->get(SettingsCacheService::class),
+        );
+    },
+    GlReconciliationService::class => function (ContainerInterface $c): GlReconciliationService {
+        return new GlReconciliationService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(LoggerInterface::class),
         );
     },
     ProvisionService::class => function (ContainerInterface $c): ProvisionService {

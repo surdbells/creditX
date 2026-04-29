@@ -122,8 +122,8 @@ final class BudgetVsActualAction
             FROM general_ledgers gl
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type = :type
-              AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) >= :fromDate
-              AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) <= :toDate
+              AND t.posting_date >= :fromDate
+              AND t.posting_date <= :toDate
             GROUP BY gl.id, gl.account_code, gl.account_name
         ";
         $actualRows = $conn->executeQuery($actualSql, [

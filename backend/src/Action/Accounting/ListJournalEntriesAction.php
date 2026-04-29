@@ -42,12 +42,12 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  *     meta: { page, per_page, total, pages } }
  *
  * Design note on date filtering: ledger_transactions stores date as
- * three columns (trans_year, trans_month, trans_day) rather than a
- * datetime, because the business uses disbursement-effective-date
- * semantics that don't always match wall-clock posting time. We
- * reconstruct a comparable date string with TO_DATE in Postgres for
- * the range compare — Doctrine's DQL CONCAT falls short here, so we
- * fall back to native SQL inside the two range clauses.
+ * three string columns (trans_year, trans_month, trans_day) for
+ * historical reasons (disbursement-effective-date semantics that
+ * don't always match wall-clock posting time). Phase 2 added a
+ * Postgres-generated posting_date date column (read-only on the
+ * entity, indexed) that we use for range filtering — gives us
+ * indexable seeks instead of full-table CONCAT scans.
  */
 final class ListJournalEntriesAction
 {
@@ -113,23 +113,18 @@ final class ListJournalEntriesAction
                ->setParameter('cb', (string) $params['callback']);
         }
 
-        // Date range filtering — since trans_year/month/day are
-        // separate columns, we reconstruct a YYYY-MM-DD string with
-        // CONCAT and compare as strings. PostgreSQL sorts date-shaped
-        // strings correctly, so lexicographic comparison is safe for
-        // our YYYY-MM-DD format where each component is zero-padded.
-        //
-        // NOTE: DQL doesn't have a CONCAT with three args in some
-        // versions. We use three-argument CONCAT() via nested calls.
+        // Date range filtering — uses the Postgres-generated
+        // posting_date column (mapped as $postingDate on the entity,
+        // read-only). Replaces the prior CONCAT pattern which
+        // couldn't use any index. Phase 2 schema-hardening migration
+        // added the column + idx_lt_posting_date.
         if (!empty($params['date_from'])) {
-            $qb->andWhere(
-                "CONCAT(t.transYear, '-', t.transMonth, '-', t.transDay) >= :dateFrom"
-            )->setParameter('dateFrom', (string) $params['date_from']);
+            $qb->andWhere('t.postingDate >= :dateFrom')
+               ->setParameter('dateFrom', new \DateTimeImmutable((string) $params['date_from']));
         }
         if (!empty($params['date_to'])) {
-            $qb->andWhere(
-                "CONCAT(t.transYear, '-', t.transMonth, '-', t.transDay) <= :dateTo"
-            )->setParameter('dateTo', (string) $params['date_to']);
+            $qb->andWhere('t.postingDate <= :dateTo')
+               ->setParameter('dateTo', new \DateTimeImmutable((string) $params['date_to']));
         }
 
         // Amount range — NUMERIC column, direct comparison works

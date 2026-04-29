@@ -151,7 +151,7 @@ final class BalanceSheetAction
             FROM general_ledgers gl
             INNER JOIN ledger_transactions t ON t.gl_id = gl.id
             WHERE gl.account_type = :type
-              AND CONCAT(t.trans_year, '-', t.trans_month, '-', t.trans_day) <= :asOf
+              AND t.posting_date <= :asOf
             GROUP BY gl.id, gl.account_code, gl.account_name
             ORDER BY gl.account_code ASC
         ";
