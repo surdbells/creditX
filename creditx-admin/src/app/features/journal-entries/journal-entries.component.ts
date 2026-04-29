@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -11,26 +11,37 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
 
 /**
- * Journal Entries — global view of every LedgerTransaction across the
- * accounting system. Complements the GL-scoped and customer-ledger-
- * scoped transaction views by letting users answer questions that
- * don't start with 'which account?':
+ * Journal Entries — header-rooted view (Phase-2.5 sub-phase F).
  *
- *   - 'Show me every journal entry over the configured currency threshold this month'
- *   - 'What were all the postings for callback DISB-LN0042-...?'
- *   - 'List every reversal today' (trans_narration LIKE '%REVERSAL%')
+ * Each row is a JournalEntry header (a balanced batch of postings,
+ * e.g. one disbursement = one row, one repayment = one row). Clicking
+ * a row opens a drawer showing the full DR/CR line table for that
+ * journal plus reversal context.
  *
- * Filters:
- *   - Search (narration, reference, callback)
- *   - Date range (from/to)
- *   - Account (GL dropdown)
- *   - Transaction type (CR/DR/all)
- *   - Amount range (min/max)
+ * Replaces the prior line-rooted view where each row was a single
+ * LedgerTransaction and the drawer queried siblings by callback
+ * string. The new view is conceptually cleaner — one row per
+ * accounting event — and matches how operators reason about the
+ * ledger when investigating activity.
  *
- * Row click → drawer showing the full entry + all sibling entries
- * sharing the same callback (i.e. the complete journal that this
- * transaction is part of). A disbursement posts 5-6 entries under
- * one callback ref; seeing them together clarifies the accounting.
+ * ─── Endpoints used ───
+ * GET /api/accounting/journals          — paginated header list
+ * GET /api/accounting/journals/{id}     — single journal + lines
+ * GET /api/journal-entries              — flat lines (for CSV export)
+ *
+ * Other consumers (loan detail, customer detail, GL reconciliation
+ * drilldowns) continue to use the legacy /journal-entries endpoint
+ * unchanged — they're filtering by callback or GL, not browsing
+ * journals as the unit.
+ *
+ * ─── Filters ───
+ * - Search (substring on narration / reference / legacy callback)
+ * - Date range (posting_date_from / posting_date_to)
+ * - Entry type (DISBURSEMENT, REPAYMENT, etc., or all)
+ * - Include reversals toggle (default off — most views want
+ *   business activity, not the reversal noise)
+ * - Include closing toggle (default off — period-close bookkeeping
+ *   is rarely what users want when browsing)
  *
  * Gated by accounting.view permission at both menu + backend layers.
  */
@@ -42,7 +53,7 @@ import { SettingsService } from '../../core/services/settings.service';
     <div class="cx-animate-in">
       <cx-page-header
         title="Journal Entries"
-        subtitle="Every posting across the general ledger — filterable + exportable"
+        subtitle="Each journal is a balanced posting — disbursement, repayment, write-off, etc."
         eyebrow="Accounting"></cx-page-header>
 
       <!-- Filter bar -->
@@ -50,49 +61,42 @@ import { SettingsService } from '../../core/services/settings.service';
         <div class="cx-je-filter-group">
           <label class="cx-je-filter-label">From</label>
           <input type="date" class="cx-input cx-je-filter-input"
-                 [(ngModel)]="filters.date_from"
+                 [(ngModel)]="filters.posting_date_from"
                  (change)="applyFilters()" />
         </div>
         <div class="cx-je-filter-group">
           <label class="cx-je-filter-label">To</label>
           <input type="date" class="cx-input cx-je-filter-input"
-                 [(ngModel)]="filters.date_to"
+                 [(ngModel)]="filters.posting_date_to"
                  (change)="applyFilters()" />
-        </div>
-        <div class="cx-je-filter-group">
-          <label class="cx-je-filter-label">Account</label>
-          <select class="cx-input cx-je-filter-input"
-                  [(ngModel)]="filters.gl_id"
-                  (change)="applyFilters()">
-            <option value="">All accounts</option>
-            @for (gl of glAccounts(); track gl.id) {
-              <option [value]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option>
-            }
-          </select>
         </div>
         <div class="cx-je-filter-group">
           <label class="cx-je-filter-label">Type</label>
           <select class="cx-input cx-je-filter-input"
-                  [(ngModel)]="filters.trans_type"
+                  [(ngModel)]="filters.entry_type"
                   (change)="applyFilters()">
-            <option value="">Both</option>
-            <option value="DR">Debit</option>
-            <option value="CR">Credit</option>
+            <option value="">All types</option>
+            @for (et of entryTypes; track et.value) {
+              <option [value]="et.value">{{ et.label }}</option>
+            }
           </select>
         </div>
         <div class="cx-je-filter-group">
-          <label class="cx-je-filter-label">Min Amount ({{ settings.currencySymbol() }})</label>
-          <input type="number" class="cx-input cx-je-filter-input tabular-nums"
-                 [(ngModel)]="filters.min_amount"
-                 (change)="applyFilters()"
-                 placeholder="0" />
-        </div>
-        <div class="cx-je-filter-group">
-          <label class="cx-je-filter-label">Max Amount ({{ settings.currencySymbol() }})</label>
-          <input type="number" class="cx-input cx-je-filter-input tabular-nums"
-                 [(ngModel)]="filters.max_amount"
-                 (change)="applyFilters()"
-                 placeholder="∞" />
+          <label class="cx-je-filter-label">View</label>
+          <div class="cx-je-toggle-row">
+            <label class="cx-je-toggle">
+              <input type="checkbox"
+                     [(ngModel)]="filters.include_reversals"
+                     (change)="applyFilters()" />
+              <span>Reversals</span>
+            </label>
+            <label class="cx-je-toggle">
+              <input type="checkbox"
+                     [(ngModel)]="filters.include_closing"
+                     (change)="applyFilters()" />
+              <span>Closing</span>
+            </label>
+          </div>
         </div>
         <div class="cx-je-filter-actions">
           @if (hasActiveFilters()) {
@@ -108,20 +112,22 @@ import { SettingsService } from '../../core/services/settings.service';
         </div>
       </div>
 
-      <!-- Summary strip — shows totals for the current filtered view -->
+      <!-- Summary strip — totals across the visible page -->
       @if (rows().length > 0 && !loading()) {
         <div class="cx-je-summary">
           <div class="cx-je-summary-cell">
             <div class="cx-je-summary-label">Showing</div>
-            <div class="cx-je-summary-value tabular-nums">{{ rows().length }} of {{ pagination()?.total || rows().length }}</div>
+            <div class="cx-je-summary-value tabular-nums">
+              {{ rows().length }} of {{ pagination()?.total || rows().length }}
+            </div>
           </div>
           <div class="cx-je-summary-cell">
-            <div class="cx-je-summary-label">Total Debit (page)</div>
-            <div class="cx-je-summary-value cx-je-summary-dr tabular-nums">{{ pageTotalDr() | money:2 }}</div>
+            <div class="cx-je-summary-label">Total Lines (page)</div>
+            <div class="cx-je-summary-value tabular-nums">{{ pageTotalLines() }}</div>
           </div>
           <div class="cx-je-summary-cell">
-            <div class="cx-je-summary-label">Total Credit (page)</div>
-            <div class="cx-je-summary-value cx-je-summary-cr tabular-nums">{{ pageTotalCr() | money:2 }}</div>
+            <div class="cx-je-summary-label">Total Amount (page)</div>
+            <div class="cx-je-summary-value tabular-nums">{{ pageTotalAmount() | money:2 }}</div>
           </div>
         </div>
       }
@@ -133,13 +139,29 @@ import { SettingsService } from '../../core/services/settings.service';
                      trackBy="id"
                      (query)="onQuery($event)">
         <ng-template #cellTemplate let-row let-col="column">
-          @if (col.key === 'posted_by') {
+          @if (col.key === 'entry_type') {
+            <span class="cx-je-type-badge" [attr.data-type]="row.entry_type">
+              {{ entryTypeLabel(row.entry_type) }}
+            </span>
+          } @else if (col.key === 'narration_with_status') {
+            <div class="cx-je-narration-cell">
+              <span class="cx-je-narration-text">{{ row.narration }}</span>
+              @if (row.is_reversal) {
+                <span class="cx-je-status-pill cx-je-status-reversal">REVERSAL</span>
+              } @else if (row.has_reversal) {
+                <span class="cx-je-status-pill cx-je-status-reversed">REVERSED</span>
+              }
+              @if (row.is_closing_entry) {
+                <span class="cx-je-status-pill cx-je-status-closing">CLOSING</span>
+              }
+            </div>
+          } @else if (col.key === 'posted_by') {
             @if (row.posted_by_name) {
               {{ row.posted_by_name }}
             } @else if (row.posted_by) {
               <span class="cx-je-posted-id">{{ row.posted_by }}</span>
             } @else {
-              —
+              <span class="cx-je-text-muted">system</span>
             }
           } @else {
             {{ row[col.key] }}
@@ -147,7 +169,8 @@ import { SettingsService } from '../../core/services/settings.service';
         </ng-template>
         <ng-template #rowActions let-row>
           <div class="flex items-center gap-1 justify-end">
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openDetail(row)" title="View details">
+            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon"
+                    (click)="openDetail(row)" title="View details">
               <lucide-icon name="eye" [size]="14"></lucide-icon>
             </button>
           </div>
@@ -155,17 +178,34 @@ import { SettingsService } from '../../core/services/settings.service';
       </cx-data-table>
     </div>
 
-    <!-- Detail drawer — full entry + siblings under the same callback -->
+    <!-- Detail drawer — full journal: header + lines + reversal context -->
     @if (drawerOpen()) {
       <div class="cx-je-backdrop" (click)="closeDrawer()"></div>
       <div class="cx-je-drawer" role="dialog" aria-labelledby="je-drawer-title">
+
         <div class="cx-je-drawer-head">
-          <div>
-            <div class="cx-je-drawer-eyebrow">Journal Entry</div>
-            <h2 id="je-drawer-title" class="cx-je-drawer-title tabular-nums">
-              {{ activeRow()?.trans_callback || activeRow()?.trans_reference || '—' }}
+          <div class="cx-je-drawer-head-main">
+            <div class="cx-je-drawer-eyebrow">
+              {{ entryTypeLabel(detailHeader()?.entry_type) }}
+              @if (detailHeader()?.is_reversal) {
+                <span class="cx-je-status-pill cx-je-status-reversal">REVERSAL</span>
+              } @else if (detail()?.reversal) {
+                <span class="cx-je-status-pill cx-je-status-reversed">REVERSED</span>
+              }
+              @if (detailHeader()?.is_closing_entry) {
+                <span class="cx-je-status-pill cx-je-status-closing">CLOSING</span>
+              }
+            </div>
+            <h2 id="je-drawer-title" class="cx-je-drawer-title">
+              {{ detailHeader()?.narration || '—' }}
             </h2>
-            <div class="cx-je-drawer-sub">{{ activeRow()?.trans_date }} · posted {{ activeRow()?.created_at }}</div>
+            <div class="cx-je-drawer-sub tabular-nums">
+              {{ detailHeader()?.posting_date }}
+              @if (detailHeader()?.reference) { · ref {{ detailHeader()?.reference }} }
+              @if (detailHeader()?.legacy_callback) {
+                · <span class="cx-je-text-muted">{{ detailHeader()?.legacy_callback }}</span>
+              }
+            </div>
           </div>
           <button class="cx-je-drawer-close" (click)="closeDrawer()" aria-label="Close">
             <lucide-icon name="x" [size]="18"></lucide-icon>
@@ -174,153 +214,138 @@ import { SettingsService } from '../../core/services/settings.service';
 
         <div class="cx-je-drawer-body">
 
-          <!-- Active row details -->
-          <section class="cx-je-section">
-            <h3 class="cx-je-section-title">This Entry</h3>
-            <div class="cx-je-meta">
-              <div class="cx-je-meta-row">
-                <span>Account</span>
-                <span class="tabular-nums">
-                  <span class="cx-je-gl-code">{{ activeRow()?.gl_code }}</span>
-                  {{ activeRow()?.gl_name }}
-                </span>
-              </div>
-              <div class="cx-je-meta-row">
-                <span>Type</span>
-                <span>
-                  <span class="cx-je-type-pill" [attr.data-type]="activeRow()?.trans_type">
-                    {{ activeRow()?.trans_type }}
-                  </span>
-                </span>
-              </div>
-              <div class="cx-je-meta-row">
-                <span>Amount</span>
-                <span class="tabular-nums cx-je-amount-big">{{ activeRow()?.trans_amount | money:2 }}</span>
-              </div>
-              <div class="cx-je-meta-row">
-                <span>Narration</span>
-                <span>{{ activeRow()?.trans_narration }}</span>
-              </div>
-              @if (activeRow()?.trans_reference) {
-                <div class="cx-je-meta-row">
-                  <span>Reference</span>
-                  <span class="tabular-nums">{{ activeRow()?.trans_reference }}</span>
-                </div>
-              }
-              @if (activeRow()?.customer_ledger_no) {
-                <div class="cx-je-meta-row">
-                  <span>Customer Ledger</span>
-                  <span class="tabular-nums">{{ activeRow()?.customer_ledger_no }}</span>
-                </div>
-              }
-              @if (activeRow()?.reversal_of_id) {
-                <div class="cx-je-meta-row">
-                  <span>Status</span>
-                  <span class="cx-je-reversal-tag">REVERSAL ENTRY</span>
-                </div>
-              } @else if (activeRow()?.reversal_status === 'reversed') {
-                <div class="cx-je-meta-row">
-                  <span>Status</span>
-                  <span class="cx-je-reversed-tag">REVERSED</span>
-                </div>
-                @if (activeRow()?.reversed_by_name) {
-                  <div class="cx-je-meta-row">
-                    <span>Reversed by</span>
-                    <span>{{ activeRow()?.reversed_by_name }}</span>
-                  </div>
-                }
-                @if (activeRow()?.reversed_at) {
-                  <div class="cx-je-meta-row">
-                    <span>Reversed at</span>
-                    <span>{{ activeRow()?.reversed_at }}</span>
-                  </div>
-                }
-              }
-              <div class="cx-je-meta-row">
-                <span>Posted by</span>
-                <span>
-                  @if (activeRow()?.posted_by_name) {
-                    {{ activeRow()?.posted_by_name }}
-                  } @else if (activeRow()?.posted_by) {
-                    <span class="cx-je-posted-id">{{ activeRow()?.posted_by }}</span>
-                  } @else {
-                    —
-                  }
-                </span>
-              </div>
+          @if (detailLoading()) {
+            <div class="cx-je-drawer-loading">
+              <lucide-icon name="loader-2" [size]="16" class="cx-je-spin"></lucide-icon>
+              <span>Loading journal…</span>
             </div>
-          </section>
+          } @else if (detail()) {
 
-          <!-- Siblings — all entries sharing the same callback -->
-          @if (activeRow()?.trans_callback) {
+            <!-- Reversal context: this journal is a reversal of … OR
+                 this journal has been reversed by … -->
+            @if (detail()?.reverses) {
+              <div class="cx-je-reversal-banner cx-je-reversal-banner-rev">
+                <lucide-icon name="rotate-ccw" [size]="14"></lucide-icon>
+                <div>
+                  <div class="cx-je-reversal-banner-label">This is a reversal</div>
+                  <div class="cx-je-reversal-banner-value">
+                    Reverses
+                    <button class="cx-je-link" (click)="loadJournal(detail()?.reverses?.id)">
+                      {{ detail()?.reverses?.narration || detail()?.reverses?.id }}
+                    </button>
+                    posted {{ detail()?.reverses?.posting_date }}
+                    @if (detail()?.reverses?.posted_by_name) {
+                      by {{ detail()?.reverses?.posted_by_name }}
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+            @if (detail()?.reversal) {
+              <div class="cx-je-reversal-banner cx-je-reversal-banner-revd">
+                <lucide-icon name="alert-triangle" [size]="14"></lucide-icon>
+                <div>
+                  <div class="cx-je-reversal-banner-label">This journal has been reversed</div>
+                  <div class="cx-je-reversal-banner-value">
+                    Reversed by
+                    <button class="cx-je-link" (click)="loadJournal(detail()?.reversal?.id)">
+                      {{ detail()?.reversal?.narration || detail()?.reversal?.id }}
+                    </button>
+                    on {{ detail()?.reversal?.posting_date }}
+                    @if (detail()?.reversal?.posted_by_name) {
+                      by {{ detail()?.reversal?.posted_by_name }}
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Header meta -->
+            <section class="cx-je-section">
+              <h3 class="cx-je-section-title">Details</h3>
+              <div class="cx-je-meta">
+                <div class="cx-je-meta-row">
+                  <span>Posted by</span>
+                  <span>
+                    @if (detailHeader()?.posted_by_name) {
+                      {{ detailHeader()?.posted_by_name }}
+                    } @else if (detailHeader()?.posted_by) {
+                      <span class="cx-je-posted-id">{{ detailHeader()?.posted_by }}</span>
+                    } @else {
+                      <span class="cx-je-text-muted">system</span>
+                    }
+                  </span>
+                </div>
+                <div class="cx-je-meta-row">
+                  <span>Created at</span>
+                  <span class="tabular-nums">{{ detailHeader()?.created_at }}</span>
+                </div>
+                @if (detailHeader()?.legacy_callback) {
+                  <div class="cx-je-meta-row">
+                    <span>Legacy callback</span>
+                    <span class="tabular-nums cx-je-text-muted">{{ detailHeader()?.legacy_callback }}</span>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <!-- Lines: DR/CR ledger view -->
             <section class="cx-je-section">
               <h3 class="cx-je-section-title">
-                Full Journal
-                @if (siblings().length) {
-                  <span class="cx-je-section-count">{{ siblings().length }} entries</span>
-                }
+                Postings
+                <span class="cx-je-section-count">{{ detail()?.lines?.length || 0 }} lines</span>
               </h3>
-              @if (siblingsLoading()) {
-                <div class="cx-je-drawer-loading">
-                  <lucide-icon name="loader-2" [size]="16" class="cx-je-spin"></lucide-icon>
-                  <span>Loading siblings…</span>
-                </div>
-              } @else if (siblings().length === 0) {
-                <div class="cx-je-empty">No other entries under this callback.</div>
-              } @else {
-                <!--
-                  Siblings rendered as a DR/CR two-column ledger so the
-                  checker can see debits balance credits at a glance.
-                  A journal is always balanced — total DR == total CR
-                  for the same callback ref (barring partial postings,
-                  which shouldn't happen in this system).
-                -->
-                <table class="cx-je-siblings-table">
-                  <thead>
+              <table class="cx-je-lines-table">
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th>Narration</th>
+                    <th class="cx-je-right">Debit</th>
+                    <th class="cx-je-right">Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (l of detail()?.lines || []; track l.id) {
                     <tr>
-                      <th>Account</th>
-                      <th>Narration</th>
-                      <th class="cx-je-right">Debit</th>
-                      <th class="cx-je-right">Credit</th>
+                      <td>
+                        <span class="cx-je-gl-code">{{ l.gl_code }}</span>
+                        <span class="cx-je-gl-name">{{ l.gl_name }}</span>
+                        @if (l.customer_ledger_no) {
+                          <div class="cx-je-sub-line">↳ {{ l.customer_ledger_no }}</div>
+                        }
+                      </td>
+                      <td class="cx-je-narration">{{ l.trans_narration }}</td>
+                      <td class="cx-je-right tabular-nums">
+                        @if (l.trans_type === 'DR') { {{ l.trans_amount | money:2 }} }
+                      </td>
+                      <td class="cx-je-right tabular-nums">
+                        @if (l.trans_type === 'CR') { {{ l.trans_amount | money:2 }} }
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    @for (s of siblings(); track s.id) {
-                      <tr [class.cx-je-siblings-row-active]="s.id === activeRow()?.id">
-                        <td>
-                          <span class="cx-je-gl-code">{{ s.gl_code }}</span>
-                          <span class="cx-je-gl-name">{{ s.gl_name }}</span>
-                        </td>
-                        <td class="cx-je-narration">{{ s.trans_narration }}</td>
-                        <td class="cx-je-right tabular-nums">
-                          @if (s.trans_type === 'DR') { {{ s.trans_amount | money:2 }} }
-                        </td>
-                        <td class="cx-je-right tabular-nums">
-                          @if (s.trans_type === 'CR') { {{ s.trans_amount | money:2 }} }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                  <tfoot>
-                    <tr class="cx-je-siblings-total">
-                      <td colspan="2">Totals</td>
-                      <td class="cx-je-right tabular-nums">{{ siblingsTotalDr() | money:2 }}</td>
-                      <td class="cx-je-right tabular-nums">{{ siblingsTotalCr() | money:2 }}</td>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="cx-je-lines-total">
+                    <td colspan="2">Totals</td>
+                    <td class="cx-je-right tabular-nums">{{ detail()?.totals?.dr | money:2 }}</td>
+                    <td class="cx-je-right tabular-nums">{{ detail()?.totals?.cr | money:2 }}</td>
+                  </tr>
+                  @if (!detail()?.totals?.balanced) {
+                    <tr class="cx-je-lines-unbalanced">
+                      <td colspan="4">
+                        <lucide-icon name="alert-triangle" [size]="12"></lucide-icon>
+                        Lines do not balance — DR and CR sums differ.
+                        This shouldn't happen for a journal posted via the
+                        new helper. Investigate via direct DB query if seen.
+                      </td>
                     </tr>
-                    @if (!isBalanced()) {
-                      <tr class="cx-je-siblings-unbalanced">
-                        <td colspan="4">
-                          <lucide-icon name="info" [size]="12"></lucide-icon>
-                          Entries in view do not balance — {{ imbalance() | money:2 }}
-                          difference. This may indicate the journal is still
-                          being posted or this query hides some entries.
-                        </td>
-                      </tr>
-                    }
-                  </tfoot>
-                </table>
-              }
+                  }
+                </tfoot>
+              </table>
             </section>
+
+          } @else {
+            <div class="cx-je-empty">Failed to load journal details.</div>
           }
 
         </div>
@@ -339,34 +364,27 @@ import { SettingsService } from '../../core/services/settings.service';
       border-radius: var(--cx-radius-xl, 12px);
       margin-bottom: 14px;
     }
-    .cx-je-filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+    .cx-je-filter-group { display: flex; flex-direction: column; gap: 4px; }
     .cx-je-filter-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--cx-text-muted);
     }
-    .cx-je-filter-input {
-      font-size: 13px;
-      padding: 6px 10px;
+    .cx-je-filter-input { font-size: 13px; padding: 6px 10px; }
+    .cx-je-filter-actions { display: flex; align-items: flex-end; gap: 6px; }
+
+    .cx-je-toggle-row { display: flex; gap: 12px; padding-top: 4px; }
+    .cx-je-toggle {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--cx-text-secondary);
+      cursor: pointer; user-select: none;
     }
-    .cx-je-filter-actions {
-      display: flex;
-      align-items: flex-end;
-      gap: 6px;
-    }
+    .cx-je-toggle input { margin: 0; }
 
     /* ═══ Summary strip ═══ */
     .cx-je-summary {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      padding: 12px 16px;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 10px; padding: 12px 16px;
       background: var(--cx-surface);
       border: 1px solid var(--cx-border);
       border-radius: var(--cx-radius-md);
@@ -374,242 +392,237 @@ import { SettingsService } from '../../core/services/settings.service';
     }
     .cx-je-summary-cell { display: flex; flex-direction: column; gap: 2px; }
     .cx-je-summary-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--cx-text-muted);
     }
     .cx-je-summary-value {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--cx-text);
+      font-size: 16px; font-weight: 600; color: var(--cx-text);
     }
-    .cx-je-summary-dr { color: var(--cx-danger, #dc2626); }
-    .cx-je-summary-cr { color: var(--cx-success, #16a34a); }
+
+    /* ═══ Type badges ═══ */
+    .cx-je-type-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.04em;
+      border-radius: 4px;
+      background: var(--cx-surface-2);
+      color: var(--cx-text-secondary);
+      border: 1px solid var(--cx-border);
+    }
+    /* Per-type tinting — keeps the page scannable when many types
+       coexist. Colours kept subtle (not saturated) to avoid noise. */
+    .cx-je-type-badge[data-type="DISBURSEMENT"] { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+    .cx-je-type-badge[data-type="REPAYMENT"]    { background: #f0fdf4; color: #166534; border-color: #dcfce7; }
+    .cx-je-type-badge[data-type="PENALTY"]      { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .cx-je-type-badge[data-type="WRITE_OFF"]    { background: #fef2f2; color: #991b1b; border-color: #fee2e2; }
+    .cx-je-type-badge[data-type="PROVISION"]    { background: #faf5ff; color: #6b21a8; border-color: #f3e8ff; }
+    .cx-je-type-badge[data-type="CLOSE"]        { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
+    .cx-je-type-badge[data-type="REVERSAL"]     { background: #fafafa; color: #525252; border-color: #e5e5e5; }
+    .cx-je-type-badge[data-type="MANUAL"]       { background: #fefce8; color: #854d0e; border-color: #fef9c3; }
+
+    .cx-je-narration-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .cx-je-narration-text {
+      max-width: 460px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .cx-je-status-pill {
+      display: inline-flex; align-items: center;
+      padding: 1px 6px;
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 0.06em;
+      border-radius: 3px;
+    }
+    .cx-je-status-reversal { background: #fafafa; color: #404040; border: 1px solid #d4d4d4; }
+    .cx-je-status-reversed { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .cx-je-status-closing  { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    .cx-je-posted-id { font-family: monospace; font-size: 11px; color: var(--cx-text-muted); }
+    .cx-je-text-muted { color: var(--cx-text-muted); font-style: italic; font-size: 12px; }
 
     /* ═══ Drawer ═══ */
     .cx-je-backdrop {
       position: fixed; inset: 0;
       background: rgba(15, 23, 42, 0.5);
-      z-index: 100;
-      backdrop-filter: blur(4px);
+      z-index: 100; backdrop-filter: blur(4px);
     }
     .cx-je-drawer {
-      position: fixed;
-      top: 0; right: 0;
-      width: min(640px, calc(100vw - 32px));
+      position: fixed; top: 0; right: 0;
+      width: min(720px, calc(100vw - 32px));
       height: 100vh;
       background: var(--cx-surface);
       box-shadow: -32px 0 80px rgba(0, 0, 0, 0.2);
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       z-index: 101;
       animation: cx-je-drawer-in 240ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
     }
     @keyframes cx-je-drawer-in {
-      from { transform: translateX(100%); }
-      to   { transform: translateX(0); }
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
-    @media (max-width: 640px) {
-      .cx-je-drawer { width: 100vw; }
-    }
-
     .cx-je-drawer-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 20px 24px 16px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; padding: 20px 24px;
       border-bottom: 1px solid var(--cx-border);
     }
+    .cx-je-drawer-head-main { flex: 1; min-width: 0; }
     .cx-je-drawer-eyebrow {
-      font-size: 10px; font-weight: 600;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 11px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--cx-text-muted);
+      margin-bottom: 6px;
     }
     .cx-je-drawer-title {
-      margin: 4px 0 0;
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 18px; font-weight: 600;
       color: var(--cx-text);
-      letter-spacing: -0.01em;
-      word-break: break-all;
+      margin: 0; line-height: 1.3;
+      word-break: break-word;
     }
     .cx-je-drawer-sub {
-      font-size: 12px;
-      color: var(--cx-text-secondary);
-      margin-top: 4px;
+      font-size: 12px; color: var(--cx-text-secondary);
+      margin-top: 6px;
     }
     .cx-je-drawer-close {
-      width: 36px; height: 36px;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--cx-surface-2); border: none; border-radius: 50%;
-      color: var(--cx-text-secondary); cursor: pointer; flex-shrink: 0;
+      flex-shrink: 0;
+      background: transparent; border: 1px solid var(--cx-border);
+      border-radius: 6px; padding: 6px;
+      color: var(--cx-text-secondary); cursor: pointer;
     }
-
-    .cx-je-drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
-
-    .cx-je-section { margin-bottom: 24px; }
-    .cx-je-section-title {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--cx-text-muted);
-      margin: 0 0 10px;
+    .cx-je-drawer-close:hover { background: var(--cx-surface-2); }
+    .cx-je-drawer-body {
+      flex: 1; overflow-y: auto;
+      padding: 20px 24px;
     }
-    .cx-je-section-count {
-      display: inline-block;
-      margin-left: 6px;
-      padding: 1px 8px;
-      background: var(--cx-primary-50, rgba(59, 130, 246, 0.1));
-      color: var(--cx-primary-600, #2563eb);
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 600;
+    .cx-je-drawer-loading {
+      display: flex; align-items: center; gap: 8px;
+      padding: 16px;
+      color: var(--cx-text-secondary); font-size: 13px;
     }
+    .cx-je-spin { animation: cx-je-spin 1s linear infinite; }
+    @keyframes cx-je-spin { to { transform: rotate(360deg); } }
 
-    .cx-je-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      background: var(--cx-surface-2);
+    /* Reversal banners */
+    .cx-je-reversal-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 14px;
       border-radius: var(--cx-radius-md);
-      padding: 4px;
-    }
-    .cx-je-meta-row {
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 12px;
-      padding: 8px 12px;
+      margin-bottom: 16px;
       font-size: 13px;
     }
+    .cx-je-reversal-banner-rev {
+      background: #f5f5f5; color: #404040;
+      border: 1px solid #e5e5e5;
+    }
+    .cx-je-reversal-banner-revd {
+      background: #fef2f2; color: #991b1b;
+      border: 1px solid #fee2e2;
+    }
+    .cx-je-reversal-banner lucide-icon { flex-shrink: 0; margin-top: 2px; }
+    .cx-je-reversal-banner-label {
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 2px;
+    }
+    .cx-je-reversal-banner-value { line-height: 1.4; }
+    .cx-je-link {
+      background: transparent; border: none;
+      padding: 0; font: inherit; color: inherit;
+      text-decoration: underline; cursor: pointer;
+    }
+    .cx-je-link:hover { opacity: 0.7; }
+
+    /* Sections */
+    .cx-je-section { margin-bottom: 22px; }
+    .cx-je-section-title {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+      margin: 0 0 10px 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .cx-je-section-count {
+      font-size: 10px; font-weight: 500;
+      color: var(--cx-text-muted);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    /* Meta key/value rows */
+    .cx-je-meta {
+      background: var(--cx-surface-2);
+      border-radius: var(--cx-radius-md);
+      padding: 4px 0;
+    }
+    .cx-je-meta-row {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-je-meta-row:last-child { border-bottom: none; }
     .cx-je-meta-row > span:first-child {
       color: var(--cx-text-muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      align-self: center;
+      font-size: 12px; font-weight: 500;
     }
-    .cx-je-meta-row > span:last-child { color: var(--cx-text); }
 
-    .cx-je-amount-big {
-      font-size: 18px;
-      font-weight: 600;
+    /* Lines table */
+    .cx-je-lines-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
     }
+    .cx-je-lines-table th {
+      text-align: left;
+      padding: 8px 10px;
+      background: var(--cx-surface-2);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-je-lines-table th.cx-je-right { text-align: right; }
+    .cx-je-lines-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--cx-border);
+      vertical-align: top;
+    }
+    .cx-je-lines-table td.cx-je-right { text-align: right; }
     .cx-je-gl-code {
       display: inline-block;
-      padding: 1px 6px;
-      background: var(--cx-surface);
-      border: 1px solid var(--cx-border);
-      border-radius: 4px;
+      font-family: monospace;
       font-size: 11px;
-      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--cx-surface-2);
       color: var(--cx-text-secondary);
       margin-right: 6px;
     }
-    .cx-je-gl-name { font-size: 12px; color: var(--cx-text-secondary); }
-
-    .cx-je-type-pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
-    .cx-je-type-pill[data-type="DR"] {
-      background: rgba(239, 68, 68, 0.12);
-      color: var(--cx-danger, #dc2626);
-    }
-    .cx-je-type-pill[data-type="CR"] {
-      background: rgba(22, 163, 74, 0.12);
-      color: var(--cx-success, #16a34a);
-    }
-    .cx-je-reversal-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      background: rgba(239, 68, 68, 0.12);
-      color: var(--cx-danger, #dc2626);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      border-radius: 4px;
-    }
-    /* 'Reversed' = an entry that has been reversed (original row).
-       Distinct tone from the reversal entry itself to avoid confusion. */
-    .cx-je-reversed-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      background: rgba(245, 158, 11, 0.12);
-      color: #b45309;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      border-radius: 4px;
-    }
-    /* Fallback when posted_by_name resolution failed — still show the
-       raw user ID so it's traceable, but subdued to indicate it's not
-       a display name. */
-    .cx-je-posted-id {
-      font-family: var(--cx-font-mono, monospace);
+    .cx-je-gl-name { font-weight: 500; }
+    .cx-je-sub-line {
       font-size: 11px;
       color: var(--cx-text-muted);
+      margin-top: 2px;
+      padding-left: 4px;
     }
-
-    /* Siblings table */
-    .cx-je-siblings-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      border: 1px solid var(--cx-border);
-      border-radius: var(--cx-radius-md);
-      overflow: hidden;
-    }
-    .cx-je-siblings-table th {
-      background: var(--cx-surface-2);
-      padding: 10px 12px;
-      text-align: left;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--cx-text-muted);
-      border-bottom: 1px solid var(--cx-border);
-    }
-    .cx-je-siblings-table td {
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--cx-border-subtle, var(--cx-border));
-      vertical-align: top;
-    }
-    .cx-je-siblings-table tbody tr:last-child td { border-bottom: none; }
-    .cx-je-siblings-row-active {
-      background: rgba(59, 130, 246, 0.06);
-    }
-    .cx-je-siblings-row-active td {
-      border-left: 2px solid var(--cx-primary-600, #2563eb);
-    }
-    .cx-je-right { text-align: right; }
-    .cx-je-narration {
-      max-width: 180px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--cx-text-secondary);
-    }
-    .cx-je-siblings-total td {
+    .cx-je-narration { color: var(--cx-text-secondary); }
+    .cx-je-lines-total td {
       background: var(--cx-surface-2);
       font-weight: 600;
       border-top: 1px solid var(--cx-border);
     }
-    .cx-je-siblings-unbalanced td {
+    .cx-je-lines-unbalanced td {
       padding: 8px 12px;
       background: rgba(245, 158, 11, 0.08);
       color: #b45309;
       font-size: 11px;
       text-align: center;
     }
-    .cx-je-siblings-unbalanced lucide-icon { vertical-align: middle; margin-right: 4px; }
+    .cx-je-lines-unbalanced lucide-icon { vertical-align: middle; margin-right: 4px; }
 
     .cx-je-empty {
       padding: 16px;
@@ -619,75 +632,93 @@ import { SettingsService } from '../../core/services/settings.service';
       color: var(--cx-text-muted);
       font-size: 13px;
     }
-    .cx-je-drawer-loading {
-      display: flex; align-items: center; gap: 8px;
-      padding: 16px;
-      color: var(--cx-text-secondary);
-      font-size: 13px;
-    }
-    .cx-je-spin { animation: cx-je-spin 1s linear infinite; }
-    @keyframes cx-je-spin { to { transform: rotate(360deg); } }
   `],
 })
 export class JournalEntriesComponent implements OnInit {
+  // Header-rooted columns. 'narration_with_status' is a custom cell
+  // that overlays the type pills (REVERSAL/REVERSED/CLOSING) on top
+  // of the narration text — saves a column and keeps the table dense.
   columns: TableColumn[] = [
-    { key: 'trans_date', label: 'Date' },
-    { key: 'gl_code', label: 'Account' },
-    { key: 'trans_type', label: 'Type' },
-    { key: 'trans_amount', label: 'Amount', type: 'currency', align: 'right' },
-    { key: 'trans_narration', label: 'Narration' },
-    { key: 'trans_callback', label: 'Reference' },
+    { key: 'posting_date', label: 'Date' },
+    { key: 'entry_type', label: 'Type', type: 'custom' },
+    { key: 'narration_with_status', label: 'Narration', type: 'custom' },
+    { key: 'line_count', label: 'Lines', align: 'right' },
+    { key: 'total_amount', label: 'Amount', type: 'currency', align: 'right' },
     { key: 'posted_by', label: 'Posted By', type: 'custom' },
+  ];
+
+  /**
+   * Static list of entry types — drives the filter dropdown. Mirrors
+   * the backend JournalEntryType enum. Editing here without updating
+   * the enum (or vice versa) creates a silent mismatch that the
+   * backend will silently ignore (tryFrom returns null → no filter
+   * applied). That's a forgiving failure mode but worth noting.
+   */
+  entryTypes = [
+    { value: 'DISBURSEMENT', label: 'Disbursement' },
+    { value: 'REPAYMENT',    label: 'Repayment' },
+    { value: 'PENALTY',      label: 'Penalty' },
+    { value: 'WRITE_OFF',    label: 'Write-off' },
+    { value: 'PROVISION',    label: 'Provision' },
+    { value: 'CLOSE',        label: 'Period close' },
+    { value: 'REVERSAL',     label: 'Reversal' },
+    { value: 'MANUAL',       label: 'Manual' },
   ];
 
   rows = signal<any[]>([]);
   loading = signal(true);
   pagination = signal<TablePagination | null>(null);
-  glAccounts = signal<any[]>([]);
   exporting = signal(false);
   q: any = {};
 
   filters = {
-    date_from: '',
-    date_to: '',
-    gl_id: '',
-    trans_type: '',
-    min_amount: '',
-    max_amount: '',
+    posting_date_from: '',
+    posting_date_to: '',
+    entry_type: '',
+    include_reversals: false,
+    include_closing: false,
   };
 
-  // Drawer state
+  // Drawer state — holds the full detail-fetch response.
   drawerOpen = signal(false);
-  activeRow = signal<any>(null);
-  siblings = signal<any[]>([]);
-  siblingsLoading = signal(false);
+  detail = signal<any>(null);
+  detailLoading = signal(false);
+
+  // Convenience accessor — extracts the header from the detail
+  // response. The detail call returns { header, lines, totals,
+  // reversal, reverses }; templates use detailHeader() rather
+  // than detail()?.header for terseness.
+  detailHeader = computed(() => this.detail()?.header);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() {
-    this.loadGlAccounts();
     this.load();
   }
 
   /**
-   * Load GL accounts for the filter dropdown. 500 upper bound covers
-   * every realistic chart of accounts without extra pagination UI.
+   * Map an entry_type enum value to a human label. Falls through the
+   * dropdown list; unknown values pass through verbatim so future
+   * enum additions don't render as blanks.
    */
-  loadGlAccounts() {
-    this.api.get('/gl-accounts', { per_page: 500 }).subscribe({
-      next: r => this.glAccounts.set(r.data || []),
-    });
+  entryTypeLabel(value: string | undefined | null): string {
+    if (!value) return '—';
+    return this.entryTypes.find(et => et.value === value)?.label ?? value;
   }
 
   load(p?: any) {
     this.loading.set(true);
     const params: any = { ...this.q, ...p };
-    // Merge in active filters (empty-string values are sent as-is;
-    // the backend treats empty as 'no filter' via !empty() checks).
     Object.entries(this.filters).forEach(([k, v]) => {
-      if (v !== '' && v != null) params[k] = v;
+      // Booleans always send (true → 'true', false omitted as default
+      // matches backend's filter_var FILTER_VALIDATE_BOOLEAN behaviour).
+      if (typeof v === 'boolean') {
+        if (v) params[k] = 'true';
+      } else if (v !== '' && v != null) {
+        params[k] = v;
+      }
     });
-    this.api.get('/journal-entries', params).subscribe({
+    this.api.get('/accounting/journals', params).subscribe({
       next: r => {
         this.rows.set(r.data || []);
         this.pagination.set(r.meta || null);
@@ -700,121 +731,99 @@ export class JournalEntriesComponent implements OnInit {
   onQuery(e: TableQueryEvent) { this.q = e; this.load(e); }
 
   applyFilters() {
-    // Reset to page 1 when filters change; otherwise user could be on
-    // page 5 of an unfiltered list then apply a filter that only has
-    // 2 pages of results, landing on an empty page 5.
     this.load({ page: 1, per_page: this.pagination()?.per_page ?? 20 });
   }
 
   clearFilters() {
     this.filters = {
-      date_from: '',
-      date_to: '',
-      gl_id: '',
-      trans_type: '',
-      min_amount: '',
-      max_amount: '',
+      posting_date_from: '',
+      posting_date_to: '',
+      entry_type: '',
+      include_reversals: false,
+      include_closing: false,
     };
     this.applyFilters();
   }
 
   hasActiveFilters(): boolean {
-    return Object.values(this.filters).some(v => v !== '');
+    return Object.entries(this.filters).some(([_, v]) => {
+      if (typeof v === 'boolean') return v === true;
+      return v !== '';
+    });
   }
 
-  // ─── Page totals (subset displayed) ────────────────────────────────
+  // ─── Page totals ────────────────────────────────────────────────
 
-  pageTotalDr(): number {
-    return this.rows().reduce(
-      (s, r) => s + (r.trans_type === 'DR' ? parseFloat(r.trans_amount || '0') : 0),
-      0,
-    );
+  pageTotalLines(): number {
+    return this.rows().reduce((s, r) => s + (parseInt(r.line_count, 10) || 0), 0);
   }
 
-  pageTotalCr(): number {
-    return this.rows().reduce(
-      (s, r) => s + (r.trans_type === 'CR' ? parseFloat(r.trans_amount || '0') : 0),
-      0,
-    );
+  pageTotalAmount(): number {
+    return this.rows().reduce((s, r) => s + parseFloat(r.total_amount || '0'), 0);
   }
 
-  // ─── Drawer ────────────────────────────────────────────────────────
+  // ─── Drawer ─────────────────────────────────────────────────────
 
   openDetail(row: any) {
-    this.activeRow.set(row);
-    this.siblings.set([]);
     this.drawerOpen.set(true);
+    this.loadJournal(row.id);
+  }
 
-    // Fetch siblings only if this entry has a callback ref (anonymous
-    // one-off postings without a callback don't have siblings).
-    if (row.trans_callback) {
-      this.siblingsLoading.set(true);
-      this.api.get('/journal-entries', {
-        callback: row.trans_callback,
-        per_page: 100,
-      }).subscribe({
-        next: r => {
-          this.siblings.set(r.data || []);
-          this.siblingsLoading.set(false);
-        },
-        error: () => this.siblingsLoading.set(false),
-      });
-    }
+  /**
+   * Load the full detail for a given journal id. Used by openDetail
+   * (initial click) and by the reversal-banner links inside the
+   * drawer (to navigate from reversal → original or vice versa
+   * without closing the drawer).
+   */
+  loadJournal(id: string | undefined | null) {
+    if (!id) return;
+    this.detailLoading.set(true);
+    this.detail.set(null);
+    this.api.get(`/accounting/journals/${id}`).subscribe({
+      next: r => {
+        this.detail.set(r.data);
+        this.detailLoading.set(false);
+      },
+      error: () => {
+        this.detailLoading.set(false);
+        this.toast.error('Failed to load journal details');
+      },
+    });
   }
 
   closeDrawer() {
     this.drawerOpen.set(false);
-    this.activeRow.set(null);
-    this.siblings.set([]);
+    this.detail.set(null);
   }
 
-  siblingsTotalDr(): number {
-    return this.siblings().reduce(
-      (s, r) => s + (r.trans_type === 'DR' ? parseFloat(r.trans_amount || '0') : 0),
-      0,
-    );
-  }
-
-  siblingsTotalCr(): number {
-    return this.siblings().reduce(
-      (s, r) => s + (r.trans_type === 'CR' ? parseFloat(r.trans_amount || '0') : 0),
-      0,
-    );
-  }
+  // ─── CSV export ─────────────────────────────────────────────────
 
   /**
-   * A journal is balanced when total debits equal total credits.
-   * In double-entry accounting this is always true for a complete
-   * journal — any imbalance means some entries were excluded by the
-   * current query or the journal is incomplete.
-   */
-  isBalanced(): boolean {
-    // Use toFixed(2) to avoid JS float-precision false positives
-    // (e.g. 1000.00 vs 999.9999999 due to accumulator drift).
-    return this.siblingsTotalDr().toFixed(2) === this.siblingsTotalCr().toFixed(2);
-  }
-
-  imbalance(): number {
-    return Math.abs(this.siblingsTotalDr() - this.siblingsTotalCr());
-  }
-
-  // ─── CSV export ────────────────────────────────────────────────────
-
-  /**
-   * Export the currently-filtered result set as CSV. Fetches with a
-   * large per_page so the export covers the whole filtered view in
-   * one pass, not just the current page.
+   * Export the currently-filtered result set as flat ledger lines.
    *
-   * Cap at 5000 rows to protect memory on both ends. Larger exports
-   * should go through a background-job / download-link pattern
-   * (future enhancement).
+   * We call the legacy /journal-entries endpoint with the same
+   * filters because the export semantics are 'flat lines for a
+   * spreadsheet', not 'one row per journal'. The legacy endpoint
+   * already handles that shape and was extended in sub-phase F to
+   * accept entry_type as a filter (joins through journal_entry_id).
+   *
+   * Date filters map directly: posting_date_from/to → date_from/to.
+   *
+   * Reversal/closing toggles don't have a direct equivalent on the
+   * legacy endpoint (it surfaces every line). We accept that the
+   * exported CSV may include reversal/closing lines that the table
+   * view filtered out — for export, that's usually what auditors
+   * actually want anyway.
+   *
+   * Capped at 5000 rows. Larger exports should go through a
+   * background-job pattern (future enhancement).
    */
   exportCsv() {
     this.exporting.set(true);
     const params: any = { per_page: 5000, page: 1 };
-    Object.entries(this.filters).forEach(([k, v]) => {
-      if (v !== '' && v != null) params[k] = v;
-    });
+    if (this.filters.posting_date_from) params.date_from = this.filters.posting_date_from;
+    if (this.filters.posting_date_to)   params.date_to = this.filters.posting_date_to;
+    if (this.filters.entry_type)        params.entry_type = this.filters.entry_type;
 
     this.api.get('/journal-entries', params).subscribe({
       next: r => {
@@ -825,15 +834,14 @@ export class JournalEntriesComponent implements OnInit {
           return;
         }
         const headers = [
-          'Date', 'Account Code', 'Account Name', 'Type',
+          'Posting Date', 'Account Code', 'Account Name', 'Type',
           'Amount', 'Narration', 'Reference', 'Callback',
           'Customer Ledger', 'Posted By',
         ];
         const escape = (v: any) => {
           if (v == null) return '';
           const s = String(v);
-          // RFC 4180: if contains comma, quote, or newline, wrap in
-          // quotes and escape embedded quotes by doubling.
+          // RFC 4180: quote + escape if contains comma, quote, or newline.
           if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
           return s;
         };
@@ -852,7 +860,7 @@ export class JournalEntriesComponent implements OnInit {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        this.toast.success(`Exported ${items.length} entries`);
+        this.toast.success(`Exported ${items.length} lines`);
         this.exporting.set(false);
       },
       error: () => {

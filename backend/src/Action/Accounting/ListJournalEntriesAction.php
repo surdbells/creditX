@@ -113,6 +113,24 @@ final class ListJournalEntriesAction
                ->setParameter('cb', (string) $params['callback']);
         }
 
+        // Phase-2.5 sub-phase F: filter lines by their journal's
+        // entry_type. Joins through journal_entry_id (now NOT NULL
+        // post-D.9) to the JournalEntry header. Useful for the
+        // CSV export from the new Journal Entries page when the
+        // operator has filtered to a specific category.
+        //
+        // Silently ignores values that don't match the enum — keeps
+        // the endpoint forgiving for older frontends that may not
+        // know the new filter.
+        if (! empty($params['entry_type'])) {
+            $entryType = \App\Domain\Enum\JournalEntryType::tryFrom((string) $params['entry_type']);
+            if ($entryType !== null) {
+                $qb->innerJoin('t.journalEntry', 'je')
+                   ->andWhere('je.entryType = :et')
+                   ->setParameter('et', $entryType);
+            }
+        }
+
         // Date range filtering — uses the Postgres-generated
         // posting_date column (mapped as $postingDate on the entity,
         // read-only). Replaces the prior CONCAT pattern which
