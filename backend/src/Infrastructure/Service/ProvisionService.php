@@ -8,6 +8,7 @@ use App\Domain\Entity\Loan;
 use App\Domain\Entity\ProvisionRun;
 use App\Domain\Entity\ProvisionRunLine;
 use App\Domain\Enum\AccountType;
+use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\ProvisionStatus;
 use App\Domain\Enum\TransactionType;
 use App\Domain\Exception\DomainException;
@@ -380,39 +381,50 @@ final class ProvisionService
                 if ($cmp !== 0) {
                     $callback = 'PROV-' . date('Ymd') . '-' . bin2hex(random_bytes(4));
                     $run->setCallbackRef($callback);
-                    [$y, $m, $d] = explode('-', $asOf);
                     $absDelta = $this->abs($totalDelta);
 
+                    // Phase-2.5 D.5: post via the helper. Delta direction
+                    // determines DR/CR pairing:
+                    //   New provision (delta > 0): DR LLP, CR ALLOW
+                    //   Release (delta < 0):       DR ALLOW, CR LLP
                     if ($cmp > 0) {
-                        // New provision: DR LLP, CR ALLOW
-                        $this->post($llp, TransactionType::DR, $absDelta,
-                            "Provision run {$asOf}: new provision",
-                            $callback, $y, $m, $d, $userId);
-                        $this->post($allow, TransactionType::CR, $absDelta,
-                            "Provision run {$asOf}: allowance increase",
-                            $callback, $y, $m, $d, $userId);
+                        $lines = [
+                            ['gl' => $llp, 'type' => TransactionType::DR,
+                                'amount' => $absDelta,
+                                'narration' => "Provision run {$asOf}: new provision"],
+                            ['gl' => $allow, 'type' => TransactionType::CR,
+                                'amount' => $absDelta,
+                                'narration' => "Provision run {$asOf}: allowance increase"],
+                        ];
+                        $headerNarration = "Provision run {$asOf} — new provision (delta {$absDelta})";
                     } else {
-                        // Release: DR ALLOW, CR LLP (reverses excess
-                        // provisioning back to expense)
-                        $this->post($allow, TransactionType::DR, $absDelta,
-                            "Provision run {$asOf}: allowance release",
-                            $callback, $y, $m, $d, $userId);
-                        $this->post($llp, TransactionType::CR, $absDelta,
-                            "Provision run {$asOf}: expense reduction",
-                            $callback, $y, $m, $d, $userId);
+                        $lines = [
+                            ['gl' => $allow, 'type' => TransactionType::DR,
+                                'amount' => $absDelta,
+                                'narration' => "Provision run {$asOf}: allowance release"],
+                            ['gl' => $llp, 'type' => TransactionType::CR,
+                                'amount' => $absDelta,
+                                'narration' => "Provision run {$asOf}: expense reduction"],
+                        ];
+                        $headerNarration = "Provision run {$asOf} — release (delta {$absDelta})";
                     }
+
+                    $this->ledgerService->postJournal(
+                        entryType: JournalEntryType::PROVISION,
+                        postingDate: $asOf,
+                        narration: $headerNarration,
+                        postedBy: $userId,
+                        lines: $lines,
+                        legacyCallback: $callback,
+                    );
                 }
             }
 
             $this->em->persist($run);
             $this->em->flush();
-            // Phase-1 invariant: validate the batch we just emitted
-            // (if any). Zero-delta runs don't post any entries — and
-            // validateBatchBalance handles empty callback gracefully.
-            $cb = $run->getCallbackRef();
-            if ($cb !== null && $cb !== '') {
-                $this->ledgerService->validateBatchBalance($cb);
-            }
+            // Phase-2.5 D.5: postJournal validated the journal balance
+            // internally. The flush here commits the ProvisionRun + lines
+            // atomically with the journal.
             $this->em->commit();
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) {
