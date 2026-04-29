@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Service;
 
-use App\Domain\Entity\LedgerTransaction;
 use App\Domain\Entity\Loan;
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Entity\Payment;
 use App\Domain\Entity\PaymentAllocation;
 use App\Domain\Entity\RepaymentSchedule;
+use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\LoanStatus;
 use App\Domain\Enum\PaymentChannel;
 use App\Domain\Enum\PaymentStatus;
@@ -136,27 +136,11 @@ final class RepaymentService
 
             $this->em->persist($payment);
 
-            // Post journal entries
-            $callback = 'REPAY-' . $payment->getReference();
-            $narration = 'REPAYMENT - ' . $loan->getCustomer()->getFullName();
-            $dateParts = explode('-', date('Y-m-d'));
-
-            // DR Bank/Cash
-            $drEntry = new LedgerTransaction();
-            $drEntry->setGeneralLedger($bankGl);
-            $drEntry->setTransType(TransactionType::DR);
-            $drEntry->setTransAmount($amount);
-            $drEntry->setTransNarration($narration);
-            $drEntry->setTransCallback($callback);
-            $drEntry->setTransDate($dateParts[0], $dateParts[1], $dateParts[2]);
-            $drEntry->setIsRepayment(true);
-            $drEntry->setPostedBy($userId);
-            $this->em->persist($drEntry);
-
-            // CR Loan Receivable — reduce the aggregate receivable
-            // asset as cash comes in. Paired with the DR at disbursement.
+            // Phase-2.5 D.2: post the repayment journal via the helper.
+            // Two lines: DR Bank (cash in) and CR Loan Receivable
+            // (asset reduction).
             //
-            // Note: we deliberately do NOT also touch CUBGL here. CUBGL
+            // We deliberately do NOT also touch CUBGL here. CUBGL
             // nets to zero per-customer at disbursement (see
             // DisbursementService steps 2-5); touching it here would
             // make it go negative. The UI reads outstanding balances
@@ -164,21 +148,30 @@ final class RepaymentService
             // from CUBGL, so the per-customer ledger view stays
             // coherent without a repayment-side CUBGL posting.
             //
-            // The customerLedger ManyToOne on the CR entry is preserved
-            // so per-customer repayment history still threads through
+            // The customerLedger field on the CR line is preserved so
+            // per-customer repayment history still threads through
             // the Journal view filtered by customer, even though the
             // GL account is now LR rather than CUBGL.
-            $crEntry = new LedgerTransaction();
-            $crEntry->setGeneralLedger($lrGl);
-            $crEntry->setCustomerLedger($customerLedger);
-            $crEntry->setTransType(TransactionType::CR);
-            $crEntry->setTransAmount($amount);
-            $crEntry->setTransNarration('REPAYMENT RECEIVED');
-            $crEntry->setTransCallback($callback);
-            $crEntry->setTransDate($dateParts[0], $dateParts[1], $dateParts[2]);
-            $crEntry->setIsRepayment(true);
-            $crEntry->setPostedBy($userId);
-            $this->em->persist($crEntry);
+            $callback = 'REPAY-' . $payment->getReference();
+            $narration = 'REPAYMENT - ' . $loan->getCustomer()->getFullName();
+
+            $this->ledgerService->postJournal(
+                entryType: JournalEntryType::REPAYMENT,
+                postingDate: date('Y-m-d'),
+                narration: $narration,
+                postedBy: $userId,
+                lines: [
+                    ['gl' => $bankGl, 'type' => TransactionType::DR,
+                        'amount' => $amount, 'narration' => $narration,
+                        'isRepayment' => true],
+                    ['gl' => $lrGl, 'customerLedger' => $customerLedger,
+                        'type' => TransactionType::CR,
+                        'amount' => $amount, 'narration' => 'REPAYMENT RECEIVED',
+                        'isRepayment' => true],
+                ],
+                legacyCallback: $callback,
+                reference: $payment->getReference(),
+            );
 
             // Check if loan is fully repaid
             $allPaid = true;
@@ -221,8 +214,10 @@ final class RepaymentService
             $loan->addTrail($trail);
 
             $this->em->flush();
-            // Phase-1 invariant — see DisbursementService for context.
-            $this->ledgerService->validateBatchBalance($callback);
+            // Phase-2.5 D.2: postJournal() above already validated the
+            // journal balance. The flush here commits non-journal writes
+            // (Payment, allocations, schedule status updates, loan
+            // status, trail) atomically with the journal.
             $this->em->commit();
 
             return $payment;
