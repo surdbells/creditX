@@ -589,11 +589,14 @@ return function (App $app): void {
             // ─── Financial Statements ───
             // Income Statement (P&L) — revenue - expenses over a period.
             // Balance Sheet — Assets / Liabilities / Equity snapshot.
+            // Statement of Cash Flows — IAS 7 indirect method.
             // Gated by accounting.view to match the other accounting
             // reports (Chart of Accounts, Journal Entries, GL Reconciliation).
             $group->get('/income-statement', Report\IncomeStatementAction::class)
                 ->add(new RbacMiddleware('accounting.view'));
             $group->get('/balance-sheet', Report\BalanceSheetAction::class)
+                ->add(new RbacMiddleware('accounting.view'));
+            $group->get('/statement-of-cash-flows', Report\StatementOfCashFlowsAction::class)
                 ->add(new RbacMiddleware('accounting.view'));
 
             // ─── Aged Receivables + PAR (commit AE) ───

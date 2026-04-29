@@ -119,7 +119,13 @@ if ($existing === null) {
 }
 
 echo "\nDone.\n";
-echo "\nNext step: configure the cron entry. Recommended schedule:\n";
-echo "  0 6 * * *  cd /www/wwwroot/creditx/backend && \\\n";
-echo "             TZ=Africa/Lagos sudo -u www php bin/run-gl-reconciliation.php \\\n";
-echo "             >> /var/log/creditx/gl-reconciliation.log 2>&1\n";
+echo "\nNext step: register the daily scan in aaPanel.\n";
+echo "  aaPanel → Cron → Add Task\n";
+echo "    Type:    Shell Script\n";
+echo "    Period:  Daily, 06:00\n";
+echo "    Script:\n";
+echo "      cd /www/wwwroot/creditx/backend && \\\n";
+echo "      sudo -u www TZ=Africa/Lagos /www/server/php/83/bin/php \\\n";
+echo "        bin/run-gl-reconciliation.php\n";
+echo "\n";
+echo "See bin/run-gl-reconciliation.php docblock for full setup notes.\n";
