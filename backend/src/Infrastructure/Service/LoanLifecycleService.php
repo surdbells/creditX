@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Service;
 
-use App\Domain\Entity\LedgerTransaction;
 use App\Domain\Entity\Loan;
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Entity\RepaymentSchedule;
+use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\LoanStatus;
 use App\Domain\Enum\RepaymentStatus;
 use App\Domain\Enum\TransactionType;
@@ -59,33 +59,41 @@ final class LoanLifecycleService
         $this->em->beginTransaction();
         try {
             $callback = 'WO-' . $loan->getApplicationId() . '-' . date('YmdHis');
-            $dateParts = [date('Y'), date('m'), date('d')];
 
-            // DR Bad Debt Expense
-            $dr = new LedgerTransaction();
-            $dr->setGeneralLedger($badDebtGl);
-            $dr->setTransType(TransactionType::DR);
-            $dr->setTransAmount($outstanding);
-            $dr->setTransNarration('WRITE-OFF - ' . $loan->getCustomer()->getFullName());
-            $dr->setTransCallback($callback);
-            $dr->setTransDate($dateParts[0], $dateParts[1], $dateParts[2]);
-            $dr->setPostedBy($userId);
-            $this->em->persist($dr);
+            // Guard: a zero-outstanding loan can't be written off as a
+            // journal — there's nothing to move to bad-debt expense.
+            // The original implementation would have failed here
+            // anyway (Phase-1's trans_amount > 0 CHECK would reject
+            // both lines), but better to surface the cause cleanly.
+            if (bccomp($outstanding, '0.00', 2) <= 0) {
+                throw new DomainException(
+                    'Cannot write off a loan with zero outstanding balance. '
+                    . 'The loan is already settled; close it via the normal '
+                    . 'flow instead.'
+                );
+            }
 
-            // CR Loan Receivable — write-off reduces the aggregate
-            // receivable asset (moved to Bad Debt Expense). The
-            // customerLedger link is preserved so the per-customer
-            // view still shows the write-off entry in context.
-            $cr = new LedgerTransaction();
-            $cr->setGeneralLedger($lrGl);
-            $cr->setCustomerLedger($customerLedger);
-            $cr->setTransType(TransactionType::CR);
-            $cr->setTransAmount($outstanding);
-            $cr->setTransNarration('WRITE-OFF POSTED');
-            $cr->setTransCallback($callback);
-            $cr->setTransDate($dateParts[0], $dateParts[1], $dateParts[2]);
-            $cr->setPostedBy($userId);
-            $this->em->persist($cr);
+            // Phase-2.5 D.3: post the write-off journal via the helper.
+            // DR Bad Debt Expense + CR Loan Receivable. The customerLedger
+            // link on the CR is preserved so the per-customer view still
+            // shows the write-off entry in context.
+            $this->ledgerService->postJournal(
+                entryType: JournalEntryType::WRITE_OFF,
+                postingDate: date('Y-m-d'),
+                narration: 'Loan write-off — ' . $loan->getApplicationId() . ' (' . $loan->getCustomer()->getFullName() . ')',
+                postedBy: $userId,
+                lines: [
+                    ['gl' => $badDebtGl, 'type' => TransactionType::DR,
+                        'amount' => $outstanding,
+                        'narration' => 'WRITE-OFF - ' . $loan->getCustomer()->getFullName()],
+                    ['gl' => $lrGl, 'customerLedger' => $customerLedger,
+                        'type' => TransactionType::CR,
+                        'amount' => $outstanding,
+                        'narration' => 'WRITE-OFF POSTED'],
+                ],
+                legacyCallback: $callback,
+                reference: $loan->getApplicationId(),
+            );
 
             // Waive remaining schedules
             foreach ($schedules as $s) {
@@ -105,8 +113,9 @@ final class LoanLifecycleService
             $loan->addTrail($trail);
 
             $this->em->flush();
-            // Phase-1 invariant — see DisbursementService for context.
-            $this->ledgerService->validateBatchBalance($callback);
+            // Phase-2.5 D.3: postJournal validated the batch internally.
+            // The flush here commits non-journal writes (loan status,
+            // schedule waivers, trail).
             $this->em->commit();
 
             return ['loan_id' => $loan->getId(), 'status' => 'written_off', 'outstanding_written_off' => $outstanding];
