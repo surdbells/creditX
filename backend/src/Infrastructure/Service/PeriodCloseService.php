@@ -4,8 +4,8 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\AccountingPeriod;
 use App\Domain\Entity\GeneralLedger;
-use App\Domain\Entity\LedgerTransaction;
 use App\Domain\Enum\AccountType;
+use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\PeriodStatus;
 use App\Domain\Enum\TransactionType;
 use App\Domain\Exception\DomainException;
@@ -125,12 +125,19 @@ final class PeriodCloseService
         $this->em->beginTransaction();
         try {
             $callback = 'CLOSE-' . $year . '-' . $month . '-' . date('YmdHis');
-            $dateParts = [$year, $month, $lastDay]; // use last-day-of-month for the close
-            // Wait — $lastDay is already 'YYYY-MM-DD'. Need just day.
-            $closeDay = substr($lastDay, 8, 2);
+            // The closing journal is posted with the period's last day
+            // as posting_date, so the entries land within the period
+            // they're closing.
+            $closingDate = $lastDay;
 
             $totalIncome = '0.00';
             $totalExpense = '0.00';
+
+            // Phase-2.5 D.8: collect all closing lines, then submit
+            // via postJournal with isClosingEntry=true. The flag
+            // denormalizes to every line per Q2c — IS/Trial Balance
+            // queries continue to filter on the line column.
+            $lines = [];
 
             foreach ($rows as $r) {
                 $isIncome = $r['account_type'] === AccountType::INCOME->value;
@@ -148,26 +155,44 @@ final class PeriodCloseService
 
                 if ($isIncome) {
                     // Zero out income: DR the income account, CR retained earnings
-                    $this->postEntry($gl, TransactionType::DR, $balance,
-                        "Close {$period->getLabel()}: zero income account {$r['account_code']}",
-                        $callback, $year, $month, $closeDay, $userId);
-                    $this->postEntry($retEarn, TransactionType::CR, $balance,
-                        "Close {$period->getLabel()}: retained earnings (income from {$r['account_code']})",
-                        $callback, $year, $month, $closeDay, $userId);
+                    $lines[] = ['gl' => $gl, 'type' => TransactionType::DR,
+                        'amount' => $balance,
+                        'narration' => "Close {$period->getLabel()}: zero income account {$r['account_code']}"];
+                    $lines[] = ['gl' => $retEarn, 'type' => TransactionType::CR,
+                        'amount' => $balance,
+                        'narration' => "Close {$period->getLabel()}: retained earnings (income from {$r['account_code']})"];
                     $totalIncome = bcadd($totalIncome, $balance, 2);
                 } elseif ($isExpense) {
                     // Zero out expense: CR the expense account, DR retained earnings
-                    $this->postEntry($gl, TransactionType::CR, $balance,
-                        "Close {$period->getLabel()}: zero expense account {$r['account_code']}",
-                        $callback, $year, $month, $closeDay, $userId);
-                    $this->postEntry($retEarn, TransactionType::DR, $balance,
-                        "Close {$period->getLabel()}: retained earnings (expense from {$r['account_code']})",
-                        $callback, $year, $month, $closeDay, $userId);
+                    $lines[] = ['gl' => $gl, 'type' => TransactionType::CR,
+                        'amount' => $balance,
+                        'narration' => "Close {$period->getLabel()}: zero expense account {$r['account_code']}"];
+                    $lines[] = ['gl' => $retEarn, 'type' => TransactionType::DR,
+                        'amount' => $balance,
+                        'narration' => "Close {$period->getLabel()}: retained earnings (expense from {$r['account_code']})"];
                     $totalExpense = bcadd($totalExpense, $balance, 2);
                 }
             }
 
             $netIncome = bcsub($totalIncome, $totalExpense, 2);
+
+            // Only post a journal if there's actual activity. A period
+            // with no income/expense activity (no rows above the abs=0
+            // filter) closes cleanly with zero net_income and no
+            // journal entries. Calling postJournal with empty lines
+            // would throw — guard explicitly.
+            if (count($lines) > 0) {
+                $this->ledgerService->postJournal(
+                    entryType: JournalEntryType::CLOSE,
+                    postingDate: $closingDate,
+                    narration: 'Period close — ' . $period->getLabel()
+                        . ' (net income: ' . $netIncome . ')',
+                    postedBy: $userId,
+                    lines: $lines,
+                    legacyCallback: $callback,
+                    isClosingEntry: true,
+                );
+            }
 
             $period->setStatus(PeriodStatus::CLOSED);
             $period->setClosedAt(new \DateTimeImmutable());
@@ -177,12 +202,9 @@ final class PeriodCloseService
             if ($notes !== null && $notes !== '') $period->setNotes($notes);
 
             $this->em->flush();
-            // Phase-1 invariant. The closing journal is a paired DR/CR
-            // for each non-zero income/expense account, all swept into
-            // Retained Earnings. By construction the batch balances —
-            // this validates that property as a defense against future
-            // changes to the close logic.
-            $this->ledgerService->validateBatchBalance($callback);
+            // Phase-2.5 D.8: postJournal validated the closing journal.
+            // The flush here commits the period status update atomically
+            // with the journal.
             $this->em->commit();
 
             return [
@@ -298,39 +320,6 @@ final class PeriodCloseService
                 "if you need to amend it."
             );
         }
-    }
-
-    /**
-     * Post a single ledger entry. Thin helper mirroring the pattern
-     * in DisbursementService — kept inline here since the close is
-     * the only caller and we don't want to share private methods.
-     */
-    private function postEntry(
-        GeneralLedger $gl,
-        TransactionType $type,
-        string $amount,
-        string $narration,
-        string $callback,
-        string $year,
-        string $month,
-        string $day,
-        string $userId,
-    ): void {
-        $entry = new LedgerTransaction();
-        $entry->setGeneralLedger($gl);
-        $entry->setTransType($type);
-        $entry->setTransAmount($amount);
-        $entry->setTransNarration($narration);
-        $entry->setTransCallback($callback);
-        $entry->setTransDate($year, $month, $day);
-        $entry->setPostedBy($userId);
-        // Mark as a closing entry so date-range reports (Income
-        // Statement, Trial Balance) can filter these out — otherwise
-        // the closing CRs/DRs cancel the period's actual income/expense
-        // within the same date range and the closed period reads as
-        // a flat zero P&L.
-        $entry->setIsClosingEntry(true);
-        $this->em->persist($entry);
     }
 
     private function abs(string $n): string
