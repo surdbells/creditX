@@ -21,6 +21,8 @@ backend/public/storage/
 backend/storage/uploads/*
 backend/storage/exports/*
 backend/storage/avatars/*
+backend/storage/documents/*
 !backend/storage/uploads/.gitkeep
 !backend/storage/exports/.gitkeep
 !backend/storage/avatars/.gitkeep
+!backend/storage/documents/.gitkeep

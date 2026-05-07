@@ -34,23 +34,34 @@ class LedgerTransaction
      * Phase-2.5 aggregate FK. Every line belongs to exactly one
      * JournalEntry header.
      *
-     * Sub-phase A (this commit): nullable. Existing lines and the
-     * unmigrated posting services produce lines without a header
-     * — those rows have journal_entry_id = NULL until sub-phase B's
-     * backfill populates them.
+     * Phase-2.5 sub-phase A: introduced as nullable.
+     * Phase-2.5 sub-phase B: backfilled all historical lines.
+     * Phase-2.5 sub-phase D.9: column ALTERed to NOT NULL on the DB.
+     * Phase-2.5 hotfix (this change): mapping tightened to nullable: false
+     *   so Doctrine's INSERT statement always includes the column,
+     *   and the in-memory type matches the DB constraint.
      *
-     * Sub-phase C will ALTER the column to NOT NULL after backfill
-     * is verified, and after the posting services are migrated to
-     * always create a header.
+     * onDelete: CASCADE — deleting a JournalEntry header cascades to
+     * its lines. Defense in depth: services must never delete journals,
+     * but if it ever happens, orphan lines would corrupt the GL —
+     * cascade ensures lines go with the header.
      *
-     * Nullable with onDelete: CASCADE so deleting a JournalEntry
-     * deletes all its lines (defense in depth — services should
-     * never delete journals, but if it ever happens, orphan lines
-     * would corrupt the GL).
+     * Type changed from `?JournalEntry = null` to non-nullable. After
+     * D.9, every line must have a header by DB constraint, so allowing
+     * the in-memory state to be null was a footgun: stale Doctrine
+     * metadata cache (from before sub-phase A) could produce INSERTs
+     * that omitted the column entirely, falling through to the DB's
+     * default (NULL) and tripping the NOT NULL constraint at the
+     * wrong layer with an opaque error.
+     *
+     * Now: callers that don't set journalEntry get a typed-property
+     * uninitialized error at the line-construction site, which is
+     * loud and immediate. postJournal() always sets it; that's the
+     * canonical path.
      */
     #[ORM\ManyToOne(targetEntity: JournalEntry::class)]
-    #[ORM\JoinColumn(name: 'journal_entry_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
-    private ?JournalEntry $journalEntry = null;
+    #[ORM\JoinColumn(name: 'journal_entry_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    private JournalEntry $journalEntry;
 
     #[ORM\Column(type: 'string', length: 5, enumType: TransactionType::class)]
     private TransactionType $transType;
@@ -154,13 +165,18 @@ class LedgerTransaction
     public function setCustomerLedger(?CustomerLedger $v): void { $this->customerLedger = $v; }
 
     /**
-     * Phase-2.5 aggregate accessor. Returns null for lines created
-     * before sub-phase B's backfill ran, or by posting services not
-     * yet migrated in sub-phase D. Will be guaranteed non-null after
-     * sub-phase C's NOT NULL constraint lands.
+     * Phase-2.5 aggregate accessor. After sub-phase D.9's NOT NULL
+     * migration, every persisted line has a header by DB constraint
+     * — the return type is non-nullable accordingly.
+     *
+     * In-memory lines that haven't been linked to a header yet (e.g.
+     * partway through assembly, before postJournal sets the FK) will
+     * raise a typed-property uninitialized error if this getter is
+     * called. That's intentional: the assembly path is private to
+     * postJournal, and external callers always see persisted lines.
      */
-    public function getJournalEntry(): ?JournalEntry { return $this->journalEntry; }
-    public function setJournalEntry(?JournalEntry $v): void { $this->journalEntry = $v; }
+    public function getJournalEntry(): JournalEntry { return $this->journalEntry; }
+    public function setJournalEntry(JournalEntry $v): void { $this->journalEntry = $v; }
     public function getTransType(): TransactionType { return $this->transType; }
     public function setTransType(TransactionType $v): void { $this->transType = $v; }
     public function getTransAmount(): string { return $this->transAmount; }
