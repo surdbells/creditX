@@ -175,6 +175,15 @@ return [
     \App\Domain\Repository\JournalEntryRepository::class => function (ContainerInterface $c): \App\Domain\Repository\JournalEntryRepository {
         return new \App\Domain\Repository\JournalEntryRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\DepositProductRepository::class => function (ContainerInterface $c): \App\Domain\Repository\DepositProductRepository {
+        return new \App\Domain\Repository\DepositProductRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Domain\Repository\DepositAccountRepository::class => function (ContainerInterface $c): \App\Domain\Repository\DepositAccountRepository {
+        return new \App\Domain\Repository\DepositAccountRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Domain\Repository\DepositTransactionRepository::class => function (ContainerInterface $c): \App\Domain\Repository\DepositTransactionRepository {
+        return new \App\Domain\Repository\DepositTransactionRepository($c->get(EntityManagerInterface::class));
+    },
     RepaymentScheduleRepository::class => function (ContainerInterface $c): RepaymentScheduleRepository {
         return new RepaymentScheduleRepository($c->get(EntityManagerInterface::class));
     },
@@ -256,6 +265,42 @@ return [
         return new LedgerService(
             $c->get(EntityManagerInterface::class),
             $c->get(SettingsCacheService::class),
+        );
+    },
+    \App\Infrastructure\Service\ManualJournalService::class => function (ContainerInterface $c): \App\Infrastructure\Service\ManualJournalService {
+        return new \App\Infrastructure\Service\ManualJournalService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
+    \App\Infrastructure\Service\OpeningBalanceService::class => function (ContainerInterface $c): \App\Infrastructure\Service\OpeningBalanceService {
+        return new \App\Infrastructure\Service\OpeningBalanceService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
+    \App\Infrastructure\Service\DepositService::class => function (ContainerInterface $c): \App\Infrastructure\Service\DepositService {
+        return new \App\Infrastructure\Service\DepositService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(CustomerRepository::class),
+            $c->get(\App\Domain\Repository\DepositAccountRepository::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
+    \App\Infrastructure\Service\DepositInterestService::class => function (ContainerInterface $c): \App\Infrastructure\Service\DepositInterestService {
+        return new \App\Infrastructure\Service\DepositInterestService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(\App\Domain\Repository\DepositAccountRepository::class),
+            $c->get(\App\Domain\Repository\DepositTransactionRepository::class),
+            $c->get(\App\Infrastructure\Service\DepositService::class),
+            $c->get(PeriodGuardService::class),
         );
     },
     GlReconciliationService::class => function (ContainerInterface $c): GlReconciliationService {

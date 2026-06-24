@@ -50,6 +50,10 @@ export const routes: Routes = [
       { path: 'provisions', loadComponent: () => import('./features/provisions/provisions.component').then(m => m.ProvisionsComponent) },
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
+      { path: 'deposit-products', loadComponent: () => import('./features/deposit-products/deposit-products.component').then(m => m.DepositProductsComponent) },
+      { path: 'deposit-accounts', loadComponent: () => import('./features/deposit-accounts/deposit-accounts.component').then(m => m.DepositAccountsComponent) },
+      { path: 'deposit-accounts/:id', loadComponent: () => import('./features/deposit-accounts/deposit-account-detail.component').then(m => m.DepositAccountDetailComponent) },
+      { path: 'deposit-interest', loadComponent: () => import('./features/deposit-interest/deposit-interest.component').then(m => m.DepositInterestComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
       { path: 'reports', redirectTo: 'reports/portfolio', pathMatch: 'full' },
       // Dedicated routes per report — replaces the old tab-driven /reports?tab=X

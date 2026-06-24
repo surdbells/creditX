@@ -109,6 +109,12 @@ import { SettingsService } from '../../core/services/settings.service';
             <lucide-icon name="download" [size]="12"></lucide-icon>
             <span>{{ exporting() ? 'Exporting…' : 'Export CSV' }}</span>
           </button>
+          @if (auth.hasPermission('accounting.journal')) {
+            <button class="cx-btn cx-btn-primary cx-btn-sm" (click)="openComposer()">
+              <lucide-icon name="plus" [size]="12"></lucide-icon>
+              <span>New Journal</span>
+            </button>
+          }
         </div>
       </div>
 
@@ -348,6 +354,125 @@ import { SettingsService } from '../../core/services/settings.service';
             <div class="cx-je-empty">Failed to load journal details.</div>
           }
 
+        </div>
+      </div>
+    }
+
+    <!-- Manual journal composer modal -->
+    @if (composerOpen()) {
+      <div class="cx-je-backdrop" (click)="closeComposer()"></div>
+      <div class="cx-je-modal" role="dialog" aria-labelledby="je-composer-title">
+        <div class="cx-je-modal-head">
+          <div>
+            <div class="cx-je-drawer-eyebrow">Accounting</div>
+            <h2 id="je-composer-title" class="cx-je-drawer-title">New Journal Entry</h2>
+          </div>
+          <button class="cx-je-drawer-close" (click)="closeComposer()" aria-label="Close">
+            <lucide-icon name="x" [size]="18"></lucide-icon>
+          </button>
+        </div>
+
+        <div class="cx-je-modal-body">
+          <div class="cx-je-form-grid">
+            <div class="cx-je-filter-group">
+              <label class="cx-je-filter-label">Posting Date</label>
+              <input type="date" class="cx-input" [(ngModel)]="draft.posting_date" />
+            </div>
+            <div class="cx-je-filter-group">
+              <label class="cx-je-filter-label">Reference (optional)</label>
+              <input type="text" class="cx-input" [(ngModel)]="draft.reference"
+                     placeholder="e.g. INV-2026-001" />
+            </div>
+            <div class="cx-je-filter-group cx-je-form-wide">
+              <label class="cx-je-filter-label">Narration</label>
+              <input type="text" class="cx-input" [(ngModel)]="draft.narration"
+                     placeholder="e.g. February staff salaries" />
+            </div>
+          </div>
+
+          <table class="cx-je-composer-table">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Line narration (optional)</th>
+                <th class="cx-je-right">Debit</th>
+                <th class="cx-je-right">Credit</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ln of draft.lines; track $index) {
+                <tr>
+                  <td>
+                    <select class="cx-input" [(ngModel)]="ln.gl_id">
+                      <option value="">Select account…</option>
+                      @for (gl of glAccounts(); track gl.id) {
+                        <option [value]="gl.id">{{ gl.account_code }} — {{ gl.account_name }}</option>
+                      }
+                    </select>
+                  </td>
+                  <td>
+                    <input type="text" class="cx-input" [(ngModel)]="ln.narration"
+                           placeholder="(defaults to journal narration)" />
+                  </td>
+                  <td class="cx-je-right">
+                    <input type="number" min="0" step="0.01" class="cx-input cx-je-amt"
+                           [ngModel]="ln.type === 'DR' ? ln.amount : ''"
+                           (ngModelChange)="setAmount(ln, 'DR', $event)" />
+                  </td>
+                  <td class="cx-je-right">
+                    <input type="number" min="0" step="0.01" class="cx-input cx-je-amt"
+                           [ngModel]="ln.type === 'CR' ? ln.amount : ''"
+                           (ngModelChange)="setAmount(ln, 'CR', $event)" />
+                  </td>
+                  <td class="cx-je-right">
+                    <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon"
+                            (click)="removeLine($index)"
+                            [disabled]="draft.lines.length <= 2" title="Remove line">
+                      <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="cx-je-lines-total">
+                <td colspan="2">
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="addLine()">
+                    <lucide-icon name="plus" [size]="12"></lucide-icon>
+                    <span>Add line</span>
+                  </button>
+                </td>
+                <td class="cx-je-right tabular-nums">{{ composerDr() | money:2 }}</td>
+                <td class="cx-je-right tabular-nums">{{ composerCr() | money:2 }}</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td colspan="5" class="cx-je-balance-row">
+                  @if (composerBalanced()) {
+                    <span class="cx-je-balance-ok">
+                      <lucide-icon name="check-circle" [size]="13"></lucide-icon>
+                      Balanced
+                    </span>
+                  } @else {
+                    <span class="cx-je-balance-bad">
+                      <lucide-icon name="alert-triangle" [size]="13"></lucide-icon>
+                      Out of balance by {{ composerDiff() | money:2 }} — debits must equal credits.
+                    </span>
+                  }
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="cx-je-modal-foot">
+          <button class="cx-btn cx-btn-ghost" (click)="closeComposer()">Cancel</button>
+          <button class="cx-btn cx-btn-primary"
+                  (click)="submitJournal()"
+                  [disabled]="!composerValid() || posting()">
+            {{ posting() ? 'Posting…' : 'Post Journal' }}
+          </button>
         </div>
       </div>
     }
@@ -632,6 +757,64 @@ import { SettingsService } from '../../core/services/settings.service';
       color: var(--cx-text-muted);
       font-size: 13px;
     }
+
+    /* ═══ Composer modal ═══ */
+    .cx-je-modal {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(860px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      background: var(--cx-surface);
+      border-radius: var(--cx-radius-xl, 12px);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
+      display: flex; flex-direction: column;
+      z-index: 101;
+      animation: cx-je-modal-in 200ms var(--cx-ease-premium, cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    @keyframes cx-je-modal-in {
+      from { transform: translate(-50%, -48%); opacity: 0; }
+      to { transform: translate(-50%, -50%); opacity: 1; }
+    }
+    .cx-je-modal-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; padding: 18px 22px;
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-je-modal-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
+    .cx-je-modal-foot {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 14px 22px;
+      border-top: 1px solid var(--cx-border);
+    }
+    .cx-je-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px; margin-bottom: 18px;
+    }
+    .cx-je-form-wide { grid-column: 1 / -1; }
+
+    .cx-je-composer-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cx-je-composer-table th {
+      text-align: left; padding: 8px 8px;
+      background: var(--cx-surface-2);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--cx-text-muted);
+      border-bottom: 1px solid var(--cx-border);
+    }
+    .cx-je-composer-table th.cx-je-right { text-align: right; }
+    .cx-je-composer-table td { padding: 6px 8px; vertical-align: middle; }
+    .cx-je-composer-table td.cx-je-right { text-align: right; }
+    .cx-je-amt { text-align: right; max-width: 130px; }
+    .cx-je-balance-row { padding: 10px 8px; }
+    .cx-je-balance-ok {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #166534; font-weight: 600; font-size: 12px;
+    }
+    .cx-je-balance-bad {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #b45309; font-weight: 600; font-size: 12px;
+    }
   `],
 })
 export class JournalEntriesComponent implements OnInit {
@@ -689,6 +872,16 @@ export class JournalEntriesComponent implements OnInit {
   // reversal, reverses }; templates use detailHeader() rather
   // than detail()?.header for terseness.
   detailHeader = computed(() => this.detail()?.header);
+
+  // ─── Manual journal composer ────────────────────────────────────
+  composerOpen = signal(false);
+  posting = signal(false);
+  glAccounts = signal<any[]>([]);
+  // A line carries a single `amount` plus a `type` (DR|CR). The two
+  // amount inputs in the table are mutually exclusive — typing into the
+  // debit box sets type=DR, the credit box sets type=CR (see setAmount).
+  draft: { posting_date: string; reference: string; narration: string;
+           lines: { gl_id: string; type: 'DR' | 'CR'; amount: string; narration: string }[] } = this.blankDraft();
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
@@ -794,6 +987,110 @@ export class JournalEntriesComponent implements OnInit {
   closeDrawer() {
     this.drawerOpen.set(false);
     this.detail.set(null);
+  }
+
+  // ─── Manual journal composer ────────────────────────────────────
+
+  private blankDraft() {
+    return {
+      posting_date: new Date().toISOString().slice(0, 10),
+      reference: '',
+      narration: '',
+      lines: [
+        { gl_id: '', type: 'DR' as 'DR' | 'CR', amount: '', narration: '' },
+        { gl_id: '', type: 'CR' as 'DR' | 'CR', amount: '', narration: '' },
+      ],
+    };
+  }
+
+  openComposer() {
+    this.draft = this.blankDraft();
+    this.composerOpen.set(true);
+    // Lazy-load active GL accounts for the line dropdowns. Pull a high
+    // per_page so the full chart of accounts is selectable in one shot.
+    if (this.glAccounts().length === 0) {
+      this.api.get('/accounting/gl-accounts', { per_page: 200 }).subscribe({
+        next: r => this.glAccounts.set((r.data || []).filter((g: any) => g.is_active !== false)),
+        error: () => this.toast.error('Failed to load chart of accounts'),
+      });
+    }
+  }
+
+  closeComposer() {
+    this.composerOpen.set(false);
+  }
+
+  addLine() {
+    this.draft.lines.push({ gl_id: '', type: 'DR', amount: '', narration: '' });
+  }
+
+  removeLine(i: number) {
+    if (this.draft.lines.length > 2) this.draft.lines.splice(i, 1);
+  }
+
+  /**
+   * Debit and credit are entered in separate columns but stored as one
+   * (type, amount) pair per line. Typing into a column claims that side
+   * and clears the other; clearing the box zeroes the amount.
+   */
+  setAmount(line: { type: 'DR' | 'CR'; amount: string }, side: 'DR' | 'CR', value: any) {
+    const v = value == null ? '' : String(value);
+    line.type = side;
+    line.amount = v;
+  }
+
+  composerDr(): number {
+    return this.draft.lines.reduce((s, l) => s + (l.type === 'DR' ? (parseFloat(l.amount) || 0) : 0), 0);
+  }
+
+  composerCr(): number {
+    return this.draft.lines.reduce((s, l) => s + (l.type === 'CR' ? (parseFloat(l.amount) || 0) : 0), 0);
+  }
+
+  composerDiff(): number {
+    return Math.abs(this.composerDr() - this.composerCr());
+  }
+
+  composerBalanced(): boolean {
+    // Match the backend's one-kobo tolerance.
+    return this.composerDiff() < 0.01 && this.composerDr() > 0;
+  }
+
+  composerValid(): boolean {
+    if (!this.draft.posting_date || !this.draft.narration.trim()) return false;
+    const filled = this.draft.lines.filter(l => l.gl_id && parseFloat(l.amount) > 0);
+    if (filled.length < 2) return false;
+    return this.composerBalanced();
+  }
+
+  submitJournal() {
+    if (!this.composerValid()) return;
+    this.posting.set(true);
+    const payload = {
+      posting_date: this.draft.posting_date,
+      narration: this.draft.narration.trim(),
+      reference: this.draft.reference.trim() || undefined,
+      lines: this.draft.lines
+        .filter(l => l.gl_id && parseFloat(l.amount) > 0)
+        .map(l => ({
+          gl_id: l.gl_id,
+          type: l.type,
+          amount: l.amount,
+          narration: l.narration.trim() || undefined,
+        })),
+    };
+    this.api.post('/accounting/journals', payload).subscribe({
+      next: () => {
+        this.posting.set(false);
+        this.composerOpen.set(false);
+        this.toast.success('Manual journal posted');
+        this.applyFilters();
+      },
+      error: (e) => {
+        this.posting.set(false);
+        this.toast.error(e?.error?.message || 'Failed to post journal');
+      },
+    });
   }
 
   // ─── CSV export ─────────────────────────────────────────────────

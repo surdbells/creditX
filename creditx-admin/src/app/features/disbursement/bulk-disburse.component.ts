@@ -5,7 +5,6 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
 /**
  * Bulk Disburse — three-step flow:
@@ -60,7 +59,7 @@ type ResultRow = {
 @Component({
   selector: 'app-bulk-disburse',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

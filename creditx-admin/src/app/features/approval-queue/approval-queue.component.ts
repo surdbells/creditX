@@ -298,7 +298,7 @@ import { SettingsService } from '../../core/services/settings.service';
             }
 
             <!-- Approval timeline -->
-            @if (approvals()?.length) {
+            @if (approvals().length) {
               <section class="cx-aq-section">
                 <h3 class="cx-aq-section-title">Approval Timeline</h3>
                 <div class="cx-aq-timeline">

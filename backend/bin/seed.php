@@ -98,6 +98,12 @@ $permissionsDef = [
         ['accounting.journal', 'Post Journal Entries'],
         ['accounting.reverse', 'Reverse Journal Entries'],
     ],
+    'deposits' => [
+        ['deposits.view', 'View Deposit Products & Accounts'],
+        ['deposits.create', 'Create/Edit Deposit Products'],
+        ['deposits.transact', 'Open Accounts & Post Deposits/Withdrawals'],
+        ['deposits.interest', 'Run Deposit Interest Accrual'],
+    ],
     'payments' => [
         ['payments.view', 'View Payments'],
         ['payments.create', 'Post Payments'],
@@ -186,6 +192,7 @@ $rolesDef = [
     ]],
     ['Accountant', 'accountant', 'Financial operations and reporting', true, [
         'accounting.view', 'accounting.create', 'accounting.edit', 'accounting.journal', 'accounting.reverse',
+        'deposits.view', 'deposits.create', 'deposits.transact', 'deposits.interest',
         'payments.view', 'payments.create', 'payments.bulk_upload',
         'loans.view', 'customers.view',
         'reports.portfolio', 'reports.par',
@@ -431,13 +438,29 @@ use App\Domain\Enum\AccountType;
 use App\Domain\Enum\LedgerType;
 
 $glDef = [
+    // ── Assets (1xxx) ──
     ['Loan Receivable', '1001', 'LR', AccountType::ASSET, LedgerType::GENERAL, 'Total loan portfolio receivable'],
     ['Customer Balance', '1002', 'CUBGL', AccountType::ASSET, LedgerType::CUSTOMER, 'Customer loan balance accounts'],
     ['Bank/Cash', '1003', 'BANK', AccountType::ASSET, LedgerType::GENERAL, 'Bank and cash accounts'],
     ['Settlement Account', '1004', 'SETTLE', AccountType::ASSET, LedgerType::GENERAL, 'Loan settlement disbursement account'],
     ['Allowance for Loan Losses', '1005', 'ALLOW', AccountType::ASSET, LedgerType::GENERAL, 'Contra-asset for loan loss provisioning (CR-normal)'],
+    ['Cash in Vault', '1006', 'VAULT', AccountType::ASSET, LedgerType::GENERAL, 'Physical cash held in branch vaults / tills'],
+    ['Prepayments', '1007', 'PREPAY', AccountType::ASSET, LedgerType::GENERAL, 'Prepaid expenses (rent, insurance, subscriptions)'],
+    ['Fixed Assets', '1008', 'FIXASSET', AccountType::ASSET, LedgerType::GENERAL, 'Property, plant and equipment at cost'],
+    ['Accumulated Depreciation', '1009', 'ACCDEP', AccountType::ASSET, LedgerType::GENERAL, 'Contra-asset; accumulated depreciation on fixed assets (CR-normal)'],
+    ['Suspense / Inter-branch', '1010', 'SUSPENSE', AccountType::ASSET, LedgerType::GENERAL, 'Temporary holding / inter-branch settlement account'],
+    // ── Liabilities (2xxx) ──
     ['Top-Up Balance', '2001', 'TUGL', AccountType::LIABILITY, LedgerType::GENERAL, 'Previous loan balance carried forward'],
+    ['Customer Deposits', '2002', 'CUSTDEP', AccountType::LIABILITY, LedgerType::GENERAL, 'Customer savings / deposit liabilities (control account; subsidiary ledger is deposit_accounts)'],
+    ['Interest Payable on Deposits', '2003', 'INTPAY', AccountType::LIABILITY, LedgerType::GENERAL, 'Accrued interest owed on customer deposits'],
+    ['Tax Payable', '2004', 'TAXPAY', AccountType::LIABILITY, LedgerType::GENERAL, 'Income / withholding tax payable to authorities'],
+    ['Accruals & Other Payables', '2005', 'ACCRPAY', AccountType::LIABILITY, LedgerType::GENERAL, 'Accrued expenses and sundry payables'],
+    // ── Equity (3xxx) ──
     ['Retained Earnings', '3001', 'RETEARN', AccountType::EQUITY, LedgerType::GENERAL, 'Cumulative net income closed from prior periods'],
+    ['Share Capital', '3002', 'SHARECAP', AccountType::EQUITY, LedgerType::GENERAL, 'Paid-up share capital contributed by owners'],
+    ['Statutory Reserve', '3003', 'STATRES', AccountType::EQUITY, LedgerType::GENERAL, 'CBN-mandated statutory reserve appropriation'],
+    ['Opening Balance Equity', '3004', 'OBE', AccountType::EQUITY, LedgerType::GENERAL, 'Contra-equity used to seed opening balances; nets to zero once balanced'],
+    // ── Income (4xxx) ──
     ['Insurance Income', '4001', 'IA', AccountType::INCOME, LedgerType::GENERAL, 'Insurance fee income'],
     ['Admin Fee Income', '4002', 'AA', AccountType::INCOME, LedgerType::GENERAL, 'Administrative fee income'],
     ['Management Fee Income', '4003', 'MFA', AccountType::INCOME, LedgerType::GENERAL, 'Management fee income'],
@@ -445,8 +468,17 @@ $glDef = [
     ['Interest Income', '4005', 'II', AccountType::INCOME, LedgerType::GENERAL, 'Loan interest income'],
     ['Penalty Income', '4006', 'PI', AccountType::INCOME, LedgerType::GENERAL, 'Late payment penalty income'],
     ['Processing Fee Income', '4007', 'PFI', AccountType::INCOME, LedgerType::GENERAL, 'Processing fee income'],
+    ['Other Income', '4008', 'OTHINC', AccountType::INCOME, LedgerType::GENERAL, 'Sundry / miscellaneous income'],
+    // ── Expenses (5xxx) ──
     ['Bad Debt Expense', '5001', 'BDE', AccountType::EXPENSE, LedgerType::GENERAL, 'Written-off loan expense'],
     ['Loan Loss Provision', '5002', 'LLP', AccountType::EXPENSE, LedgerType::GENERAL, 'Loan loss provision expense (CBN prudential)'],
+    ['Salaries & Wages', '5003', 'SALARY', AccountType::EXPENSE, LedgerType::GENERAL, 'Staff salaries, wages and benefits'],
+    ['Rent', '5004', 'RENT', AccountType::EXPENSE, LedgerType::GENERAL, 'Office and branch rent'],
+    ['Utilities', '5005', 'UTIL', AccountType::EXPENSE, LedgerType::GENERAL, 'Electricity, water, internet and telephony'],
+    ['Depreciation Expense', '5006', 'DEPEXP', AccountType::EXPENSE, LedgerType::GENERAL, 'Periodic depreciation of fixed assets'],
+    ['Interest Expense on Deposits', '5007', 'INTEXP', AccountType::EXPENSE, LedgerType::GENERAL, 'Interest expense accrued on customer deposits'],
+    ['Bank Charges', '5008', 'BANKCHG', AccountType::EXPENSE, LedgerType::GENERAL, 'Bank fees, COT and transaction charges'],
+    ['General & Admin Expense', '5009', 'GENADMIN', AccountType::EXPENSE, LedgerType::GENERAL, 'Sundry general and administrative expenses'],
 ];
 
 $glCount = 0;

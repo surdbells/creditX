@@ -20,6 +20,7 @@ use App\Action\Loan;
 use App\Action\Approval;
 use App\Action\ApprovalWorkflow;
 use App\Action\Accounting;
+use App\Action\Deposit;
 use App\Action\Disbursement;
 use App\Action\MakerChecker;
 use App\Action\Payment;
@@ -349,6 +350,15 @@ return function (App $app): void {
         // compatibility with consumers that haven't migrated yet.
         $api->get('/accounting/journals', Accounting\ListJournalsAction::class)
             ->add(new RbacMiddleware('accounting.view'));
+        // Accountant-authored manual journal (opex, capital, corrections).
+        // Gated by accounting.journal — same permission held by the
+        // Accountant role; posts a balanced JournalEntry of type MANUAL.
+        $api->post('/accounting/journals', Accounting\CreateManualJournalAction::class)
+            ->add(new RbacMiddleware('accounting.journal'));
+        // One-time opening-balance seeding (auto-balanced against Opening
+        // Balance Equity). Same permission as manual journals.
+        $api->post('/accounting/opening-balances', Accounting\PostOpeningBalancesAction::class)
+            ->add(new RbacMiddleware('accounting.journal'));
         $api->get('/accounting/journals/{id}', Accounting\GetJournalAction::class)
             ->add(new RbacMiddleware('accounting.view'));
 
@@ -403,6 +413,44 @@ return function (App $app): void {
             ->add(new RbacMiddleware('accounting.provision'));
         $api->post('/accounting/provisions/runs/{id}/reverse', Accounting\ReverseProvisionRunAction::class)
             ->add(new RbacMiddleware('accounting.provision'));
+
+        // ─── Deposits (deposit-taking MFB) ───
+        // Deposit products (templates) carry the per-product interest
+        // accrual method and withdrawal policy. Product reads are gated
+        // by deposits.view; create/update by deposits.create.
+        $api->get('/deposits/products', Deposit\ListDepositProductsAction::class)
+            ->add(new RbacMiddleware('deposits.view'));
+        $api->post('/deposits/products', Deposit\CreateDepositProductAction::class)
+            ->add(new RbacMiddleware('deposits.create'));
+        $api->get('/deposits/products/{id}', Deposit\GetDepositProductAction::class)
+            ->add(new RbacMiddleware('deposits.view'));
+        $api->put('/deposits/products/{id}', Deposit\UpdateDepositProductAction::class)
+            ->add(new RbacMiddleware('deposits.create'));
+
+        // Deposit accounts + money movements. Listing/statement gated by
+        // deposits.view; opening accounts and posting deposits/withdrawals/
+        // closures (which post balanced GL journals) by deposits.transact.
+        $api->get('/deposits/accounts', Deposit\ListDepositAccountsAction::class)
+            ->add(new RbacMiddleware('deposits.view'));
+        $api->post('/deposits/accounts', Deposit\OpenDepositAccountAction::class)
+            ->add(new RbacMiddleware('deposits.transact'));
+        $api->get('/deposits/accounts/{id}', Deposit\GetDepositAccountAction::class)
+            ->add(new RbacMiddleware('deposits.view'));
+        $api->get('/deposits/accounts/{id}/statement', Deposit\DepositAccountStatementAction::class)
+            ->add(new RbacMiddleware('deposits.view'));
+        $api->post('/deposits/accounts/{id}/deposit', Deposit\PostDepositAction::class)
+            ->add(new RbacMiddleware('deposits.transact'));
+        $api->post('/deposits/accounts/{id}/withdraw', Deposit\PostWithdrawalAction::class)
+            ->add(new RbacMiddleware('deposits.transact'));
+        $api->post('/deposits/accounts/{id}/close', Deposit\CloseDepositAccountAction::class)
+            ->add(new RbacMiddleware('deposits.transact'));
+
+        // Monthly interest accrual. Preview is read-only; run posts the
+        // INTEREST journals. Both gated by deposits.interest.
+        $api->get('/deposits/interest/preview', Deposit\PreviewDepositInterestAction::class)
+            ->add(new RbacMiddleware('deposits.interest'));
+        $api->post('/deposits/interest/run', Deposit\RunDepositInterestAction::class)
+            ->add(new RbacMiddleware('deposits.interest'));
 
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)

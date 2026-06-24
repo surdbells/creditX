@@ -57,6 +57,11 @@ export class LayoutComponent {
       { label: 'Maker-Checker', icon: 'gavel', route: '/maker-checker', permission: 'maker_checker.check' },
       { label: 'Payments', icon: 'credit-card', route: '/payments', permission: 'payments.view' },
     ]},
+    { label: 'Deposits', items: [
+      { label: 'Deposit Accounts', icon: 'piggy-bank', route: '/deposit-accounts', permission: 'deposits.view' },
+      { label: 'Deposit Products', icon: 'folder-kanban', route: '/deposit-products', permission: 'deposits.view' },
+      { label: 'Interest Run', icon: 'percent', route: '/deposit-interest', permission: 'deposits.interest' },
+    ]},
     // Reports — top-level group with one sidebar entry per report.
     // Replaces:
     //   - The old 'Performance' group (4 entries) which deep-linked into
