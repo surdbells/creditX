@@ -18,6 +18,16 @@ class CustomerRepository extends BaseRepository
         return $this->findOneBy(['bvn' => $bvn]);
     }
 
+    /**
+     * Look up a customer by email. Email is stored lower-cased/trimmed by the
+     * entity setter, so callers must normalise before searching — the portal
+     * actions pass already-validated (lower-cased) emails.
+     */
+    public function findByEmail(string $email): ?Customer
+    {
+        return $this->findOneBy(['email' => strtolower(trim($email))]);
+    }
+
     public function staffIdExists(string $staffId, ?string $excludeId = null): bool
     {
         $qb = $this->em->createQueryBuilder()->select('COUNT(c.id)')->from(Customer::class, 'c')

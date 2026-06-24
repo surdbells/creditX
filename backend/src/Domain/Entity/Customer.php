@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
+use App\Domain\Enum\CustomerPortalStatus;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -162,6 +163,32 @@ class Customer
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
     private ?string $grossPay = null;
 
+    // ─── Self-service portal authentication ───
+    // These columns are all nullable / default-off because the vast
+    // majority of customer rows are created by agents and never enable
+    // portal access. A row only becomes a portal account once the
+    // customer self-registers (or staff invites them).
+
+    /** Bcrypt hash of the portal password. Null = no password set (OTP-only). */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $passwordHash = null;
+
+    /** Whether self-service portal login is permitted for this customer. */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isPortalEnabled = false;
+
+    #[ORM\Column(type: 'string', length: 20, nullable: true, enumType: CustomerPortalStatus::class)]
+    private ?CustomerPortalStatus $portalStatus = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $emailVerifiedAt = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $lastLoginAt = null;
+
+    #[ORM\Column(type: 'string', length: 45, nullable: true)]
+    private ?string $lastLoginIp = null;
+
     // ─── Relations ───
 
     /** @var Collection<int, NextOfKin> */
@@ -217,6 +244,13 @@ class Customer
     public function getWorkIdIssuedDate(): ?\DateTimeInterface { return $this->workIdIssuedDate; }
     public function getWorkIdExpiryDate(): ?\DateTimeInterface { return $this->workIdExpiryDate; }
     public function getGrossPay(): ?string { return $this->grossPay; }
+    public function getPasswordHash(): ?string { return $this->passwordHash; }
+    public function isPortalEnabled(): bool { return $this->isPortalEnabled; }
+    public function getPortalStatus(): ?CustomerPortalStatus { return $this->portalStatus; }
+    public function getEmailVerifiedAt(): ?\DateTimeInterface { return $this->emailVerifiedAt; }
+    public function isEmailVerified(): bool { return $this->emailVerifiedAt !== null; }
+    public function getLastLoginAt(): ?\DateTimeInterface { return $this->lastLoginAt; }
+    public function getLastLoginIp(): ?string { return $this->lastLoginIp; }
     /** @return Collection<int, NextOfKin> */
     public function getNextOfKins(): Collection { return $this->nextOfKins; }
     /** @return Collection<int, Document> */
@@ -259,6 +293,33 @@ class Customer
     public function setWorkIdIssuedDate(?\DateTimeInterface $v): void { $this->workIdIssuedDate = $v; }
     public function setWorkIdExpiryDate(?\DateTimeInterface $v): void { $this->workIdExpiryDate = $v; }
     public function setGrossPay(?string $v): void { $this->grossPay = $v; }
+    public function setPasswordHash(?string $v): void { $this->passwordHash = $v; }
+    public function setIsPortalEnabled(bool $v): void { $this->isPortalEnabled = $v; }
+    public function setPortalStatus(?CustomerPortalStatus $v): void { $this->portalStatus = $v; }
+    public function setEmailVerifiedAt(?\DateTimeInterface $v): void { $this->emailVerifiedAt = $v; }
+    public function setLastLoginIp(?string $v): void { $this->lastLoginIp = $v; }
+
+    // ─── Portal helpers ───
+
+    /**
+     * Mark this customer's email as verified and activate portal access.
+     * Idempotent — re-verifying keeps the original verification timestamp.
+     */
+    public function markEmailVerified(): void
+    {
+        if ($this->emailVerifiedAt === null) {
+            $this->emailVerifiedAt = new \DateTime();
+        }
+        $this->portalStatus = CustomerPortalStatus::ACTIVE;
+        $this->isPortalEnabled = true;
+    }
+
+    /** Stamp a successful portal login (timestamp + originating IP). */
+    public function recordPortalLogin(?string $ip): void
+    {
+        $this->lastLoginAt = new \DateTime();
+        $this->lastLoginIp = $ip;
+    }
 
     // ─── NextOfKin management ───
 
@@ -391,6 +452,10 @@ class Customer
             'work_id_issued_date' => $this->workIdIssuedDate?->format('Y-m-d'),
             'work_id_expiry_date' => $this->workIdExpiryDate?->format('Y-m-d'),
             'gross_pay'          => $this->grossPay,
+            'is_portal_enabled'  => $this->isPortalEnabled,
+            'portal_status'      => $this->portalStatus?->value,
+            'email_verified_at'  => $this->emailVerifiedAt?->format('Y-m-d H:i:s'),
+            'last_login_at'      => $this->lastLoginAt?->format('Y-m-d H:i:s'),
             'created_at'         => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'         => $this->updatedAt->format('Y-m-d H:i:s'),
         ];

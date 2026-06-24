@@ -28,12 +28,19 @@ final class JwtService
     /**
      * Issue an access + refresh token pair.
      *
+     * @param array<string, mixed> $extraClaims Additional claims merged into
+     *        the access payload (e.g. ['scope' => 'customer']). Cannot
+     *        override the reserved claims set below.
+     *
      * @return array{access_token: string, refresh_token: string, expires_in: int}
      */
-    public function issueTokens(string $userId, string $email, array $roles, array $permissions): array
+    public function issueTokens(string $userId, string $email, array $roles, array $permissions, array $extraClaims = []): array
     {
         $now = time();
 
+        // Reserved claims listed first so they win on any key collision —
+        // the union operator keeps the left operand's value for duplicate
+        // keys, so extraClaims can only ADD claims, never overwrite these.
         $accessPayload = [
             'iss'   => $this->issuer,
             'sub'   => $userId,
@@ -44,7 +51,7 @@ final class JwtService
             'iat'   => $now,
             'exp'   => $now + $this->accessTtl,
             'jti'   => bin2hex(random_bytes(16)),
-        ];
+        ] + $extraClaims;
 
         $refreshPayload = [
             'iss'  => $this->issuer,

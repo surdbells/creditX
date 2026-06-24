@@ -34,8 +34,10 @@ use App\Action\DsaTarget;
 use App\Action\Department;
 use App\Action\Team;
 use App\Action\Reconciliation;
+use App\Action\Portal;
 use App\Action\ListBanksAction;
 use App\Infrastructure\Middleware\AuthMiddleware;
+use App\Infrastructure\Middleware\CustomerAuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
 use Slim\App;
@@ -720,4 +722,32 @@ return function (App $app): void {
         });
 
     })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
+
+    // ─── Customer self-service portal ───
+    // Deliberately OUTSIDE the staff /api group above: portal endpoints are
+    // gated by CustomerAuthMiddleware (scope='customer'), never the staff
+    // AuthMiddleware. The /auth/* endpoints are public (registration/login);
+    // everything else requires a valid customer token.
+    $app->group('/api/portal', function (RouteCollectorProxy $portal) use ($app) {
+        // Public auth endpoints
+        $portal->post('/auth/register', Portal\RegisterAction::class);
+        $portal->post('/auth/verify-email', Portal\VerifyEmailAction::class);
+        $portal->post('/auth/resend-verification', Portal\ResendVerificationAction::class);
+        $portal->post('/auth/login', Portal\LoginAction::class);
+        $portal->post('/auth/request-otp', Portal\RequestOtpAction::class);
+        $portal->post('/auth/verify-otp', Portal\VerifyOtpLoginAction::class);
+        $portal->post('/auth/refresh', Portal\RefreshAction::class);
+
+        // Authenticated customer endpoints
+        $portal->group('', function (RouteCollectorProxy $secure) {
+            $secure->post('/auth/logout', Portal\LogoutAction::class);
+            $secure->get('/me', Portal\MeAction::class);
+            $secure->patch('/me', Portal\UpdateProfileAction::class);
+            $secure->get('/products', Portal\ListProductsAction::class);
+            $secure->post('/loans', Portal\ApplyLoanAction::class);
+            $secure->get('/loans', Portal\ListMyLoansAction::class);
+            $secure->get('/loans/{id}', Portal\GetMyLoanAction::class);
+            $secure->get('/loans/{id}/schedule', Portal\MyRepaymentScheduleAction::class);
+        })->add(new CustomerAuthMiddleware($app->getContainer()->get(JwtService::class)));
+    });
 };

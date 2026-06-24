@@ -11,7 +11,14 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Slim\Psr7\Response;
 
-final class AuthMiddleware implements MiddlewareInterface
+/**
+ * Guards the customer self-service portal endpoints. Mirrors the staff
+ * AuthMiddleware but requires the access token to carry scope='customer',
+ * so a staff token can never reach a customer-scoped route (and vice
+ * versa — staff routes reject scope='customer'). The authenticated
+ * customer id is attached as 'customer_id' for downstream ownership checks.
+ */
+final class CustomerAuthMiddleware implements MiddlewareInterface
 {
     public function __construct(
         private readonly JwtService $jwtService,
@@ -34,19 +41,13 @@ final class AuthMiddleware implements MiddlewareInterface
             return $this->unauthorized($e->getMessage());
         }
 
-        // Customer portal tokens carry scope='customer'. They must never be
-        // accepted on staff routes, even though they are otherwise valid
-        // access tokens signed with the same secret.
-        if (($payload->scope ?? null) === 'customer') {
-            return $this->unauthorized('This token is not valid for staff endpoints');
+        if (($payload->scope ?? null) !== 'customer') {
+            return $this->unauthorized('This token is not valid for portal endpoints');
         }
 
-        // Attach user data to request attributes
         $request = $request
-            ->withAttribute('user_id', $payload->sub)
-            ->withAttribute('user_email', $payload->email ?? '')
-            ->withAttribute('user_roles', $payload->roles ?? [])
-            ->withAttribute('user_permissions', $payload->permissions ?? [])
+            ->withAttribute('customer_id', $payload->sub)
+            ->withAttribute('customer_email', $payload->email ?? '')
             ->withAttribute('jwt_payload', $payload);
 
         return $handler->handle($request);

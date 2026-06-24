@@ -55,7 +55,7 @@ class LoanRepository extends BaseRepository
     public function paginated(
         int $offset, int $limit, string $sortBy = 'createdAt', string $sortDir = 'DESC',
         ?string $search = null, ?string $status = null, ?string $productId = null,
-        ?string $branchId = null, ?string $agentId = null,
+        ?string $branchId = null, ?string $agentId = null, ?string $customerId = null,
     ): array {
         $qb = $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c');
@@ -63,6 +63,7 @@ class LoanRepository extends BaseRepository
         if ($productId) $qb->andWhere('l.product = :pid')->setParameter('pid', $productId);
         if ($branchId) $qb->andWhere('l.branch = :bid')->setParameter('bid', $branchId);
         if ($agentId) $qb->andWhere('l.agent = :aid')->setParameter('aid', $agentId);
+        if ($customerId) $qb->andWhere('l.customer = :cid')->setParameter('cid', $customerId);
 
         // Search across loan and customer fields
         if ($search && $search !== '') {
