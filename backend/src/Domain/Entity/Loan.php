@@ -146,6 +146,20 @@ class Loan
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $accountStatementPassword = null;
 
+    // ─── Affordability snapshot — captured at application time on the
+    //     self-service portal. Frozen here (rather than read live off the
+    //     customer) so the figure a reviewer sees is the one the applicant
+    //     was assessed on, even if the customer later edits their income.
+    //     Null for agent/government-captured loans. ───
+
+    /** Applicant's self-declared monthly income at the time of application. */
+    #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
+    private ?string $applicantMonthlyIncome = null;
+
+    /** Debt-service ratio (monthly instalment / monthly income) at application time. */
+    #[ORM\Column(type: 'decimal', precision: 8, scale: 6, nullable: true)]
+    private ?string $dsr = null;
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $disbursedAt = null;
 
@@ -211,6 +225,8 @@ class Loan
     }
 
     public function getPreviousLoanId(): ?string { return $this->previousLoanId; }
+    public function getApplicantMonthlyIncome(): ?string { return $this->applicantMonthlyIncome; }
+    public function getDsr(): ?string { return $this->dsr; }
     public function getDisbursedAt(): ?\DateTimeImmutable { return $this->disbursedAt; }
     public function getLoanAmountWords(): ?string { return $this->loanAmountWords; }
     public function getLoanPurpose(): ?string { return $this->loanPurpose; }
@@ -241,6 +257,8 @@ class Loan
     public function setTopUpBalance(?string $v): void { $this->topUpBalance = $v; }
     public function setTopUpBalanceUnderwriter(?string $v): void { $this->topUpBalanceUnderwriter = $v; }
     public function setPreviousLoanId(?string $v): void { $this->previousLoanId = $v; }
+    public function setApplicantMonthlyIncome(?string $v): void { $this->applicantMonthlyIncome = $v; }
+    public function setDsr(?string $v): void { $this->dsr = $v; }
     public function setDisbursedAt(?\DateTimeImmutable $v): void { $this->disbursedAt = $v; }
     public function setLoanAmountWords(?string $v): void { $this->loanAmountWords = $v; }
     public function setLoanPurpose(?string $v): void { $this->loanPurpose = $v; }
@@ -329,6 +347,8 @@ class Loan
             'top_up_balance_effective'        => $this->getEffectiveTopUpBalance(),
             'top_up_locked_by_underwriter'    => $this->isTopUpLockedByUnderwriter(),
             'previous_loan_id'   => $this->previousLoanId,
+            'applicant_monthly_income' => $this->applicantMonthlyIncome,
+            'dsr'                => $this->dsr,
             'disbursed_at'       => $this->disbursedAt?->format('Y-m-d H:i:s'),
             'loan_amount_words'  => $this->loanAmountWords,
             'loan_purpose'       => $this->loanPurpose,

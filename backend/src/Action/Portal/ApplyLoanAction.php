@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Action\Portal;
 
 use App\Domain\Entity\{Loan, LoanFeeBreakdown, LoanTrail, LoanTransaction};
-use App\Domain\Enum\{FeeCalculationType, LoanStatus, LoanType};
+use App\Domain\Enum\{EmploymentType, FeeCalculationType, LoanStatus, LoanType};
 use App\Domain\Repository\{CustomerRepository, LoanProductRepository, LoanRepository};
-use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, InputValidator, LoanCalculationService};
+use App\Infrastructure\Service\{AffordabilityService, ApiResponse, ApprovalEngineService, InputValidator, LoanCalculationService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -37,6 +37,7 @@ final class ApplyLoanAction
         private readonly LoanProductRepository $productRepo,
         private readonly LoanCalculationService $calcService,
         private readonly ApprovalEngineService $approvalEngine,
+        private readonly AffordabilityService $affordability,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -52,15 +53,47 @@ final class ApplyLoanAction
         $data = (array) ($request->getParsedBody() ?? []);
 
         $v = InputValidator::validate($data, [
-            'product_id'   => ['required' => true, 'type' => 'string'],
-            'amount'       => ['required' => true, 'type' => 'string'],
-            'tenure'       => ['required' => true, 'type' => 'int', 'min' => 1],
-            'loan_purpose' => ['required' => false, 'type' => 'string', 'max' => 500],
+            'product_id'      => ['required' => true, 'type' => 'string'],
+            'amount'          => ['required' => true, 'type' => 'string'],
+            'tenure'          => ['required' => true, 'type' => 'int', 'min' => 1],
+            'loan_purpose'    => ['required' => false, 'type' => 'string', 'max' => 500],
+            'employment_type' => ['required' => true, 'type' => 'string', 'max' => 20],
+            'monthly_income'  => ['required' => true, 'type' => 'string'],
+            'employer'        => ['required' => false, 'type' => 'string', 'max' => 200],
+            'job_title'       => ['required' => false, 'type' => 'string', 'max' => 100],
+            'business_name'   => ['required' => false, 'type' => 'string', 'max' => 200],
         ]);
         if (!empty($v['errors'])) {
             return $this->validationError($v['errors']);
         }
         $c = $v['clean'];
+
+        // ─── Employment & income (affordability basis) ───
+        // The portal serves any individual, including the self-employed, so
+        // income is self-declared here rather than read from a government
+        // record. Income is required; a thin DSR breach is soft-flagged, not
+        // blocked (see further below).
+        $errors = [];
+        $employmentType = strtoupper(trim((string) ($c['employment_type'] ?? '')));
+        if (!in_array($employmentType, EmploymentType::values(), true)) {
+            $errors['employment_type'] = 'Select a valid employment type.';
+        }
+        $monthlyIncome = (float) ($c['monthly_income'] ?? 0);
+        if ($monthlyIncome <= 0) {
+            $errors['monthly_income'] = 'Enter a valid monthly income.';
+        }
+        $employer = trim((string) ($c['employer'] ?? ''));
+        $businessName = trim((string) ($c['business_name'] ?? ''));
+        if ($employmentType === EmploymentType::EMPLOYED->value && $employer === '') {
+            $errors['employer'] = 'Employer is required for employed applicants.';
+        }
+        if (in_array($employmentType, [EmploymentType::SELF_EMPLOYED->value, EmploymentType::BUSINESS_OWNER->value], true)
+            && $businessName === '') {
+            $errors['business_name'] = 'Business name is required for self-employed applicants.';
+        }
+        if (!empty($errors)) {
+            return $this->validationError($errors);
+        }
 
         // One application at a time.
         foreach ($this->loanRepo->findActiveByCustomer($customerId) as $existing) {
@@ -85,6 +118,21 @@ final class ApplyLoanAction
 
         $calc = $this->calcService->calculate($product, $c['amount'], $c['tenure'], null, '0');
 
+        // Persist the declared employment/income onto the customer profile so
+        // it carries forward and a reviewer can see it. Income reuses the
+        // existing gross_pay column (single source of truth for monthly pay).
+        $customer->fillFromArray([
+            'employment_type' => $employmentType,
+            'gross_pay'       => sprintf('%.2f', $monthlyIncome),
+            'employer'        => $employer !== '' ? $employer : null,
+            'job_title'       => !empty($c['job_title']) ? $c['job_title'] : null,
+            'business_name'   => $businessName !== '' ? $businessName : null,
+        ]);
+
+        // Affordability: monthly instalment vs declared income. Soft-flagged —
+        // a breach still submits, with the snapshot frozen on the loan.
+        $affordability = $this->affordability->assess($monthlyIncome, $calc['mr_principal_interest']);
+
         $this->em->beginTransaction();
         try {
             $loan = new Loan();
@@ -99,6 +147,10 @@ final class ApplyLoanAction
             $loan->setCalculationMethod($product->getInterestCalculationMethod());
             $loan->setStatus(LoanStatus::SUBMITTED);
             $loan->setLoanType(LoanType::NEW_LOAN);
+            $loan->setApplicantMonthlyIncome(sprintf('%.2f', $monthlyIncome));
+            if ($affordability['dsr'] !== null) {
+                $loan->setDsr(sprintf('%.6f', $affordability['dsr']));
+            }
             if (!empty($c['loan_purpose'])) {
                 $loan->setLoanPurpose($c['loan_purpose']);
             }
@@ -136,7 +188,17 @@ final class ApplyLoanAction
             $trail = new LoanTrail();
             $trail->setUserId($customerId);
             $trail->setAction('Loan application submitted via customer portal');
-            $trail->setDetails(['status' => LoanStatus::SUBMITTED->value, 'amount' => $c['amount'], 'tenure' => $c['tenure']]);
+            $trail->setDetails([
+                'status'                     => LoanStatus::SUBMITTED->value,
+                'amount'                     => $c['amount'],
+                'tenure'                     => $c['tenure'],
+                'employment_type'            => $employmentType,
+                'monthly_income'             => $affordability['monthly_income'],
+                'monthly_installment'        => $affordability['monthly_installment'],
+                'dsr'                        => $affordability['dsr'],
+                'max_dsr'                    => $affordability['max_dsr'],
+                'within_affordability_limit' => $affordability['within_limit'],
+            ]);
             $trail->setIpAddress($this->getClientIp($request));
             $loan->addTrail($trail);
 
@@ -160,6 +222,9 @@ final class ApplyLoanAction
             // No workflow configured — leave SUBMITTED for staff to action.
         }
 
-        return $this->created($loan->toArray(true), 'Your loan application has been submitted.');
+        $payload = $loan->toArray(true);
+        $payload['affordability'] = $affordability;
+
+        return $this->created($payload, 'Your loan application has been submitted.');
     }
 }

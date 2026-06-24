@@ -243,6 +243,11 @@ return [
     LoanCalculationService::class => function (ContainerInterface $c): LoanCalculationService {
         return new LoanCalculationService();
     },
+    \App\Infrastructure\Service\AffordabilityService::class => function (ContainerInterface $c): \App\Infrastructure\Service\AffordabilityService {
+        return new \App\Infrastructure\Service\AffordabilityService(
+            $c->get(SettingsCacheService::class),
+        );
+    },
     ApprovalEngineService::class => function (ContainerInterface $c): ApprovalEngineService {
         return new ApprovalEngineService(
             $c->get(EntityManagerInterface::class),

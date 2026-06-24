@@ -120,6 +120,21 @@ class Customer
     //     the loan capture wizard. All nullable — existing customer rows
     //     predate these columns). ───
 
+    /**
+     * Employment classification — EMPLOYED, SELF_EMPLOYED, BUSINESS_OWNER,
+     * OTHER (see App\Domain\Enum\EmploymentType). Captured on the
+     * self-service portal so non-government applicants have an affordability
+     * basis. Null for agent/government-captured rows (income comes from the
+     * GovernmentRecord there). Stored as a plain string; validated against
+     * the enum at the action boundary.
+     */
+    #[ORM\Column(type: 'string', length: 20, nullable: true)]
+    private ?string $employmentType = null;
+
+    /** Trading/business name for self-employed or business-owner applicants. */
+    #[ORM\Column(type: 'string', length: 200, nullable: true)]
+    private ?string $businessName = null;
+
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $jobTitle = null;
 
@@ -234,6 +249,8 @@ class Customer
     public function getAltBankName(): ?string { return $this->altBankName; }
     public function getAltAccountNumber(): ?string { return $this->altAccountNumber; }
     public function getAltAccountName(): ?string { return $this->altAccountName; }
+    public function getEmploymentType(): ?string { return $this->employmentType; }
+    public function getBusinessName(): ?string { return $this->businessName; }
     public function getJobTitle(): ?string { return $this->jobTitle; }
     public function getEmployer(): ?string { return $this->employer; }
     public function getOrganization(): ?string { return $this->organization; }
@@ -283,6 +300,8 @@ class Customer
     public function setAltBankName(?string $v): void { $this->altBankName = $v; }
     public function setAltAccountNumber(?string $v): void { $this->altAccountNumber = $v; }
     public function setAltAccountName(?string $v): void { $this->altAccountName = $v; }
+    public function setEmploymentType(?string $v): void { $this->employmentType = $v; }
+    public function setBusinessName(?string $v): void { $this->businessName = $v; }
     public function setJobTitle(?string $v): void { $this->jobTitle = $v; }
     public function setEmployer(?string $v): void { $this->employer = $v; }
     public function setOrganization(?string $v): void { $this->organization = $v; }
@@ -384,6 +403,8 @@ class Customer
         if (isset($data['alt_account_name'])) $this->setAltAccountName($data['alt_account_name']);
 
         // Employment fields
+        if (isset($data['employment_type'])) $this->setEmploymentType($data['employment_type']);
+        if (isset($data['business_name'])) $this->setBusinessName($data['business_name']);
         if (isset($data['job_title'])) $this->setJobTitle($data['job_title']);
         if (isset($data['employer'])) $this->setEmployer($data['employer']);
         if (isset($data['organization'])) $this->setOrganization($data['organization']);
@@ -442,6 +463,8 @@ class Customer
             'alt_bank_name'      => $this->altBankName,
             'alt_account_number' => $this->altAccountNumber,
             'alt_account_name'   => $this->altAccountName,
+            'employment_type'    => $this->employmentType,
+            'business_name'      => $this->businessName,
             'job_title'          => $this->jobTitle,
             'employer'           => $this->employer,
             'organization'       => $this->organization,

@@ -52,6 +52,11 @@ export interface Customer {
   hometown?: string | null;
   marital_status?: string | null;
   gender?: string | null;
+  employment_type?: string | null;
+  business_name?: string | null;
+  employer?: string | null;
+  job_title?: string | null;
+  gross_pay?: string | number | null;
   is_portal_enabled?: boolean;
   portal_status?: string | null;
   email_verified_at?: string | null;
@@ -89,6 +94,9 @@ export interface Loan {
   tenure?: number;
   interest_rate?: string | number;
   loan_purpose?: string | null;
+  applicant_monthly_income?: string | number | null;
+  dsr?: string | number | null;
+  affordability?: Affordability;
   disbursed_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -110,10 +118,29 @@ export interface RepaymentScheduleItem {
   [key: string]: any;
 }
 
+// ─── Employment & affordability ───
+export type EmploymentType = 'EMPLOYED' | 'SELF_EMPLOYED' | 'BUSINESS_OWNER' | 'OTHER';
+
+/** Mirrors AffordabilityService::assess() output returned by the apply endpoint. */
+export interface Affordability {
+  monthly_income: number;
+  monthly_installment: number;
+  dsr: number | null;
+  max_dsr: number;
+  within_limit: boolean;
+  disposable_income: number | null;
+  has_income: boolean;
+}
+
 // ─── Loan apply ───
 export interface ApplyLoanRequest {
   product_id: string;
   amount: string;
   tenure: number;
   loan_purpose: string;
+  employment_type: EmploymentType;
+  monthly_income: string;
+  employer?: string;
+  job_title?: string;
+  business_name?: string;
 }
