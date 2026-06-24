@@ -1,4 +1,4 @@
-import { Component, inject, signal, Input, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
@@ -39,7 +39,7 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
             <div>
               <p class="text-xs" style="color: var(--cx-text-muted)">Gross loan</p>
-              <p class="font-bold tabular-nums" style="color: var(--cx-text)">{{ money(l.gross_loan || l.application_amount) }}</p>
+              <p class="font-bold tabular-nums" style="color: var(--cx-text)">{{ money(l.gross_loan || l.amount_requested) }}</p>
             </div>
             <div>
               <p class="text-xs" style="color: var(--cx-text-muted)">Net disbursed</p>
@@ -96,16 +96,26 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
                 <tbody>
                   @for (row of schedule(); track row.id) {
                     <tr>
-                      <td class="tabular-nums">{{ row['installment_number'] }}</td>
-                      <td>{{ row['due_date'] }}</td>
-                      <td class="text-right tabular-nums">{{ money(row['principal_amount']) }}</td>
-                      <td class="text-right tabular-nums">{{ money(row['interest_amount']) }}</td>
-                      <td class="text-right tabular-nums font-semibold">{{ money(row['total_amount']) }}</td>
-                      <td class="text-right tabular-nums">{{ money(row['outstanding']) }}</td>
-                      <td><span class="cx-badge" [class]="statusBadge(row['status'])">{{ statusLabel(row['status']) }}</span></td>
+                      <td class="tabular-nums">{{ row.installment_number }}</td>
+                      <td>{{ row.due_date }}</td>
+                      <td class="text-right tabular-nums">{{ money(row.principal_amount) }}</td>
+                      <td class="text-right tabular-nums">{{ money(row.interest_amount) }}</td>
+                      <td class="text-right tabular-nums font-semibold">{{ money(row.total_amount) }}</td>
+                      <td class="text-right tabular-nums">{{ money(row.outstanding) }}</td>
+                      <td><span class="cx-badge" [class]="statusBadge(row.status)">{{ statusLabel(row.status) }}</span></td>
                     </tr>
                   }
                 </tbody>
+                <tfoot>
+                  <tr style="border-top: 2px solid var(--cx-border)">
+                    <td colspan="2" class="font-semibold" style="color: var(--cx-text)">Total</td>
+                    <td class="text-right tabular-nums font-semibold">{{ money(totals().principal) }}</td>
+                    <td class="text-right tabular-nums font-semibold">{{ money(totals().interest) }}</td>
+                    <td class="text-right tabular-nums font-semibold">{{ money(totals().total) }}</td>
+                    <td class="text-right tabular-nums font-semibold">{{ money(totals().outstanding) }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           }
@@ -128,6 +138,20 @@ export class LoanDetailComponent implements OnInit {
   scheduleLoading = signal(true);
   loan = signal<Loan | null>(null);
   schedule = signal<RepaymentScheduleItem[]>([]);
+
+  /** Column totals for the schedule footer, derived from real installment rows. */
+  totals = computed(() => {
+    const num = (v: string | number | null | undefined) => parseFloat(String(v ?? 0)) || 0;
+    return this.schedule().reduce(
+      (acc, row) => ({
+        principal: acc.principal + num(row.principal_amount),
+        interest: acc.interest + num(row.interest_amount),
+        total: acc.total + num(row.total_amount),
+        outstanding: acc.outstanding + num(row.outstanding),
+      }),
+      { principal: 0, interest: 0, total: 0, outstanding: 0 },
+    );
+  });
 
   ngOnInit(): void {
     if (!this.id) {

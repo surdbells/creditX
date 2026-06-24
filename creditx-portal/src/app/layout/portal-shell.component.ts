@@ -125,7 +125,7 @@ export class PortalShellComponent {
 
   displayName = computed(() => {
     const c = this.customer();
-    return c?.full_name || [c?.first_name, c?.last_name].filter(Boolean).join(' ') || c?.email || 'Customer';
+    return c?.full_name || c?.email || 'Customer';
   });
 
   initials = computed(() => {

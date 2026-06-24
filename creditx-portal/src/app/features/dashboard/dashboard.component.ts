@@ -2,6 +2,8 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { PortalService } from '../../core/services/portal.service';
 import { Loan } from '../../core/models';
@@ -47,7 +49,11 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
             <lucide-icon name="wallet" [size]="16"></lucide-icon>
             <span class="text-xs font-semibold uppercase tracking-wide">Outstanding</span>
           </div>
-          <p class="text-2xl font-bold tabular-nums" style="color: var(--cx-text)">{{ money(totalOutstanding()) }}</p>
+          @if (outstandingLoading()) {
+            <div class="cx-skeleton h-8 w-28"></div>
+          } @else {
+            <p class="text-2xl font-bold tabular-nums" style="color: var(--cx-text)">{{ money(totalOutstanding()) }}</p>
+          }
           <p class="text-xs mt-1" style="color: var(--cx-text-muted)">Across active loans</p>
         </div>
       </div>
@@ -87,7 +93,7 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                   <span class="text-sm font-semibold tabular-nums" style="color: var(--cx-text)">
-                    {{ money(loan.gross_loan || loan.application_amount) }}
+                    {{ money(loan.gross_loan || loan.amount_requested) }}
                   </span>
                   <span class="cx-badge" [class]="statusBadge(loan.status)">{{ statusLabel(loan.status) }}</span>
                   <lucide-icon name="chevron-right" [size]="16" style="color: var(--cx-text-muted)"></lucide-icon>
@@ -109,32 +115,67 @@ export class DashboardComponent implements OnInit {
   statusBadge = statusBadge;
 
   loading = signal(true);
+  outstandingLoading = signal(true);
+  /** Five most recent loans, shown in the activity list. */
   loans = signal<Loan[]>([]);
+  /** All of the customer's loans — drives the summary counts. */
+  allLoans = signal<Loan[]>([]);
+  totalOutstanding = signal(0);
 
   private inProgress = ['DRAFT', 'CAPTURED', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED'];
   private active = ['DISBURSED', 'ACTIVE', 'OVERDUE'];
 
   firstName = computed(() => {
     const c = this.auth.customer();
-    const name = c?.first_name || c?.full_name || 'there';
+    const name = c?.full_name || 'there';
     return name.split(' ')[0];
   });
 
-  inProgressCount = computed(() => this.loans().filter(l => this.inProgress.includes((l.status ?? '').toUpperCase())).length);
-  activeCount = computed(() => this.loans().filter(l => this.active.includes((l.status ?? '').toUpperCase())).length);
-  totalOutstanding = computed(() =>
-    this.loans()
-      .filter(l => this.active.includes((l.status ?? '').toUpperCase()))
-      .reduce((sum, l) => sum + (parseFloat(String(l.outstanding_balance ?? 0)) || 0), 0),
-  );
+  inProgressCount = computed(() => this.allLoans().filter(l => this.inProgress.includes((l.status ?? '').toUpperCase())).length);
+  activeCount = computed(() => this.allLoans().filter(l => this.active.includes((l.status ?? '').toUpperCase())).length);
 
   ngOnInit(): void {
-    this.portal.listLoans({ per_page: 5, sort_by: 'created_at', sort_dir: 'desc' }).subscribe({
+    this.portal.listLoans({ per_page: 100, sort_by: 'created_at', sort_dir: 'desc' }).subscribe({
       next: res => {
-        this.loans.set(res.data ?? []);
+        const all = res.data ?? [];
+        this.allLoans.set(all);
+        this.loans.set(all.slice(0, 5));
         this.loading.set(false);
+        this.computeOutstanding(all);
       },
-      error: () => this.loading.set(false),
+      error: () => {
+        this.loading.set(false);
+        this.outstandingLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Outstanding balance isn't a loan-level field on the API, so it's derived
+   * from the repayment schedule: the sum of each active loan's per-installment
+   * outstanding amounts. Loans with no schedule yet (not yet disbursed)
+   * contribute zero.
+   */
+  private computeOutstanding(all: Loan[]): void {
+    const activeLoans = all.filter(l => this.active.includes((l.status ?? '').toUpperCase()));
+    if (activeLoans.length === 0) {
+      this.totalOutstanding.set(0);
+      this.outstandingLoading.set(false);
+      return;
+    }
+    forkJoin(
+      activeLoans.map(l =>
+        this.portal.getSchedule(l.id).pipe(
+          map(res => (res.data ?? []).reduce((sum, row) => sum + (parseFloat(String(row.outstanding ?? 0)) || 0), 0)),
+          catchError(() => of(0)),
+        ),
+      ),
+    ).subscribe({
+      next: sums => {
+        this.totalOutstanding.set(sums.reduce((a, b) => a + b, 0));
+        this.outstandingLoading.set(false);
+      },
+      error: () => this.outstandingLoading.set(false),
     });
   }
 }

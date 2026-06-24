@@ -59,7 +59,7 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
                 <div>
                   <p class="text-xs" style="color: var(--cx-text-muted)">Amount</p>
                   <p class="text-lg font-bold tabular-nums" style="color: var(--cx-text)">
-                    {{ money(loan.gross_loan || loan.application_amount) }}
+                    {{ money(loan.gross_loan || loan.amount_requested) }}
                   </p>
                 </div>
                 <div class="text-right">

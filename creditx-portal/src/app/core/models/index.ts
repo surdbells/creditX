@@ -42,8 +42,6 @@ export interface LoginRequest {
 export interface Customer {
   id: string;
   full_name?: string;
-  first_name?: string;
-  last_name?: string;
   email: string;
   phone?: string | null;
   alt_phone?: string | null;
@@ -83,30 +81,32 @@ export interface Loan {
   status: string;
   product_id?: string;
   product_name?: string;
-  application_amount?: string | number;
+  customer_id?: string;
+  customer_name?: string;
+  amount_requested?: string | number;
   gross_loan?: string | number;
   net_disbursed?: string | number;
   tenure?: number;
   interest_rate?: string | number;
   loan_purpose?: string | null;
-  monthly_repayment?: string | number;
-  total_repayment?: string | number;
-  outstanding_balance?: string | number;
+  disbursed_at?: string | null;
   created_at?: string;
   updated_at?: string;
   [key: string]: any;
 }
 
-// ─── Repayment Schedule ───
+// ─── Repayment Schedule (mirrors RepaymentSchedule::toArray) ───
 export interface RepaymentScheduleItem {
   id: string;
   installment_number?: number;
   due_date?: string;
-  principal_due?: string | number;
-  interest_due?: string | number;
-  total_due?: string | number;
-  amount_paid?: string | number;
+  principal_amount?: string | number;
+  interest_amount?: string | number;
+  total_amount?: string | number;
+  paid_amount?: string | number;
+  outstanding?: string | number;
   status?: string;
+  paid_at?: string | null;
   [key: string]: any;
 }
 
