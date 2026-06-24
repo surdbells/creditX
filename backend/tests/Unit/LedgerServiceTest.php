@@ -10,9 +10,11 @@ use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\TransactionType;
 use App\Domain\Exception\DomainException;
 use App\Infrastructure\Service\LedgerService;
+use App\Infrastructure\Service\RedisService;
 use App\Infrastructure\Service\SettingsCacheService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Predis\Client as RedisClient;
 
 /**
  * Unit tests for LedgerService::postJournal's pre-flight validation —
@@ -34,7 +36,12 @@ final class LedgerServiceTest extends TestCase
         $em->expects($this->never())->method('persist');
         $em->expects($this->never())->method('flush');
 
-        $settings = $this->createMock(SettingsCacheService::class);
+        // SettingsCacheService and RedisService are both declared `final`, so
+        // PHPUnit can't double them. The validation paths under test never
+        // read a setting (and therefore never issue a Redis command), so a
+        // real SettingsCacheService backed by a lazily-connecting Predis
+        // client is safe — no live Redis is required.
+        $settings = new SettingsCacheService($em, new RedisService(new RedisClient()));
 
         return new LedgerService($em, $settings);
     }
