@@ -207,6 +207,31 @@ import { SettingsService } from '../../core/services/settings.service';
               </div>
             </section>
 
+            <!-- Affordability (portal-originated loans capture an income + DSR snapshot) -->
+            @if (l.applicant_monthly_income != null || l.dsr != null) {
+              <section class="cx-aq-section">
+                <h3 class="cx-aq-section-title">Affordability</h3>
+                <div class="cx-aq-grid">
+                  <div class="cx-aq-field">
+                    <span class="cx-aq-field-label">Declared Monthly Income</span>
+                    <span class="cx-aq-field-value tabular-nums">
+                      {{ l.applicant_monthly_income != null ? (l.applicant_monthly_income | money:2) : '—' }}
+                    </span>
+                  </div>
+                  <div class="cx-aq-field">
+                    <span class="cx-aq-field-label">Debt-Service Ratio (DSR)</span>
+                    <span class="cx-aq-field-value tabular-nums"
+                          [class.cx-aq-flag]="dsrExceedsLimit(l.dsr)">
+                      {{ l.dsr != null ? ((l.dsr * 100) | number:'1.1-2') + '%' : '—' }}
+                      @if (dsrExceedsLimit(l.dsr)) {
+                        <lucide-icon name="alert-triangle" [size]="14"></lucide-icon>
+                      }
+                    </span>
+                  </div>
+                </div>
+              </section>
+            }
+
             <!-- Customer -->
             @if (l.customer; as c) {
               <section class="cx-aq-section">
@@ -709,6 +734,14 @@ import { SettingsService } from '../../core/services/settings.service';
       color: var(--cx-text);
       word-break: break-word;
     }
+    /* High-DSR soft flag — advisory only, mirrors backend soft-flag. */
+    .cx-aq-field-value.cx-aq-flag {
+      color: var(--cx-warning, #b45309);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
 
     /* Fee breakdown */
     .cx-aq-fees { display: flex; flex-direction: column; gap: 4px; }
@@ -1071,6 +1104,19 @@ export class ApprovalQueueComponent implements OnInit {
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
   ngOnInit() { this.load(); }
+
+  // Soft-flag threshold mirroring the backend default for
+  // affordability.max_dsr (see AffordabilityService::DEFAULT_MAX_DSR).
+  // Used only to highlight a high-DSR snapshot for the reviewer — the
+  // authoritative within-limit decision is computed server-side.
+  private static readonly DSR_SOFT_LIMIT = 0.40;
+
+  /** True when a loan's stored DSR snapshot exceeds the soft limit. */
+  dsrExceedsLimit(dsr: string | number | null | undefined): boolean {
+    if (dsr === null || dsr === undefined || dsr === '') return false;
+    const n = typeof dsr === 'number' ? dsr : parseFloat(dsr);
+    return !isNaN(n) && n > ApprovalQueueComponent.DSR_SOFT_LIMIT;
+  }
 
   // ─── Selection + batch helpers ─────────────────────────────────────
 

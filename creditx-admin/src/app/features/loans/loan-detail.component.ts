@@ -1437,6 +1437,13 @@ export class LoanDetailComponent implements OnInit {
       { label: 'Agent', value: l.agent_name || '—' },
       { label: 'Created', value: l.created_at },
       { label: 'Disbursed', value: l.disbursed_at || '—' },
+      // Portal-originated loans carry an affordability snapshot.
+      ...(l.applicant_monthly_income != null
+        ? [{ label: 'Declared Monthly Income', value: this.settings.formatMoney(l.applicant_monthly_income) }]
+        : []),
+      ...(l.dsr != null
+        ? [{ label: 'Debt-Service Ratio (DSR)', value: (Number(l.dsr) * 100).toFixed(1) + '%' }]
+        : []),
     ];
   }
 

@@ -72,6 +72,7 @@ class ApprovalCondition
             'product_code' => $loan->getProduct()->getCode(),
             'branch_id'    => $loan->getBranch()?->getId() ?? '',
             'loan_type'    => $loan->getLoanType()->value,
+            'dsr'          => $loan->getDsr() ?? '',
             default        => '',
         };
 
