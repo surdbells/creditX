@@ -463,6 +463,22 @@ return function (App $app): void {
         $api->post('/accounting/depreciation/runs', Accounting\DepreciationAction::class . ':run')
             ->add(new RbacMiddleware('accounting.journal'));
 
+        // ─── Accounting — Accounts payable (vendors + bills) ───
+        $api->get('/accounting/vendors', Accounting\VendorsAction::class . ':list')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/vendors', Accounting\VendorsAction::class . ':create')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->get('/accounting/bills', Accounting\BillsAction::class . ':list')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/bills', Accounting\BillsAction::class . ':create')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->post('/accounting/bills/{id}/approve', Accounting\BillsAction::class . ':approve')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->post('/accounting/bills/{id}/pay', Accounting\BillsAction::class . ':pay')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->get('/reports/ap-aging', Accounting\BillsAction::class . ':aging')
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Deposits (deposit-taking MFB) ───
         // Deposit products (templates) carry the per-product interest
         // accrual method and withdrawal policy. Product reads are gated
