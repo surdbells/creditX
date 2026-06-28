@@ -50,17 +50,25 @@ final class UpdateWorkflowAction
             }
         }
 
-        // Replace conditions if provided
+        // Replace conditions if provided. Steps are rebuilt fresh above, so
+        // their IDs change — conditions therefore reference the target step
+        // by its position (additional_step_index) rather than a stale ID.
+        // additional_step_id is still honored as a fallback for API/seed use.
         if (isset($data['conditions']) && is_array($data['conditions'])) {
             $wf->clearConditions();
             $this->em->flush(); // Flush to persist new steps before referencing them
+            $orderedSteps = array_values($wf->getSteps()->toArray());
             foreach ($data['conditions'] as $condData) {
-                $additionalStep = $this->em->getRepository(ApprovalStep::class)->find($condData['additional_step_id'] ?? '');
+                $additionalStep = $this->resolveAdditionalStep($condData, $orderedSteps);
                 if ($additionalStep === null) continue;
+
+                $field = $condData['field'] ?? 'amount';
+                if (!in_array($field, ApprovalCondition::allowedFields(), true)) continue;
+
                 $cond = new ApprovalCondition();
-                $cond->setField($condData['field'] ?? 'amount');
+                $cond->setField($field);
                 $cond->setOperator(ConditionOperator::from($condData['operator'] ?? 'gt'));
-                $cond->setValue($condData['value'] ?? '0');
+                $cond->setValue((string) ($condData['value'] ?? '0'));
                 $cond->setAdditionalStep($additionalStep);
                 $cond->setIsActive(filter_var($condData['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN));
                 $wf->addCondition($cond);
@@ -70,5 +78,23 @@ final class UpdateWorkflowAction
         $this->em->flush();
         $this->audit->logUpdate($request->getAttribute('user_id'), 'ApprovalWorkflow', $wf->getId(), $old, $wf->toArray(), $this->getClientIp($request), $this->getUserAgent($request));
         return $this->success($wf->toArray(), 'Approval workflow updated successfully');
+    }
+
+    /**
+     * Resolve a condition's target step from either a 0-based index into the
+     * rebuilt steps (preferred — step IDs change on every update) or an
+     * explicit step ID fallback.
+     *
+     * @param array<int, ApprovalStep> $orderedSteps
+     */
+    private function resolveAdditionalStep(array $condData, array $orderedSteps): ?ApprovalStep
+    {
+        if (isset($condData['additional_step_index']) && is_numeric($condData['additional_step_index'])) {
+            return $orderedSteps[(int) $condData['additional_step_index']] ?? null;
+        }
+        if (!empty($condData['additional_step_id'])) {
+            return $this->em->getRepository(ApprovalStep::class)->find($condData['additional_step_id']);
+        }
+        return null;
     }
 }

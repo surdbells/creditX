@@ -46,8 +46,15 @@ final class ApprovalEngineService
             throw new DomainException('No active approval workflow configured for product: ' . $loan->getProduct()->getName());
         }
 
-        // Get base steps
-        $steps = $workflow->getSteps()->toArray();
+        // Get base steps. Steps flagged is_conditional are NOT part of the
+        // always-on pipeline — they only enter the flow when an
+        // ApprovalCondition that targets them evaluates true (see below).
+        // Without this filter a conditional step would run on every loan,
+        // making the whole condition mechanism inert.
+        $steps = array_values(array_filter(
+            $workflow->getSteps()->toArray(),
+            fn(ApprovalStep $s) => !$s->isConditional()
+        ));
 
         // Evaluate conditional steps
         $conditionalRoutingEnabled = $this->settings->getBool('approval.conditional_routing_enabled', true);

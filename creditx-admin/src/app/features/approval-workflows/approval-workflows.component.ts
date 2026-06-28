@@ -91,8 +91,71 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
                       <label class="cx-label">Approver Role</label>
                       <cx-searchable-select [options]="roleOptions()" placeholder="Select role..." [(ngModel)]="step.role_id"></cx-searchable-select>
                     </div>
+                    <label class="cx-wf-step-cond">
+                      <input type="checkbox" [(ngModel)]="step.is_conditional" />
+                      <span>Conditional step — skipped unless a routing condition below targets it</span>
+                    </label>
                   </div>
                   <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-wf-step-remove" (click)="removeStep(i)" title="Remove">
+                    <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Routing Conditions -->
+        <div class="cx-wf-steps-section">
+          <div class="cx-wf-steps-header">
+            <h4 class="cx-form-section-title" style="margin: 0; border: none; padding: 0;">Routing Conditions</h4>
+            <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="addCondition()" [disabled]="conditionalStepOptions().length === 0">
+              <lucide-icon name="plus" [size]="12"></lucide-icon>
+              <span>Add Condition</span>
+            </button>
+          </div>
+          @if (conditionalStepOptions().length === 0) {
+            <div class="cx-wf-cond-hint">
+              <lucide-icon name="info" [size]="14"></lucide-icon>
+              <span>Mark at least one step above as <strong>Conditional</strong> to use it as a routing target, then add a condition that injects it.</span>
+            </div>
+          }
+          @if (form.conditions?.length) {
+            <div class="cx-wf-steps-list">
+              @for (cond of form.conditions; track $index; let ci = $index) {
+                <div class="cx-wf-step">
+                  <div class="cx-wf-cond-fields">
+                    <div>
+                      <label class="cx-label">When loan</label>
+                      <select class="cx-select" [(ngModel)]="cond.field">
+                        @for (f of fieldOptions; track f.value) {
+                          <option [value]="f.value">{{ f.label }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <label class="cx-label">Operator</label>
+                      <select class="cx-select" [(ngModel)]="cond.operator">
+                        @for (o of operatorOptions; track o.value) {
+                          <option [value]="o.value">{{ o.label }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div>
+                      <label class="cx-label">Value</label>
+                      <input class="cx-input" [placeholder]="valuePlaceholder(cond.field)" [(ngModel)]="cond.value" />
+                    </div>
+                    <div>
+                      <label class="cx-label">Then add step</label>
+                      <select class="cx-select" [(ngModel)]="cond.additional_step_index">
+                        <option [ngValue]="null" disabled>Select step...</option>
+                        @for (s of conditionalStepOptions(); track s.value) {
+                          <option [ngValue]="s.value">{{ s.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-wf-step-remove" (click)="removeCondition(ci)" title="Remove">
                     <lucide-icon name="trash-2" [size]="14"></lucide-icon>
                   </button>
                 </div>
@@ -145,6 +208,34 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
     @media (max-width: 640px) { .cx-wf-step-fields { grid-template-columns: 1fr; } }
     .cx-wf-step-remove { color: var(--cx-danger); margin-top: 22px; }
     .cx-wf-step-remove:hover { background: var(--cx-danger-50); }
+
+    /* Conditional-step toggle inside a step card */
+    .cx-wf-step-cond {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: var(--cx-text-xs); color: var(--cx-text-muted);
+      cursor: pointer;
+    }
+    .cx-wf-step-cond input { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* Routing condition row: field / operator / value / target step */
+    .cx-wf-cond-fields {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.3fr 1.1fr 0.9fr 1.4fr;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    @media (max-width: 720px) { .cx-wf-cond-fields { grid-template-columns: 1fr 1fr; } }
+    .cx-wf-cond-hint {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 0.9rem;
+      background: var(--cx-stone-50);
+      border: 1px dashed var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      font-size: var(--cx-text-sm); color: var(--cx-text-muted);
+    }
+    .cx-wf-cond-hint lucide-icon { flex-shrink: 0; color: var(--cx-primary-600); }
   `],
 })
 export class ApprovalWorkflowsComponent implements OnInit {
@@ -159,6 +250,25 @@ export class ApprovalWorkflowsComponent implements OnInit {
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};
   products = signal<any[]>([]); roles = signal<any[]>([]);
+
+  // Mirror of backend ApprovalCondition::fieldOptions() — keep in sync.
+  fieldOptions = [
+    { value: 'amount', label: 'Loan Amount' },
+    { value: 'tenure', label: 'Tenure (months)' },
+    { value: 'product_code', label: 'Product Code' },
+    { value: 'branch_id', label: 'Branch' },
+    { value: 'loan_type', label: 'Loan Type' },
+    { value: 'dsr', label: 'Debt-Service Ratio (DSR)' },
+  ];
+  // Mirror of backend ConditionOperator enum.
+  operatorOptions = [
+    { value: 'gt', label: 'is greater than' },
+    { value: 'gte', label: 'is at least' },
+    { value: 'lt', label: 'is less than' },
+    { value: 'lte', label: 'is at most' },
+    { value: 'eq', label: 'equals' },
+    { value: 'in', label: 'is one of' },
+  ];
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
 
@@ -177,21 +287,86 @@ export class ApprovalWorkflowsComponent implements OnInit {
   openForm(row?: any) {
     if (row) {
       this.editId = row.id;
-      this.form = { name: row.name, product_id: row.product_id, mode: row.mode, is_active: row.is_active, steps: (row.steps || []).map((s: any) => ({ name: s.name, role_id: s.role_id || s.approver_role_id })) };
+      const steps = (row.steps || []).map((s: any) => ({ name: s.name, role_id: s.role_id || s.approver_role_id, is_conditional: !!s.is_conditional }));
+      // Conditions reference their target step by ID on the backend; map it
+      // back to a position index so the form's step dropdown stays valid even
+      // after steps are reordered/rebuilt.
+      const stepIdIndex = new Map<string, number>((row.steps || []).map((s: any, i: number) => [s.id, i]));
+      const conditions = (row.conditions || []).map((c: any) => ({
+        field: c.field,
+        operator: c.operator,
+        value: c.value,
+        additional_step_index: stepIdIndex.has(c.additional_step_id) ? stepIdIndex.get(c.additional_step_id) : null,
+        is_active: c.is_active !== false,
+      }));
+      this.form = { name: row.name, product_id: row.product_id, mode: row.mode, is_active: row.is_active, steps, conditions };
     } else {
       this.editId = null;
-      this.form = { name: '', product_id: '', mode: 'sequential', is_active: true, steps: [] };
+      this.form = { name: '', product_id: '', mode: 'sequential', is_active: true, steps: [], conditions: [] };
     }
     this.showForm.set(true);
   }
 
-  addStep() { this.form.steps = [...(this.form.steps || []), { name: '', role_id: '' }]; }
-  removeStep(i: number) { this.form.steps.splice(i, 1); this.form.steps = [...this.form.steps]; }
+  addStep() { this.form.steps = [...(this.form.steps || []), { name: '', role_id: '', is_conditional: false }]; }
+  removeStep(i: number) {
+    this.form.steps.splice(i, 1);
+    this.form.steps = [...this.form.steps];
+    // Drop conditions whose target step no longer exists, and re-anchor
+    // indexes that shifted because a step above them was removed.
+    this.form.conditions = (this.form.conditions || [])
+      .map((c: any) => {
+        if (c.additional_step_index == null) return c;
+        if (c.additional_step_index === i) return { ...c, additional_step_index: null };
+        return c.additional_step_index > i ? { ...c, additional_step_index: c.additional_step_index - 1 } : c;
+      });
+  }
+
+  addCondition() {
+    const first = this.conditionalStepOptions()[0];
+    this.form.conditions = [...(this.form.conditions || []), { field: 'dsr', operator: 'gt', value: '', additional_step_index: first ? first.value : null, is_active: true }];
+  }
+  removeCondition(i: number) { this.form.conditions.splice(i, 1); this.form.conditions = [...this.form.conditions]; }
+
+  /** Steps marked conditional, as {value: index, label} options for the target dropdown. */
+  conditionalStepOptions(): { value: number; label: string }[] {
+    return (this.form.steps || [])
+      .map((s: any, i: number) => ({ s, i }))
+      .filter((x: any) => x.s.is_conditional)
+      .map((x: any) => ({ value: x.i, label: `Step ${x.i + 1}: ${x.s.name || '(unnamed)'}` }));
+  }
+
+  valuePlaceholder(field: string): string {
+    switch (field) {
+      case 'dsr': return 'e.g. 0.4 (40% ratio)';
+      case 'amount': return 'e.g. 5000000';
+      case 'tenure': return 'e.g. 12';
+      case 'loan_type': return 'e.g. top_up';
+      case 'product_code': return 'e.g. PAYDAY';
+      case 'branch_id': return 'branch UUID';
+      default: return 'threshold value';
+    }
+  }
 
   saveForm() {
     if (!this.form.name || !this.form.product_id) { this.toast.error('Name and product are required'); return; }
+    // Only submit conditions that target a valid step; a null target would
+    // be silently dropped by the backend and confuse the admin.
+    const conditions = (this.form.conditions || []).filter((c: any) => c.additional_step_index != null && c.value !== '' && c.value != null);
+    if ((this.form.conditions || []).length > 0 && conditions.length !== this.form.conditions.length) {
+      this.toast.error('Every routing condition needs a value and a target step'); return;
+    }
     this.saving.set(true);
-    const payload = { ...this.form, steps: (this.form.steps || []).map((s: any, i: number) => ({ ...s, step_order: i + 1 })) };
+    const payload = {
+      ...this.form,
+      steps: (this.form.steps || []).map((s: any, i: number) => ({ ...s, step_order: i + 1 })),
+      conditions: conditions.map((c: any) => ({
+        field: c.field,
+        operator: c.operator,
+        value: String(c.value),
+        additional_step_index: c.additional_step_index,
+        is_active: c.is_active !== false,
+      })),
+    };
     (this.editId ? this.api.put('/approval-workflows/' + this.editId, payload) : this.api.post('/approval-workflows', payload)).subscribe({
       next: r => { this.saving.set(false); this.toast.success(r.message || 'Saved'); this.showForm.set(false); this.load(this.q); },
       error: e => { this.saving.set(false); this.toast.error(e.error?.message || 'Failed'); },

@@ -47,6 +47,32 @@ class ApprovalCondition
         $this->id = Uuid::uuid4()->toString();
     }
 
+    /**
+     * The loan fields a routing condition may evaluate, mapped to a
+     * human label for the admin condition-builder UI. This is the single
+     * source of truth — the evaluate() match below MUST resolve every key
+     * here, and the create/update workflow actions validate against it.
+     *
+     * @return array<string, string>
+     */
+    public static function fieldOptions(): array
+    {
+        return [
+            'amount'       => 'Loan Amount',
+            'tenure'       => 'Tenure (months)',
+            'product_code' => 'Product Code',
+            'branch_id'    => 'Branch',
+            'loan_type'    => 'Loan Type',
+            'dsr'          => 'Debt-Service Ratio (DSR)',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function allowedFields(): array
+    {
+        return array_keys(self::fieldOptions());
+    }
+
     public function getId(): string { return $this->id; }
     public function getWorkflow(): ApprovalWorkflow { return $this->workflow; }
     public function setWorkflow(ApprovalWorkflow $v): void { $this->workflow = $v; }
