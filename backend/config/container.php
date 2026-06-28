@@ -330,6 +330,11 @@ return [
             $c->get(LedgerService::class),
         );
     },
+    \App\Infrastructure\Service\BankReconciliationService::class => function (ContainerInterface $c): \App\Infrastructure\Service\BankReconciliationService {
+        return new \App\Infrastructure\Service\BankReconciliationService(
+            $c->get(EntityManagerInterface::class),
+        );
+    },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
         return new DisbursementService(
             $c->get(EntityManagerInterface::class),

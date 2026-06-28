@@ -431,6 +431,26 @@ return function (App $app): void {
         $api->post('/accounting/interest-accrual/runs/{id}/reverse', Accounting\ReverseInterestAccrualRunAction::class)
             ->add(new RbacMiddleware('accounting.provision'));
 
+        // ─── Accounting — Bank reconciliation (BRS) ───
+        // Import a bank statement and reconcile it against the BANK GL:
+        // create a session, import lines, auto/manual match, complete.
+        $api->get('/accounting/bank-reconciliations', Accounting\ListBankReconciliationsAction::class)
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations', Accounting\CreateBankReconciliationAction::class)
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->get('/accounting/bank-reconciliations/{id}', Accounting\GetBankReconciliationAction::class)
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations/{id}/import', Accounting\ImportBankStatementAction::class)
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations/{id}/auto-match', Accounting\MatchBankReconciliationAction::class . ':auto')
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations/{id}/lines/{lineId}/match', Accounting\MatchBankReconciliationAction::class . ':match')
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations/{id}/lines/{lineId}/unmatch', Accounting\MatchBankReconciliationAction::class . ':unmatch')
+            ->add(new RbacMiddleware('reports.reconciliation'));
+        $api->post('/accounting/bank-reconciliations/{id}/complete', Accounting\MatchBankReconciliationAction::class . ':complete')
+            ->add(new RbacMiddleware('reports.reconciliation'));
+
         // ─── Deposits (deposit-taking MFB) ───
         // Deposit products (templates) carry the per-product interest
         // accrual method and withdrawal policy. Product reads are gated

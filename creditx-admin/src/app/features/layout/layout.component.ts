@@ -109,6 +109,7 @@ export class LayoutComponent {
       { label: 'Provisions', icon: 'shield-alert', route: '/provisions', permission: 'accounting.provision' },
       { label: 'Interest Accrual', icon: 'trending-up', route: '/interest-accrual', permission: 'accounting.provision' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
+      { label: 'Bank Reconciliation', icon: 'landmark', route: '/bank-reconciliation', permission: 'reports.reconciliation' },
     ]},
     { label: 'System', items: [
       { label: 'Users', icon: 'users', route: '/users', permission: 'users.view' },
