@@ -5,7 +5,7 @@ namespace App\Action\Disbursement;
 use App\Domain\Enum\AccountType;
 use App\Domain\Enum\LoanStatus;
 use App\Domain\Repository\{LoanRepository, GeneralLedgerRepository, RepaymentScheduleRepository};
-use App\Infrastructure\Service\{ApiResponse, LoanCalculationService};
+use App\Infrastructure\Service\{ApiResponse, LoanCalculationService, SettingsCacheService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -55,6 +55,7 @@ final class DisbursementPreviewAction
         private readonly RepaymentScheduleRepository $scheduleRepo,
         private readonly LoanCalculationService $calcService,
         private readonly EntityManagerInterface $em,
+        private readonly SettingsCacheService $settings,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -206,21 +207,33 @@ final class DisbursementPreviewAction
         // balances into one disbursement is rare and best handled as
         // a manual override in the UI.
         $sourceLoan = $priorLoans[0];
-        $outstanding = $this->scheduleRepo->sumOutstandingByLoan($sourceLoan->getId());
+
+        // Carry-forward method is configurable per organisation:
+        //   'principal_minus_current' (default) — future principal less the
+        //       current month's installment, plus full P+I for arrears.
+        //   'full_outstanding' — legacy: sum of all unpaid (principal+interest).
+        $method = (string) $this->settings->get('topup.calc_method', 'principal_minus_current');
+        $outstanding = $method === 'full_outstanding'
+            ? $this->scheduleRepo->sumOutstandingByLoan($sourceLoan->getId())
+            : $this->scheduleRepo->computeTopUpCarryForward($sourceLoan->getId());
+        $fullOutstanding = $this->scheduleRepo->sumOutstandingByLoan($sourceLoan->getId());
 
         return [
-            'auto_detected' => true,
-            'balance'       => number_format((float) $outstanding, 2, '.', ''),
+            'auto_detected'    => true,
+            'balance'          => number_format((float) $outstanding, 2, '.', ''),
+            'calc_method'      => $method,
+            'full_outstanding' => number_format((float) $fullOutstanding, 2, '.', ''),
             'source_loan'   => [
                 'id'             => $sourceLoan->getId(),
                 'application_id' => $sourceLoan->getApplicationId(),
                 'status'         => $sourceLoan->getStatus()->value,
-                'outstanding'    => number_format((float) $outstanding, 2, '.', ''),
+                'outstanding'    => number_format((float) $fullOutstanding, 2, '.', ''),
             ],
             'message'       => sprintf(
-                'Outstanding balance of ₦%s automatically detected from loan %s. Adjust manually if this does not match records.',
+                'Top-up carry-forward of ₦%s detected from loan %s (%s). Adjust manually if this does not match records.',
                 number_format((float) $outstanding, 2, '.', ','),
                 $sourceLoan->getApplicationId(),
+                $method === 'full_outstanding' ? 'full outstanding' : 'principal less current month + arrears',
             ),
         ];
     }

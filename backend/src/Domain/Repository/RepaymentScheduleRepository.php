@@ -37,6 +37,67 @@ class RepaymentScheduleRepository extends BaseRepository
     }
 
     /**
+     * Top-up carry-forward balance for a prior loan, per the org's settlement
+     * rule:
+     *   - Already-due / overdue installments (arrears): full outstanding (P+I)
+     *   - Future installments: principal portion only
+     *   - Minus the current month's principal (the earliest future installment)
+     *     because that repayment is expected to still come in.
+     *
+     * @return string decimal(15,2)
+     */
+    public function computeTopUpCarryForward(string $loanId): string
+    {
+        $sql = "
+            SELECT due_date,
+                   CAST(principal_amount AS NUMERIC) AS principal,
+                   CAST(total_amount AS NUMERIC)     AS total,
+                   CAST(paid_amount AS NUMERIC)      AS paid
+            FROM repayment_schedules
+            WHERE loan_id = :loanId AND status IN ('pending', 'partial', 'overdue')
+            ORDER BY installment_number ASC
+        ";
+        $rows = $this->em->getConnection()->executeQuery($sql, ['loanId' => $loanId])->fetchAllAssociative();
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+
+        $arrears = '0.00';
+        $futurePrincipal = '0.00';
+        $firstFuturePrincipal = null;
+
+        foreach ($rows as $r) {
+            $outstanding = bcsub((string) $r['total'], (string) $r['paid'], 2);
+            if (bccomp($outstanding, '0.00', 2) <= 0) {
+                continue;
+            }
+            $due = substr((string) $r['due_date'], 0, 10);
+            if ($due <= $today) {
+                // Arrears — carry the full outstanding (principal + interest).
+                $arrears = bcadd($arrears, $outstanding, 2);
+            } else {
+                // Future — carry the principal portion of the outstanding.
+                $total = (string) $r['total'];
+                $principalOut = bccomp($total, '0.00', 2) > 0
+                    ? bcmul($outstanding, bcdiv((string) $r['principal'], $total, 6), 2)
+                    : (string) $r['principal'];
+                $futurePrincipal = bcadd($futurePrincipal, $principalOut, 2);
+                if ($firstFuturePrincipal === null) {
+                    $firstFuturePrincipal = $principalOut;
+                }
+            }
+        }
+
+        // Drop one current-month principal (the next upcoming installment).
+        $carry = bcadd($arrears, $futurePrincipal, 2);
+        if ($firstFuturePrincipal !== null) {
+            $carry = bcsub($carry, $firstFuturePrincipal, 2);
+        }
+        if (bccomp($carry, '0.00', 2) < 0) {
+            $carry = '0.00';
+        }
+        return $carry;
+    }
+
+    /**
      * Loan maturity date = the latest installment due date. Null if the
      * loan has no schedule. Used to gate penalties to post-maturity only.
      */
