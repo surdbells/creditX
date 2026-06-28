@@ -199,6 +199,7 @@ php bin/init-reconciliation-columns.php
 php bin/init-topup-underwriter-column.php
 php bin/init-audit-columns-repair.php
 php bin/init-interest-accrual-gls.php   # Interest Receivable + Interest in Suspense GLs (accrual-basis interest)
+php bin/init-tax-rates.php              # Default VAT/WHT rates (VAT 7.5%, WHT 5% / 10%)
 
 # 3. Seed permissions, roles, default settings, chart of accounts, admin user:
 php bin/seed.php
@@ -286,6 +287,7 @@ tasks (adjust PHP path to the version installed):
 | Daily 01:00 | `php /www/wwwroot/creditx/backend/bin/overdue-check.php` | Flag overdue loans |
 | Daily 02:00 | `php /www/wwwroot/creditx/backend/bin/run-gl-reconciliation.php` | GL reconciliation |
 | Monthly, 1st 00:30 | `php /www/wwwroot/creditx/backend/bin/accrue-loan-interest.php` | Accrue prior month's loan interest income (accrual basis) |
+| Monthly, 1st 00:45 | `php /www/wwwroot/creditx/backend/bin/run-depreciation.php` | Post prior month's fixed-asset depreciation |
 | Per schedule | `php /www/wwwroot/creditx/backend/bin/report-schedule.php` | Scheduled report delivery |
 
 > The interest-accrual job is idempotent per month (one POSTED run per

@@ -112,6 +112,7 @@ export class LayoutComponent {
       { label: 'Bank Reconciliation', icon: 'landmark', route: '/bank-reconciliation', permission: 'reports.reconciliation' },
       { label: 'Fixed Assets', icon: 'package', route: '/fixed-assets', permission: 'accounting.view' },
       { label: 'Accounts Payable', icon: 'banknote', route: '/accounts-payable', permission: 'accounting.view' },
+      { label: 'Tax (VAT/WHT)', icon: 'percent', route: '/tax', permission: 'accounting.view' },
     ]},
     { label: 'System', items: [
       { label: 'Users', icon: 'users', route: '/users', permission: 'users.view' },

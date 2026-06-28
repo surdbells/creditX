@@ -349,6 +349,13 @@ return [
             $c->get(LedgerService::class),
         );
     },
+    \App\Infrastructure\Service\TaxService::class => function (ContainerInterface $c): \App\Infrastructure\Service\TaxService {
+        return new \App\Infrastructure\Service\TaxService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
         return new DisbursementService(
             $c->get(EntityManagerInterface::class),

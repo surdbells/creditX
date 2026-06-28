@@ -479,6 +479,20 @@ return function (App $app): void {
         $api->get('/reports/ap-aging', Accounting\BillsAction::class . ':aging')
             ->add(new RbacMiddleware('accounting.view'));
 
+        // ─── Accounting — Tax (VAT/WHT) ───
+        $api->get('/accounting/tax/rates', Accounting\TaxAction::class . ':listRates')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/tax/rates', Accounting\TaxAction::class . ':createRate')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->get('/accounting/tax/transactions', Accounting\TaxAction::class . ':listTransactions')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/tax/transactions', Accounting\TaxAction::class . ':record')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->post('/accounting/tax/remit', Accounting\TaxAction::class . ':remit')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->get('/reports/tax-summary', Accounting\TaxAction::class . ':summary')
+            ->add(new RbacMiddleware('accounting.view'));
+
         // ─── Deposits (deposit-taking MFB) ───
         // Deposit products (templates) carry the per-product interest
         // accrual method and withdrawal policy. Product reads are gated

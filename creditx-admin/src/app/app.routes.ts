@@ -52,6 +52,7 @@ export const routes: Routes = [
       { path: 'bank-reconciliation', loadComponent: () => import('./features/bank-reconciliation/bank-reconciliation.component').then(m => m.BankReconciliationComponent) },
       { path: 'fixed-assets', loadComponent: () => import('./features/fixed-assets/fixed-assets.component').then(m => m.FixedAssetsComponent) },
       { path: 'accounts-payable', loadComponent: () => import('./features/accounts-payable/accounts-payable.component').then(m => m.AccountsPayableComponent) },
+      { path: 'tax', loadComponent: () => import('./features/tax/tax.component').then(m => m.TaxComponent) },
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'deposit-products', loadComponent: () => import('./features/deposit-products/deposit-products.component').then(m => m.DepositProductsComponent) },
