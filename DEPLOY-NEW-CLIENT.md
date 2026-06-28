@@ -9,6 +9,11 @@ scratch:
 - **Agent app** (Ionic/Capacitor) built as a mobile APK/IPA, or optionally
   served as a PWA on Cloudflare Pages.
 
+It then covers the **operational setup for a new organization** (§12) — the
+business configuration (chart of accounts, opening balances, products, fees,
+penalties, approval workflows, settings, month-end routine, go-live test) an
+administrator performs after the software is technically live.
+
 > For **updating an already-deployed** instance, use [`DEPLOY.md`](DEPLOY.md)
 > instead. This document is only for the first-time setup of a new tenant.
 
@@ -418,7 +423,210 @@ curl -sI https://<API_DOMAIN>/api/banks | head -1          # HTTP/2 200
 
 ---
 
-## 12. Per-client checklist (copy this into the client's ticket)
+## 12. Operational setup for a new organization
+
+Everything above makes the software *run*. This section makes the org *operational* —
+the business configuration an administrator performs in the admin app before
+go-live. Do these **in order**: later steps depend on earlier ones (you can't
+create a loan product's approval workflow before the product exists, can't
+disburse before a bank GL and an open period exist, etc.).
+
+All steps are in the **admin app** (`https://<ADMIN_DOMAIN>`) unless noted.
+Each references the left-nav screen by name.
+
+### 12.1 People & access (System group)
+
+1. **Replace the seed admin** — see §4.1 if not already done.
+2. **Locations** → create the org's **branches** (head office + each branch).
+   Branches scope loans, agents, and reporting.
+3. **Departments** and **Teams** → create as needed for staff org structure
+   and approval routing.
+4. **Roles** → review the seeded roles (`super_admin`, and the operational
+   roles). Create/adjust roles and tick the exact **permissions** each needs.
+   Key permission families: `customers.*`, `loans.*`, `payments.*`,
+   `accounting.*` (`view`, `journal`, `provision`, `close`, `budget`),
+   `reports.*`, `products.*`, `users.*`, `roles.*`, `locations.*`.
+   - For **segregation of duties**, give *makers* (e.g. loan officers) create
+     permissions and *checkers* (e.g. managers) the approval permissions —
+     this is what the maker-checker toggles (§12.7) and the 2-level
+     registration approval rely on.
+5. **Users** → create each staff member, set their role(s), branch, and
+   department. They receive credentials per your onboarding process.
+
+### 12.2 Branding & general settings (Settings)
+
+**Settings → General** (these drive both apps via the public settings endpoint):
+
+| Setting key | Purpose | Typical value |
+|---|---|---|
+| `general.company_name` | Brand name on login, portal, exports | `<Client> MFB` |
+| `general.currency` | ISO currency code | `NGN` |
+| `general.currency_symbol` | Symbol shown in money fields | `₦` |
+| `general.support_email` | Shown to customers | `support@<client>` |
+| `general.date_format` | Display format | `Y-m-d` |
+
+### 12.3 Chart of accounts (Accounting)
+
+`seed.php` ships a full MFB chart. Review and tailor it under **Accounting**
+(Chart of Accounts tab):
+
+1. **Rename** any account to the org's wording — click the pencil; the account
+   **name**, type, description and active flag are editable. The account
+   **code** is intentionally locked (services post by code — changing it would
+   break postings).
+2. **Add org-specific accounts** the org actually uses — e.g. a GL per real
+   bank account (`BANK2`, `BANK3`…), additional expense lines, etc. Pick the
+   correct **account type** (asset/liability/equity/income/expense) and a
+   unique code + number.
+3. **Do NOT delete these control accounts** — the engine resolves them by code:
+
+   | Code | Used by |
+   |---|---|
+   | `LR`, `CUBGL` | Loan receivable + per-customer wash account (disbursement/repayment) |
+   | `BANK`, `SETTLE`, `VAULT` | Disbursement settlement, payoff, cash |
+   | `II`, `INTRECV`, `INTSUSP` | Loan interest income, accrued receivable, NPL suspense |
+   | `PI` | Penalty income |
+   | `ALLOW`, `LLP` | Loan-loss allowance + provision expense |
+   | `RETEARN`, `OBE` | Retained earnings, opening-balance equity |
+   | `CUSTDEP`, `INTPAY`, `INTEXP` | Deposits liability, deposit interest payable/expense |
+   | `ACCRPAY`, `TAXPAY` | Accounts payable, tax payable |
+   | `FIXASSET`, `ACCDEP`, `DEPEXP` | Fixed assets, accumulated depreciation, depreciation expense |
+
+### 12.4 Opening balances (only if migrating from another system)
+
+If the org has an existing book, post its trial balance as **opening balances**
+so reports tie out from day one:
+
+1. Make sure the target **accounting period is open** (§12.5).
+2. **Accounting → Post Opening Balances** — enter each GL's opening debit/credit.
+   The contra account **`OBE` (Opening Balance Equity)** absorbs the difference
+   and should net to **zero** once the full trial balance is entered.
+3. Verify **Reports → Trial Balance** shows `is_balanced = true` and `OBE` = 0.
+4. For **in-flight loans** being migrated, also load their repayment schedules
+   so outstanding balances, top-up carry-forward, payoff quotes and provisioning
+   compute correctly. (Loan interest already recognised in the old system stays
+   recognised; accrual is forward-looking — see the accrual note in §12.10.)
+
+### 12.5 Accounting periods (Period Close)
+
+1. **Period Close** → ensure the **current month's period is OPEN** before any
+   posting. Postings into a non-open period are rejected by the period guard.
+2. Establish the **month-end close routine** (see §12.10). Periods are closed
+   after all month-end runs and reconciliations; they can be reopened if a
+   correction is needed.
+
+### 12.6 Loan products, fees & penalties
+
+1. **Loan products** → create each product:
+   - **Interest method**: `flat_rate`, `reducing_balance`, or `amortized`.
+   - **Interest rate** — entered as the **monthly** rate (e.g. `0.05` = 5%/month).
+   - Tenure bounds, min/max principal, bank-statement mode if used.
+2. **Fees** (Fee Types + Product Fees) per product:
+   - For each fee set **calculation type** (flat / percentage), **value**,
+     **applies to** (`principal` or `gross_loan`), and **effect**:
+     `adds_to_gross` (customer repays it over the schedule) vs
+     `deducted_from_disbursement` (taken upfront from net disbursed).
+   - Map each fee to its **income GL** (e.g. admin fee → `AA`, management → `MFA`).
+3. **Penalty Rules** (Penalty Rules screen) per product:
+   - Grace-period days, **flat or percentage** value, optional max cap.
+   - **"Only penalise after the loan's maturity date"** — tick this if the org
+     only charges penalties once the *whole loan* matures (interim late
+     installments are flagged overdue but not penalised). This is also
+     available globally via `penalty.apply_after_maturity_only` (§12.7).
+
+### 12.7 Operational settings (Settings)
+
+Tune these to the org's policy. Defaults shown; all are live without redeploy.
+
+| Setting key | Default | Meaning |
+|---|---|---|
+| `approval.default_mode` | `sequential` | Default approval mode for new workflows |
+| `approval.conditional_routing_enabled` | `true` | Honour routing conditions (DSR etc.) |
+| `affordability.max_dsr` | `0.40` | DSR soft-limit flagged to reviewers / routable |
+| `penalty.default_grace_period_days` | `5` | Default grace when creating penalty rules |
+| `penalty.overdue_check_enabled` | `true` | Daily overdue detection on/off |
+| `penalty.apply_after_maturity_only` | `false` | Global "penalty only after maturity" |
+| `penalty.payment_allocation_order` | `["penalty","interest","principal"]` | Repayment allocation priority |
+| `topup.calc_method` | `principal_minus_current` | Top-up carry-forward rule (or `full_outstanding`) |
+| `loan.liquidation_charge_mode` | `subtotal_pct` | Payoff liquidation basis (`subtotal_pct`/`principal_pct`/`flat`) |
+| `loan.liquidation_charge_value` | `0.012` | Liquidation charge (1.2% of subtotal by default) |
+| `registration.require_approval` | `true` | Hold portal sign-ups for **2-level** staff approval |
+| `security.maker_checker_disbursement` | `true` | Require checker for disbursements |
+| `security.maker_checker_write_off` | `true` | Require checker for write-offs |
+| `security.maker_checker_reversal` | `true` | Require checker for reversals |
+| `security.maker_checker_gl_entry` | `false` | Require checker for manual journals |
+| `notification.email_enabled` / `sms_enabled` / `push_enabled` | `true` | Channel kill-switches |
+
+### 12.8 Approval workflows (Approval Workflows)
+
+For **each loan product**, build its approval pipeline:
+
+1. **Approval Workflows** → New → pick the product, set **mode** (sequential /
+   parallel), then add ordered **steps** (each tied to an approver **role**,
+   with optional SLA hours / auto-approve).
+2. Mark a step **Conditional** to keep it out of the always-on path, then add a
+   **Routing Condition** that injects it — e.g. `DSR > 0.4`, `amount >
+   5,000,000`, `loan_type = top_up`. Conditions evaluate on submission.
+3. Test: submit a sample loan that should and shouldn't trip the condition.
+
+### 12.9 Deposits, tax, vendors, assets
+
+- **Deposit Products** → create savings/current/term products: interest method
+  (`min_balance_monthly` / `daily_balance_monthly` / `none`), rate, minimum
+  balance, withdrawal policy, dormancy days. Then customers' **Deposit Accounts**
+  can be opened and **Interest Run** posts monthly deposit interest.
+- **Tax (VAT/WHT)** → review the seeded rates (VAT 7.5%, WHT 5% / 10%); add any
+  org-specific rates. These feed WHT-on-payment (Accounts Payable) and the tax
+  remittance flow.
+- **Accounts Payable** → add **Vendors** the org pays; capture/approve/pay
+  **Bills** (WHT withheld at payment when a rate is chosen).
+- **Fixed Assets** → register existing assets. For assets already on the books,
+  leave the funding GL blank (no acquisition posting); for new purchases set a
+  funding GL (e.g. `BANK`) so `DR Fixed Assets / CR <funding>` posts.
+- **Government Records** (if the org uses **agent** onboarding with government
+  verification) → import the government staff records agents must match against.
+  The **self-service portal** never checks government records — it serves any
+  individual, including the self-employed.
+
+### 12.10 Month-end operations routine
+
+Run this each accounting month (most are admin-triggered; the cron jobs in §7
+cover interest accrual and depreciation automatically — preview them first):
+
+1. **Provisions** → run loan-loss provisioning (CBN classification) as of month-end.
+2. **Interest Accrual** → preview, then post the month's loan-interest accrual
+   (also scheduled via cron; the screen lets you review/reverse).
+3. **Fixed Assets / Depreciation** → post the month's depreciation (also cron).
+4. **Interest Run** (deposits) → post deposit interest for the period.
+5. **Tax (VAT/WHT)** → review tax payable; **remit** to the authority.
+6. **Bank Reconciliation** → import each bank statement, auto/manual match,
+   confirm the difference is reconciled.
+7. **GL Reconciliation** / **Reconciliation** → confirm control accounts tie to
+   sub-ledgers (no orphan postings).
+8. **Reports** → review Trial Balance, Income Statement, Balance Sheet, Cash
+   Flow, Aged Receivables, PAR/NPL, and **CBN Returns**.
+9. **Period Close** → close the month once everything reconciles.
+
+### 12.11 Go-live verification (end-to-end)
+
+Before handing over, walk one full cycle on real config:
+
+1. **Customer** → register on the portal → verify email (OTP) → approve the
+   registration **twice** (two different staff) → confirm the **Verified badge**.
+2. **Loan** → apply (with employment + income) → confirm it routes through the
+   product's **approval workflow** (and trips any DSR condition) → **disburse**
+   (pick a real bank GL; if maker-checker is on, a checker approves) → confirm
+   the GL journal and repayment schedule.
+3. **Repayment** → post a repayment; confirm interest income is recognised.
+4. **Payoff** → open a loan's **Payoff**, verify the quote (remaining principal
+   + current interest + 1.2% liquidation + arrears), tick "I have made the
+   payment", choose **Full**, pick the payoff bank GL, confirm the loan closes.
+5. **Deposit** → open a deposit account, post a deposit and a withdrawal.
+6. **Accounting** → confirm Trial Balance is balanced after all of the above.
+
+---
+
+## 13. Per-client checklist (copy this into the client's ticket)
 
 - [ ] DNS records created (`<API_DOMAIN>` A, admin/portal CNAMEs)
 - [ ] aaPanel: PHP 8.2/8.3 + extensions, PostgreSQL, Redis installed
@@ -436,6 +644,20 @@ curl -sI https://<API_DOMAIN>/api/banks | head -1          # HTTP/2 200
 - [ ] Provider keys live (mail, SMS, Paystack, FCM) and test-sent
 - [ ] Smoke test passed (login, loan application, approval routing)
 - [ ] Firebase service-account JSON uploaded (if push needed)
+
+**Operational (§12) — business go-live:**
+- [ ] Branches, departments, teams, roles created; staff users assigned
+- [ ] General settings: company name, currency, support email
+- [ ] Chart of accounts reviewed/renamed; org bank GLs added; control accounts intact
+- [ ] Opening balances posted + OBE nets to zero (if migrating)
+- [ ] Current accounting period OPEN
+- [ ] Loan products + fees + penalty rules configured
+- [ ] Operational settings tuned (penalty, top-up, liquidation, maker-checker, registration approval)
+- [ ] Approval workflow per product (with any DSR/amount routing conditions)
+- [ ] Deposit products, tax rates, vendors, fixed assets set up as applicable
+- [ ] Government records imported (if agent onboarding is used)
+- [ ] Month-end routine documented with the operations team
+- [ ] End-to-end go-live test passed (register→approve→apply→disburse→repay→payoff; deposit; period close)
 
 ---
 
