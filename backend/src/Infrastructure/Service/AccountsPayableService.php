@@ -4,6 +4,8 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\Bill;
 use App\Domain\Entity\GeneralLedger;
+use App\Domain\Entity\TaxRate;
+use App\Domain\Entity\TaxTransaction;
 use App\Domain\Entity\Vendor;
 use App\Domain\Enum\JournalEntryType;
 use App\Domain\Enum\TransactionType;
@@ -109,8 +111,19 @@ final class AccountsPayableService
         }
     }
 
-    /** Pay (or part-pay) an approved bill from a funding account. */
-    public function payBill(string $billId, string $amount, ?string $fundingGlCode, string $paymentDate, ?string $userId): Bill
+    /**
+     * Pay (or part-pay) an approved bill from a funding account.
+     *
+     * When $whtRateCode is given, withholding tax is deducted from the
+     * vendor payment and raised as a Tax Payable liability:
+     *   DR Accruals & Payables (amount settled)
+     *   CR Bank                (net = amount − WHT)
+     *   CR Tax Payable         (WHT)
+     * The payable is discharged by the full $amount (WHT is paid to the
+     * authority on the vendor's behalf). A WHT TaxTransaction is recorded so
+     * it shows in the tax module and is tracked for remittance.
+     */
+    public function payBill(string $billId, string $amount, ?string $fundingGlCode, string $paymentDate, ?string $userId, ?string $whtRateCode = null): Bill
     {
         $bill = $this->bill($billId);
         if (!in_array($bill->getStatus(), ['approved', 'partially_paid'], true)) {
@@ -123,8 +136,30 @@ final class AccountsPayableService
         if (bccomp($amount, '0.00', 2) <= 0) throw new DomainException('Payment amount must be greater than zero');
         if (bccomp($amount, $bill->outstanding(), 2) > 0) throw new DomainException('Payment exceeds outstanding balance');
 
+        // Resolve withholding tax (optional).
+        $whtRate = '0.0000';
+        $wht = '0.00';
+        if ($whtRateCode !== null && $whtRateCode !== '') {
+            $rate = $this->em->getRepository(TaxRate::class)->findOneBy(['code' => $whtRateCode]);
+            if ($rate === null) throw new DomainException('WHT rate code not found');
+            if (strtoupper($rate->getType()) !== 'WHT') throw new DomainException('Selected rate is not a WHT rate');
+            $whtRate = $rate->getRate();
+            $wht = $this->money(bcmul($amount, $whtRate, 4));
+        }
+        $net = bcsub($amount, $wht, 2);
+        if (bccomp($net, '0.00', 2) <= 0) throw new DomainException('Withholding leaves no net payable to the vendor');
+
         $apGl = $this->gl('ACCRPAY');
         $fundGl = $this->gl($fundingGlCode !== null && $fundingGlCode !== '' ? $fundingGlCode : 'BANK');
+        $callback = 'AP-PAY-' . $bill->getBillNumber() . '-' . date('YmdHis');
+
+        $lines = [
+            ['gl' => $apGl, 'type' => TransactionType::DR, 'amount' => $amount, 'narration' => 'Settle payable - ' . $bill->getBillNumber()],
+            ['gl' => $fundGl, 'type' => TransactionType::CR, 'amount' => $net, 'narration' => 'Vendor payment - ' . $bill->getVendor()->getName()],
+        ];
+        if (bccomp($wht, '0.00', 2) > 0) {
+            $lines[] = ['gl' => $this->gl('TAXPAY'), 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT withheld - ' . $bill->getBillNumber()];
+        }
 
         $this->em->beginTransaction();
         try {
@@ -133,13 +168,29 @@ final class AccountsPayableService
                 postingDate: $paymentDate,
                 narration: 'Bill payment — ' . $bill->getVendor()->getName() . ' #' . $bill->getBillNumber(),
                 postedBy: $userId,
-                lines: [
-                    ['gl' => $apGl, 'type' => TransactionType::DR, 'amount' => $amount, 'narration' => 'Settle payable - ' . $bill->getBillNumber()],
-                    ['gl' => $fundGl, 'type' => TransactionType::CR, 'amount' => $amount, 'narration' => 'Vendor payment - ' . $bill->getVendor()->getName()],
-                ],
-                legacyCallback: 'AP-PAY-' . $bill->getBillNumber() . '-' . date('YmdHis'),
+                lines: $lines,
+                legacyCallback: $callback,
                 reference: $bill->getBillNumber(),
             );
+
+            // Record the WHT for the tax module (the journal above already
+            // posted the CR Tax Payable — this row is the reporting record).
+            if (bccomp($wht, '0.00', 2) > 0) {
+                $t = new TaxTransaction();
+                $t->setKind('WHT');
+                $t->setBaseAmount($amount);
+                $t->setRate($whtRate);
+                $t->setTaxAmount($wht);
+                $t->setParty($bill->getVendor()->getName());
+                $t->setReference($bill->getBillNumber());
+                $t->setTxnDate(new \DateTimeImmutable($paymentDate));
+                $t->setPeriodYear(substr($paymentDate, 0, 4));
+                $t->setPeriodMonth(substr($paymentDate, 5, 2));
+                $t->setCallbackRef($callback);
+                $t->setCreatedBy($userId);
+                $this->em->persist($t);
+            }
+
             $newPaid = bcadd($bill->getAmountPaid(), $amount, 2);
             $bill->setAmountPaid($newPaid);
             $bill->setStatus(bccomp($newPaid, $bill->getAmount(), 2) >= 0 ? 'paid' : 'partially_paid');

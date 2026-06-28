@@ -71,6 +71,7 @@ final class BillsAction
                 isset($b['funding_gl_code']) ? (string) $b['funding_gl_code'] : null,
                 (string) ($b['payment_date'] ?? date('Y-m-d')),
                 $userId,
+                isset($b['wht_rate_code']) ? (string) $b['wht_rate_code'] : null,
             );
         } catch (\App\Domain\Exception\DomainException $e) {
             return $this->error($e->getMessage(), 400);

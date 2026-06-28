@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -61,7 +61,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
                   <td class="r">
                     @if (auth.hasPermission('accounting.journal')) {
                       @if (b.status === 'draft') { <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="approve(b)">Approve</button> }
-                      @if (b.status === 'approved' || b.status === 'partially_paid') { <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="pay(b)">Pay</button> }
+                      @if (b.status === 'approved' || b.status === 'partially_paid') { <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="openPay(b)">Pay</button> }
                     }
                   </td>
                 </tr>
@@ -93,6 +93,30 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
               }
             </tbody>
           </table>
+        </div>
+      }
+
+      <!-- Pay modal (with optional WHT) -->
+      @if (payTarget(); as b) {
+        <div class="cx-ap-modal-backdrop" (click)="payTarget.set(null)">
+          <div class="cx-ap-modal" (click)="$event.stopPropagation()">
+            <h3 class="cx-ap-modal-title">Pay {{ b.vendor_name }} — #{{ b.bill_number }}</h3>
+            <label class="cx-label">Amount to settle (outstanding {{ b.outstanding | money:2 }})</label>
+            <input type="number" class="cx-input" [(ngModel)]="payForm.amount" />
+            <label class="cx-label">Withholding tax (optional)</label>
+            <select class="cx-select" [(ngModel)]="payForm.wht_rate_code">
+              <option [ngValue]="''">No WHT</option>
+              @for (r of whtRates(); track r.id) { <option [ngValue]="r.code">{{ r.name }} ({{ r.rate_pct }}%)</option> }
+            </select>
+            <div class="cx-ap-net">
+              WHT: <span class="tabular-nums">{{ whtAmount() | money:2 }}</span> ·
+              Net to vendor: <span class="tabular-nums">{{ netAmount() | money:2 }}</span>
+            </div>
+            <div class="cx-ap-modal-actions">
+              <button class="cx-btn cx-btn-ghost" (click)="payTarget.set(null)">Cancel</button>
+              <button class="cx-btn cx-btn-primary" (click)="submitPay()" [disabled]="busy()">Post Payment</button>
+            </div>
+          </div>
         </div>
       }
 
@@ -133,6 +157,13 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
     .cx-ap-al { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--cx-text-muted); }
     .cx-ap-av { font-size: 15px; font-weight: 600; }
     @media (max-width: 800px) { .cx-ap-aging { grid-template-columns: repeat(3, 1fr); } }
+
+    .cx-ap-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .cx-ap-modal { background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-xl, 12px);
+      padding: 20px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }
+    .cx-ap-modal-title { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+    .cx-ap-net { font-size: 13px; color: var(--cx-text-secondary); margin-top: 6px; }
+    .cx-ap-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
   `],
 })
 export class AccountsPayableComponent {
@@ -144,9 +175,29 @@ export class AccountsPayableComponent {
   vendorForm: any = { name: '', contact_email: '', bank_account: '', bank_name: '' };
   billForm: any = { vendor_id: '', bill_number: '', bill_date: new Date().toISOString().slice(0, 10), due_date: new Date().toISOString().slice(0, 10), expense_gl_code: 'GENADMIN', amount: 0 };
 
+  // Pay modal + WHT
+  whtRates = signal<any[]>([]);
+  payTarget = signal<any>(null);
+  payForm: any = { amount: 0, wht_rate_code: '' };
+  whtAmount = computed(() => {
+    const code = this.payForm.wht_rate_code;
+    const rate = this.whtRates().find(r => r.code === code);
+    const amt = Number(this.payForm.amount) || 0;
+    return rate ? +(amt * Number(rate.rate)).toFixed(2) : 0;
+  });
+  netAmount = computed(() => +((Number(this.payForm.amount) || 0) - this.whtAmount()).toFixed(2));
+
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {
     this.loadVendors();
     this.loadBills();
+    this.loadWhtRates();
+  }
+
+  loadWhtRates() {
+    this.api.get('/accounting/tax/rates', {}).subscribe({
+      next: r => this.whtRates.set((r.data?.rates || []).filter((x: any) => x.type === 'WHT')),
+      error: () => {},
+    });
   }
 
   pretty(s: string): string {
@@ -180,12 +231,22 @@ export class AccountsPayableComponent {
     });
   }
 
-  pay(b: any) {
-    const amount = prompt(`Pay ${b.vendor_name} bill ${b.bill_number}. Outstanding ${b.outstanding}. Amount:`, b.outstanding);
-    if (amount === null) return;
-    this.api.post(`/accounting/bills/${b.id}/pay`, { amount, payment_date: new Date().toISOString().slice(0, 10) }).subscribe({
-      next: () => { this.toast.success('Payment posted'); this.loadBills(); },
-      error: e => this.toast.error(e.error?.message || 'Payment failed'),
+  openPay(b: any) {
+    this.payForm = { amount: Number(b.outstanding) || 0, wht_rate_code: '' };
+    this.payTarget.set(b);
+  }
+
+  submitPay() {
+    const b = this.payTarget();
+    if (!b) return;
+    this.busy.set(true);
+    this.api.post(`/accounting/bills/${b.id}/pay`, {
+      amount: this.payForm.amount,
+      wht_rate_code: this.payForm.wht_rate_code || null,
+      payment_date: new Date().toISOString().slice(0, 10),
+    }).subscribe({
+      next: () => { this.busy.set(false); this.payTarget.set(null); this.toast.success('Payment posted'); this.loadBills(); },
+      error: e => { this.busy.set(false); this.toast.error(e.error?.message || 'Payment failed'); },
     });
   }
 }
