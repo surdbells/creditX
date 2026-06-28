@@ -72,6 +72,10 @@ class InterestAccrualRun
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
     private string $totalSuspended = '0.00';
 
+    /** Previously-recognised income reclassified to suspense on NPL slip. */
+    #[ORM\Column(name: 'total_reclassified', type: 'decimal', precision: 15, scale: 2)]
+    private string $totalReclassified = '0.00';
+
     #[ORM\Column(type: 'integer')]
     private int $loanCount = 0;
 
@@ -117,6 +121,8 @@ class InterestAccrualRun
     public function setTotalIncomeAccrued(string $v): void { $this->totalIncomeAccrued = $v; }
     public function getTotalSuspended(): string { return $this->totalSuspended; }
     public function setTotalSuspended(string $v): void { $this->totalSuspended = $v; }
+    public function getTotalReclassified(): string { return $this->totalReclassified; }
+    public function setTotalReclassified(string $v): void { $this->totalReclassified = $v; }
     public function getLoanCount(): int { return $this->loanCount; }
     public function setLoanCount(int $v): void { $this->loanCount = $v; }
     public function getNotes(): ?string { return $this->notes; }
@@ -155,6 +161,7 @@ class InterestAccrualRun
             'callback_ref'         => $this->callbackRef,
             'total_income_accrued' => $this->totalIncomeAccrued,
             'total_suspended'      => $this->totalSuspended,
+            'total_reclassified'   => $this->totalReclassified,
             'loan_count'           => $this->loanCount,
             'notes'                => $this->notes,
             'created_by'           => $this->createdBy,

@@ -55,6 +55,14 @@ class InterestAccrualLine
     #[ORM\Column(type: 'string', length: 36, nullable: true)]
     private ?string $customerLedgerId = null;
 
+    /**
+     * Previously-recognised interest moved out of income into suspense when
+     * this loan crossed into NPL (DR Interest Income / CR Interest in
+     * Suspense). Distinct from the period's own suspended accrual.
+     */
+    #[ORM\Column(name: 'reclassified_to_suspense', type: 'decimal', precision: 15, scale: 2)]
+    private string $reclassifiedToSuspense = '0.00';
+
     public function __construct() { $this->id = Uuid::uuid4()->toString(); }
 
     public function getId(): string { return $this->id; }
@@ -74,6 +82,8 @@ class InterestAccrualLine
     public function setDaysOverdueSnapshot(int $v): void { $this->daysOverdueSnapshot = $v; }
     public function getCustomerLedgerId(): ?string { return $this->customerLedgerId; }
     public function setCustomerLedgerId(?string $v): void { $this->customerLedgerId = $v; }
+    public function getReclassifiedToSuspense(): string { return $this->reclassifiedToSuspense; }
+    public function setReclassifiedToSuspense(string $v): void { $this->reclassifiedToSuspense = $v; }
 
     public function toArray(): array
     {
@@ -87,6 +97,7 @@ class InterestAccrualLine
             'classification'    => $this->classification,
             'days_overdue'      => $this->daysOverdueSnapshot,
             'customer_ledger_id'=> $this->customerLedgerId,
+            'reclassified_to_suspense' => $this->reclassifiedToSuspense,
         ];
     }
 }

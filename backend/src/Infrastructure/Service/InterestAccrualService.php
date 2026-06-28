@@ -51,6 +51,7 @@ final class InterestAccrualService
         private readonly EntityManagerInterface $em,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly \App\Domain\Repository\LedgerTransactionRepository $ledgerTxnRepo,
     ) {}
 
     /**
@@ -72,12 +73,14 @@ final class InterestAccrualService
 
         $income = '0.00';
         $suspended = '0.00';
+        $reclassified = '0.00';
         foreach ($lines as $l) {
             if ($l['suspended']) {
                 $suspended = bcadd($suspended, $l['interest_accrued'], 2);
             } else {
                 $income = bcadd($income, $l['interest_accrued'], 2);
             }
+            $reclassified = bcadd($reclassified, $l['reclass_amount'] ?? '0.00', 2);
         }
 
         return [
@@ -85,10 +88,11 @@ final class InterestAccrualService
             'posting_date' => $postingDate,
             'lines'        => $lines,
             'summary'      => [
-                'loan_count'      => count($lines),
-                'total_income'    => $income,
-                'total_suspended' => $suspended,
-                'total'           => bcadd($income, $suspended, 2),
+                'loan_count'         => count($lines),
+                'total_income'       => $income,
+                'total_suspended'    => $suspended,
+                'total_reclassified' => $reclassified,
+                'total'              => bcadd($income, $suspended, 2),
             ],
         ];
     }
@@ -133,9 +137,11 @@ final class InterestAccrualService
 
             $totalIncome = '0.00';
             $totalSuspended = '0.00';
+            $totalReclassified = '0.00';
             $journalLines = [];
 
             foreach ($lines as $l) {
+                $reclass = $l['reclass_amount'] ?? '0.00';
                 $line = new InterestAccrualLine();
                 $line->setLoan($this->em->getReference(Loan::class, $l['loan_id']));
                 $line->setApplicationIdSnapshot($l['application_id']);
@@ -144,8 +150,11 @@ final class InterestAccrualService
                 $line->setClassification($l['classification']);
                 $line->setDaysOverdueSnapshot($l['days_overdue']);
                 $line->setCustomerLedgerId($l['customer_ledger_id']);
+                $line->setReclassifiedToSuspense($reclass);
                 $run->addLine($line);
                 $this->em->persist($line);
+
+                $totalReclassified = bcadd($totalReclassified, $reclass, 2);
 
                 // DR Interest Receivable, tagged to the loan's customer
                 // ledger so repayments can clear it precisely.
@@ -172,6 +181,7 @@ final class InterestAccrualService
 
             $run->setTotalIncomeAccrued($totalIncome);
             $run->setTotalSuspended($totalSuspended);
+            $run->setTotalReclassified($totalReclassified);
             $run->setLoanCount(count($lines));
 
             // Aggregate credit side: income to II, suspended to INTSUSP.
@@ -183,8 +193,17 @@ final class InterestAccrualService
                 $journalLines[] = ['gl' => $intSusp, 'type' => TransactionType::CR,
                     'amount' => $totalSuspended, 'narration' => "Interest suspended on NPLs — {$year}-{$month}"];
             }
+            // NPL reclassification: move previously-recognised uncollected
+            // interest out of income into suspense (self-balancing pair).
+            if (bccomp($totalReclassified, '0.00', 2) > 0) {
+                $journalLines[] = ['gl' => $income, 'type' => TransactionType::DR,
+                    'amount' => $totalReclassified, 'narration' => "Interest income reclassified to suspense (NPL) — {$year}-{$month}"];
+                $journalLines[] = ['gl' => $intSusp, 'type' => TransactionType::CR,
+                    'amount' => $totalReclassified, 'narration' => "Suspense raised on NPL slip — {$year}-{$month}"];
+            }
 
-            if (!empty($journalLines) && bccomp(bcadd($totalIncome, $totalSuspended, 2), '0.00', 2) > 0) {
+            $journalTotal = bcadd(bcadd($totalIncome, $totalSuspended, 2), $totalReclassified, 2);
+            if (!empty($journalLines) && bccomp($journalTotal, '0.00', 2) > 0) {
                 $callback = 'ACCR-' . $year . $month . '-' . bin2hex(random_bytes(4));
                 $run->setCallbackRef($callback);
                 $this->ledgerService->postJournal(
@@ -324,18 +343,44 @@ final class InterestAccrualService
         $loanIds = array_column($rows, 'loan_id');
         $dpd = $this->daysPastDue($loanIds, $postingDate);
 
+        // GLs needed for the NPL reclassification calc below.
+        $intRecvId = $this->resolveGl('INTRECV', 'Interest Receivable')->getId();
+        $intSuspId = $this->resolveGl('INTSUSP', 'Interest in Suspense')->getId();
+
         $out = [];
         foreach ($rows as $r) {
             $loanDpd = $dpd[$r['loan_id']] ?? 0;
             $suspended = $loanDpd >= self::NPL_DPD_THRESHOLD;
+            $clId = $r['customer_ledger_id'] ?: null;
+
+            // NPL reclassification: when a loan is non-performing, any
+            // interest previously RECOGNISED to income but not yet collected
+            // should be moved into suspense. Per loan that is:
+            //   reclass = (INTRECV balance − INTSUSP balance)
+            // i.e. the receivable that isn't already suspended. The formula
+            // self-limits — once reclassified it's ~0, so re-running on a
+            // still-NPL loan is a no-op, and it re-captures fresh recognised
+            // interest if a loan recovers then slips again. Computed on PRIOR
+            // balances (this period's accrual isn't posted yet).
+            $reclass = '0.00';
+            if ($suspended && $clId !== null) {
+                $recv = $this->ledgerTxnRepo->getGlSumForCustomerLedger($intRecvId, $clId);
+                $susp = $this->ledgerTxnRepo->getGlSumForCustomerLedger($intSuspId, $clId);
+                $recvBal = bcsub($recv['total_dr'], $recv['total_cr'], 2); // asset DR−CR
+                $suspBal = bcsub($susp['total_cr'], $susp['total_dr'], 2); // contra CR−DR
+                $reclass = bcsub($recvBal, $suspBal, 2);
+                if (bccomp($reclass, '0.00', 2) < 0) $reclass = '0.00';
+            }
+
             $out[] = [
                 'loan_id'            => $r['loan_id'],
                 'application_id'     => $r['application_id'],
-                'customer_ledger_id' => $r['customer_ledger_id'] ?: null,
+                'customer_ledger_id' => $clId,
                 'interest_accrued'  => number_format((float) $r['interest_due'], 2, '.', ''),
                 'days_overdue'      => $loanDpd,
                 'suspended'         => $suspended,
                 'classification'    => $this->classify($loanDpd),
+                'reclass_amount'    => $reclass,
             ];
         }
         return $out;

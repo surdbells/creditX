@@ -64,6 +64,10 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
             <div class="cx-ia-summary-value tabular-nums cx-ia-susp">{{ r.summary.total_suspended | money:2 }}</div>
           </div>
           <div class="cx-ia-summary-cell">
+            <div class="cx-ia-summary-label">Reclassified (NPL)</div>
+            <div class="cx-ia-summary-value tabular-nums cx-ia-susp">{{ r.summary.total_reclassified | money:2 }}</div>
+          </div>
+          <div class="cx-ia-summary-cell">
             <div class="cx-ia-summary-label">Posting Date</div>
             <div class="cx-ia-summary-value">{{ r.posting_date }}</div>
           </div>
@@ -171,7 +175,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
     .cx-ia-actions { display: flex; gap: 8px; margin-left: auto; }
 
     .cx-ia-summary {
-      display: grid; grid-template-columns: repeat(4, 1fr);
+      display: grid; grid-template-columns: repeat(5, 1fr);
       gap: 10px; padding: 12px 16px; margin-bottom: 14px;
       background: var(--cx-surface); border: 1px solid var(--cx-border);
       border-radius: var(--cx-radius-md);

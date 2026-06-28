@@ -328,6 +328,7 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(LedgerTransactionRepository::class),
         );
     },
     \App\Infrastructure\Service\BankReconciliationService::class => function (ContainerInterface $c): \App\Infrastructure\Service\BankReconciliationService {
