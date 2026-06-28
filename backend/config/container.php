@@ -342,6 +342,7 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(LedgerTransactionRepository::class),
         );
     },
     BulkRepaymentService::class => function (ContainerInterface $c): BulkRepaymentService {

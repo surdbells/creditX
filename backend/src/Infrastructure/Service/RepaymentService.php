@@ -18,6 +18,7 @@ use App\Domain\Enum\TransactionType;
 use App\Domain\Exception\DomainException;
 use App\Domain\Repository\CustomerLedgerRepository;
 use App\Domain\Repository\GeneralLedgerRepository;
+use App\Domain\Repository\LedgerTransactionRepository;
 use App\Domain\Repository\RepaymentScheduleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -31,6 +32,7 @@ final class RepaymentService
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly LedgerTransactionRepository $ledgerTxnRepo,
     ) {
     }
 
@@ -71,6 +73,27 @@ final class RepaymentService
         if ($lrGl === null) {
             throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
         }
+
+        // Interest Income — recognised when interest is collected (cash
+        // basis) OR cleared from Interest Receivable when it was already
+        // accrued. Required: without crediting II, loan interest income
+        // never reaches the GL and LR drifts negative by the interest
+        // collected over the life of the loan.
+        $iiGl = $this->glRepo->findByCode('II');
+        if ($iiGl === null) {
+            throw new DomainException('Interest Income GL (II) not found. Run seeder.');
+        }
+
+        // Accrual-basis support (optional). When the interest-accrual
+        // engine has posted DR INTRECV / CR II for this loan, a repayment
+        // clears the receivable rather than recognising income twice.
+        // INTSUSP holds accrued interest on non-performing loans that was
+        // NOT taken to income; collecting it releases the suspense to
+        // income. Both GLs are nullable — if a tenant hasn't seeded them,
+        // we fall back to pure cash-basis recognition (CR II for all
+        // interest), which is still correct, just not time-apportioned.
+        $intRecvGl = $this->glRepo->findByCode('INTRECV');
+        $intSuspGl = $this->glRepo->findByCode('INTSUSP');
 
         $this->em->beginTransaction();
 
@@ -136,39 +159,92 @@ final class RepaymentService
 
             $this->em->persist($payment);
 
-            // Phase-2.5 D.2: post the repayment journal via the helper.
-            // Two lines: DR Bank (cash in) and CR Loan Receivable
-            // (asset reduction).
+            // Post the repayment journal, splitting cash received into
+            // its principal and interest components so interest income is
+            // recognised in the GL.
             //
-            // We deliberately do NOT also touch CUBGL here. CUBGL
-            // nets to zero per-customer at disbursement (see
-            // DisbursementService steps 2-5); touching it here would
-            // make it go negative. The UI reads outstanding balances
-            // from repayment_schedules (see loan detail page), not
-            // from CUBGL, so the per-customer ledger view stays
-            // coherent without a repayment-side CUBGL posting.
+            //   DR Bank                    (cash in, full amount)
+            //   CR Loan Receivable (LR)    principal portion (+ any
+            //                              unallocated overpayment)
+            //   CR Interest Receivable     interest already accrued for
+            //     (INTRECV)                this loan — clears the asset
+            //   CR Interest Income (II)    interest not yet accrued —
+            //                              recognised now on a cash basis
             //
-            // The customerLedger field on the CR line is preserved so
-            // per-customer repayment history still threads through
-            // the Journal view filtered by customer, even though the
-            // GL account is now LR rather than CUBGL.
+            // If the loan was non-performing, some of the cleared interest
+            // was parked in Interest-in-Suspense (INTSUSP) rather than
+            // income; collecting it releases the suspense to income:
+            //   DR Interest in Suspense / CR Interest Income.
+            //
+            // CUBGL is deliberately untouched here (it nets to zero per
+            // customer at disbursement; the UI reads outstanding balances
+            // from repayment_schedules). The customerLedger tag is kept on
+            // the LR/INTRECV/INTSUSP lines so per-customer history still
+            // threads through the Journal view filtered by customer.
             $callback = 'REPAY-' . $payment->getReference();
             $narration = 'REPAYMENT - ' . $loan->getCustomer()->getFullName();
+
+            // Overpayment beyond all pending schedules: treat as extra
+            // principal paydown on LR (matches the prior behaviour of
+            // crediting LR with the whole payment).
+            $principalCredit = bcadd($totalPrincipal, $remaining, 2);
+
+            // How much interest was already accrued (and is still
+            // uncollected) for THIS loan? Clear that from INTRECV; the
+            // remainder is recognised straight to income.
+            $intRecvBalance = '0.00';
+            $intSuspBalance = '0.00';
+            if ($intRecvGl !== null) {
+                $r = $this->ledgerTxnRepo->getGlSumForCustomerLedger($intRecvGl->getId(), $customerLedger->getId());
+                $intRecvBalance = bcsub($r['total_dr'], $r['total_cr'], 2); // asset: DR − CR
+            }
+            if ($intSuspGl !== null) {
+                $s = $this->ledgerTxnRepo->getGlSumForCustomerLedger($intSuspGl->getId(), $customerLedger->getId());
+                $intSuspBalance = bcsub($s['total_cr'], $s['total_dr'], 2); // contra-asset: CR − DR
+            }
+            if (bccomp($intRecvBalance, '0.00', 2) < 0) $intRecvBalance = '0.00';
+            if (bccomp($intSuspBalance, '0.00', 2) < 0) $intSuspBalance = '0.00';
+
+            $interestCleared = bccomp($totalInterest, $intRecvBalance, 2) <= 0 ? $totalInterest : $intRecvBalance;
+            $interestToIncome = bcsub($totalInterest, $interestCleared, 2); // not-yet-accrued → cash basis
+            $suspenseRelease = bccomp($interestCleared, $intSuspBalance, 2) <= 0 ? $interestCleared : $intSuspBalance;
+
+            $lines = [
+                ['gl' => $bankGl, 'type' => TransactionType::DR,
+                    'amount' => $amount, 'narration' => $narration,
+                    'isRepayment' => true],
+            ];
+            if (bccomp($principalCredit, '0.00', 2) > 0) {
+                $lines[] = ['gl' => $lrGl, 'customerLedger' => $customerLedger,
+                    'type' => TransactionType::CR, 'amount' => $principalCredit,
+                    'narration' => 'PRINCIPAL REPAYMENT', 'isRepayment' => true];
+            }
+            if ($intRecvGl !== null && bccomp($interestCleared, '0.00', 2) > 0) {
+                $lines[] = ['gl' => $intRecvGl, 'customerLedger' => $customerLedger,
+                    'type' => TransactionType::CR, 'amount' => $interestCleared,
+                    'narration' => 'ACCRUED INTEREST COLLECTED', 'isRepayment' => true];
+            }
+            if (bccomp($interestToIncome, '0.00', 2) > 0) {
+                $lines[] = ['gl' => $iiGl, 'type' => TransactionType::CR,
+                    'amount' => $interestToIncome, 'narration' => 'INTEREST INCOME (CASH BASIS)',
+                    'isRepayment' => true];
+            }
+            // Release suspended interest to income on collection (self-
+            // balancing pair, independent of the cash side above).
+            if ($intSuspGl !== null && bccomp($suspenseRelease, '0.00', 2) > 0) {
+                $lines[] = ['gl' => $intSuspGl, 'customerLedger' => $customerLedger,
+                    'type' => TransactionType::DR, 'amount' => $suspenseRelease,
+                    'narration' => 'INTEREST IN SUSPENSE RELEASED'];
+                $lines[] = ['gl' => $iiGl, 'type' => TransactionType::CR,
+                    'amount' => $suspenseRelease, 'narration' => 'SUSPENDED INTEREST RECOGNISED ON COLLECTION'];
+            }
 
             $this->ledgerService->postJournal(
                 entryType: JournalEntryType::REPAYMENT,
                 postingDate: date('Y-m-d'),
                 narration: $narration,
                 postedBy: $userId,
-                lines: [
-                    ['gl' => $bankGl, 'type' => TransactionType::DR,
-                        'amount' => $amount, 'narration' => $narration,
-                        'isRepayment' => true],
-                    ['gl' => $lrGl, 'customerLedger' => $customerLedger,
-                        'type' => TransactionType::CR,
-                        'amount' => $amount, 'narration' => 'REPAYMENT RECEIVED',
-                        'isRepayment' => true],
-                ],
+                lines: $lines,
                 legacyCallback: $callback,
                 reference: $payment->getReference(),
             );

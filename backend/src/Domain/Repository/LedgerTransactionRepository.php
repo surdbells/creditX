@@ -68,4 +68,29 @@ class LedgerTransactionRepository extends BaseRepository
     {
         return $this->findBy(['customerLedger' => $customerLedgerId], ['createdAt' => 'DESC']);
     }
+
+    /**
+     * Sum DR/CR for a specific GL account scoped to one customer ledger
+     * (sub-ledger). Used by RepaymentService to read a single loan's
+     * accrued-but-uncollected Interest Receivable (INTRECV) and
+     * Interest-in-Suspense (INTSUSP) balances so a repayment can clear
+     * exactly what was accrued for that loan.
+     *
+     * @return array{total_dr: string, total_cr: string}
+     */
+    public function getGlSumForCustomerLedger(string $glId, string $customerLedgerId): array
+    {
+        $qb = $this->em->createQueryBuilder()->select(
+            "SUM(CASE WHEN t.transType = 'CR' THEN t.transAmount ELSE 0 END) as total_cr",
+            "SUM(CASE WHEN t.transType = 'DR' THEN t.transAmount ELSE 0 END) as total_dr",
+        )->from(LedgerTransaction::class, 't')
+            ->where('t.generalLedger = :glId')->setParameter('glId', $glId)
+            ->andWhere('t.customerLedger = :clId')->setParameter('clId', $customerLedgerId);
+
+        $result = $qb->getQuery()->getSingleResult();
+        return [
+            'total_dr' => number_format((float) ($result['total_dr'] ?? 0), 2, '.', ''),
+            'total_cr' => number_format((float) ($result['total_cr'] ?? 0), 2, '.', ''),
+        ];
+    }
 }

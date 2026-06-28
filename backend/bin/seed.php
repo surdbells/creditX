@@ -449,6 +449,8 @@ $glDef = [
     ['Fixed Assets', '1008', 'FIXASSET', AccountType::ASSET, LedgerType::GENERAL, 'Property, plant and equipment at cost'],
     ['Accumulated Depreciation', '1009', 'ACCDEP', AccountType::ASSET, LedgerType::GENERAL, 'Contra-asset; accumulated depreciation on fixed assets (CR-normal)'],
     ['Suspense / Inter-branch', '1010', 'SUSPENSE', AccountType::ASSET, LedgerType::GENERAL, 'Temporary holding / inter-branch settlement account'],
+    ['Interest Receivable', '1011', 'INTRECV', AccountType::ASSET, LedgerType::GENERAL, 'Accrued but uncollected loan interest (accrual basis)'],
+    ['Interest in Suspense', '1012', 'INTSUSP', AccountType::ASSET, LedgerType::GENERAL, 'Contra-asset; accrued interest on non-performing loans not taken to income (CR-normal)'],
     // ── Liabilities (2xxx) ──
     ['Top-Up Balance', '2001', 'TUGL', AccountType::LIABILITY, LedgerType::GENERAL, 'Previous loan balance carried forward'],
     ['Customer Deposits', '2002', 'CUSTDEP', AccountType::LIABILITY, LedgerType::GENERAL, 'Customer savings / deposit liabilities (control account; subsidiary ledger is deposit_accounts)'],
