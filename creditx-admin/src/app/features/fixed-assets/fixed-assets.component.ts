@@ -130,6 +130,18 @@ export class FixedAssetsComponent {
   }
 
   create() {
+    // Guard: a positive-cost asset with no funding GL is NOT capitalised to
+    // the GL (no acquisition journal). That's correct for assets already on
+    // the books (opening balances), but a likely mistake for a new purchase.
+    if ((Number(this.form.cost) || 0) > 0 && !this.form.funding_gl_code) {
+      const ok = confirm(
+        'No funding GL set — the acquisition will NOT be posted to the general ledger ' +
+        '(the asset is only added to the register for depreciation).\n\n' +
+        'Use this only for assets already on your books. For a new purchase, set the ' +
+        'funding GL (e.g. BANK) so DR Fixed Assets / CR <funding> is posted.\n\nContinue without posting?'
+      );
+      if (!ok) return;
+    }
     this.busy.set(true);
     this.api.post('/accounting/fixed-assets', this.form).subscribe({
       next: () => { this.busy.set(false); this.toast.success('Registered'); this.form.name = ''; this.form.cost = 0; this.load(); },
