@@ -23,6 +23,7 @@ use App\Infrastructure\Service\LedgerTransactionEnricher;
 use App\Infrastructure\Service\PeriodCloseService;
 use App\Infrastructure\Service\PeriodGuardService;
 use App\Infrastructure\Service\ProvisionService;
+use App\Infrastructure\Service\InterestAccrualService;
 use App\Infrastructure\Service\RepaymentService;
 use App\Infrastructure\Service\BulkRepaymentService;
 use App\Infrastructure\Service\DocumentService;
@@ -317,6 +318,13 @@ return [
     },
     ProvisionService::class => function (ContainerInterface $c): ProvisionService {
         return new ProvisionService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
+    InterestAccrualService::class => function (ContainerInterface $c): InterestAccrualService {
+        return new InterestAccrualService(
             $c->get(EntityManagerInterface::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),

@@ -35,4 +35,5 @@ enum JournalEntryType: string
     case CLOSE        = 'CLOSE';
     case REVERSAL     = 'REVERSAL';
     case MANUAL       = 'MANUAL';
+    case INTEREST_ACCRUAL = 'INTEREST_ACCRUAL';
 }

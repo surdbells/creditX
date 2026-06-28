@@ -416,6 +416,21 @@ return function (App $app): void {
         $api->post('/accounting/provisions/runs/{id}/reverse', Accounting\ReverseProvisionRunAction::class)
             ->add(new RbacMiddleware('accounting.provision'));
 
+        // ─── Accounting — Loan interest accrual ───
+        // Accrual-basis recognition of loan interest income. Preview is a
+        // read-only sandbox; a run posts DR Interest Receivable / CR
+        // Interest Income (or Interest in Suspense for NPLs) for the period.
+        $api->get('/reports/interest-accrual/preview', Accounting\PreviewInterestAccrualAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->get('/accounting/interest-accrual/runs', Accounting\ListInterestAccrualRunsAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->post('/accounting/interest-accrual/runs', Accounting\RunInterestAccrualAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->get('/accounting/interest-accrual/runs/{id}', Accounting\GetInterestAccrualRunAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+        $api->post('/accounting/interest-accrual/runs/{id}/reverse', Accounting\ReverseInterestAccrualRunAction::class)
+            ->add(new RbacMiddleware('accounting.provision'));
+
         // ─── Deposits (deposit-taking MFB) ───
         // Deposit products (templates) carry the per-product interest
         // accrual method and withdrawal policy. Product reads are gated
