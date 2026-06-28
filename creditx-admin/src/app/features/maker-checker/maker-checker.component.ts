@@ -1017,6 +1017,8 @@ export class MakerCheckerComponent implements OnInit {
 
   prettyOperationType(type: string | null | undefined): string {
     if (!type) return '—';
+    const labels: Record<string, string> = { gl_entry: 'Manual Journal' };
+    if (labels[type]) return labels[type];
     return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   }
 

@@ -40,6 +40,7 @@ final class MakerCheckerExecutionService
         private readonly LoanLifecycleService $lifecycleService,
         private readonly LoanRepository $loanRepo,
         private readonly EntityManagerInterface $em,
+        private readonly ManualJournalService $manualJournalService,
     ) {}
 
     /**
@@ -59,10 +60,42 @@ final class MakerCheckerExecutionService
             'disbursement' => $this->executeDisbursement($payload, $checker),
             'reversal'     => $this->executeReversal($payload, $checker),
             'write_off'    => $this->executeWriteOff($payload, $checker),
+            'gl_entry'     => $this->executeManualJournal($payload, $checker),
             default => throw new DomainException(
                 "Maker-checker execution not implemented for operation type: {$opType}"
             ),
         };
+    }
+
+    /**
+     * Execute a pending manual GL journal once the checker approves.
+     *
+     * The full journal is re-validated at execution time by
+     * ManualJournalService::post() — period still open, GLs still active,
+     * still balanced — so an approval that lands after the period closed
+     * (or a GL was deactivated) fails cleanly rather than posting a bad
+     * entry. The checker becomes the attributed poster.
+     *
+     * Expected payload keys (matches CreateManualJournalAction's capture):
+     *   - posting_date
+     *   - narration
+     *   - reference (optional)
+     *   - lines   (array of {gl_id, type, amount, ...})
+     */
+    private function executeManualJournal(array $payload, User $checker): array
+    {
+        $lines = $payload['lines'] ?? null;
+        if (!is_array($lines) || count($lines) < 2) {
+            throw new DomainException('Maker-checker payload missing journal lines');
+        }
+        $journal = $this->manualJournalService->post(
+            (string) ($payload['posting_date'] ?? ''),
+            (string) ($payload['narration'] ?? ''),
+            isset($payload['reference']) && $payload['reference'] !== '' ? (string) $payload['reference'] : null,
+            $lines,
+            $checker->getId(),
+        );
+        return $journal->toArray();
     }
 
     /**

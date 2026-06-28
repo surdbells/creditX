@@ -442,6 +442,7 @@ return [
             $c->get(LoanLifecycleService::class),
             $c->get(LoanRepository::class),
             $c->get(EntityManagerInterface::class),
+            $c->get(\App\Infrastructure\Service\ManualJournalService::class),
         );
     },
 ];
