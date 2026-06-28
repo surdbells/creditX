@@ -335,6 +335,13 @@ return [
             $c->get(EntityManagerInterface::class),
         );
     },
+    \App\Infrastructure\Service\FixedAssetService::class => function (ContainerInterface $c): \App\Infrastructure\Service\FixedAssetService {
+        return new \App\Infrastructure\Service\FixedAssetService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
     DisbursementService::class => function (ContainerInterface $c): DisbursementService {
         return new DisbursementService(
             $c->get(EntityManagerInterface::class),

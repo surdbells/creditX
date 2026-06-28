@@ -50,6 +50,7 @@ export const routes: Routes = [
       { path: 'provisions', loadComponent: () => import('./features/provisions/provisions.component').then(m => m.ProvisionsComponent) },
       { path: 'interest-accrual', loadComponent: () => import('./features/interest-accrual/interest-accrual.component').then(m => m.InterestAccrualComponent) },
       { path: 'bank-reconciliation', loadComponent: () => import('./features/bank-reconciliation/bank-reconciliation.component').then(m => m.BankReconciliationComponent) },
+      { path: 'fixed-assets', loadComponent: () => import('./features/fixed-assets/fixed-assets.component').then(m => m.FixedAssetsComponent) },
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'deposit-products', loadComponent: () => import('./features/deposit-products/deposit-products.component').then(m => m.DepositProductsComponent) },

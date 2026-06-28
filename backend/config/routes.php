@@ -451,6 +451,18 @@ return function (App $app): void {
         $api->post('/accounting/bank-reconciliations/{id}/complete', Accounting\MatchBankReconciliationAction::class . ':complete')
             ->add(new RbacMiddleware('reports.reconciliation'));
 
+        // ─── Accounting — Fixed assets + depreciation ───
+        $api->get('/accounting/fixed-assets', Accounting\FixedAssetsAction::class . ':list')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/fixed-assets', Accounting\FixedAssetsAction::class . ':create')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->post('/accounting/fixed-assets/{id}/dispose', Accounting\FixedAssetsAction::class . ':dispose')
+            ->add(new RbacMiddleware('accounting.journal'));
+        $api->get('/reports/depreciation/preview', Accounting\DepreciationAction::class . ':preview')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/depreciation/runs', Accounting\DepreciationAction::class . ':run')
+            ->add(new RbacMiddleware('accounting.journal'));
+
         // ─── Deposits (deposit-taking MFB) ───
         // Deposit products (templates) carry the per-product interest
         // accrual method and withdrawal policy. Product reads are gated
