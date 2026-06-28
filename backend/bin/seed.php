@@ -279,6 +279,7 @@ $settingsDef = [
     ['penalty.default_grace_period_days', '5', SettingType::INTEGER, SettingCategory::PENALTY, 'Default grace period before penalty applies'],
     ['penalty.overdue_check_enabled', 'true', SettingType::BOOLEAN, SettingCategory::PENALTY, 'Enable daily overdue loan detection'],
     ['penalty.payment_allocation_order', '["penalty","interest","principal"]', SettingType::JSON, SettingCategory::PENALTY, 'Payment allocation priority order'],
+    ['penalty.apply_after_maturity_only', 'false', SettingType::BOOLEAN, SettingCategory::PENALTY, 'Only apply penalties after a loan passes its maturity date (last installment due date)'],
 
     // Notification settings
     ['notification.email_enabled', 'true', SettingType::BOOLEAN, SettingCategory::NOTIFICATION, 'Enable email notifications'],

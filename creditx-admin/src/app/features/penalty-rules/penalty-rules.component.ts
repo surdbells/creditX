@@ -72,6 +72,10 @@ import { SettingsService } from '../../core/services/settings.service';
           <div><label class="cx-label">Grace Period (days)</label><input class="cx-input" type="number" [(ngModel)]="form.grace_period_days" placeholder="0" /></div>
           <div><label class="cx-label">Max Amount Cap</label><input class="cx-input" type="number" [(ngModel)]="form.max_amount" placeholder="Optional" /></div>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cx-text-secondary);cursor:pointer;">
+          <input type="checkbox" [(ngModel)]="form.apply_after_maturity_only" />
+          <span>Only penalise after the loan's maturity date (last installment due date)</span>
+        </label>
       </div>
     </cx-form-dialog>
   `,
@@ -85,6 +89,6 @@ export class PenaltyRulesComponent implements OnInit {
   ngOnInit() { this.load(); this.api.get('/loan-products',{per_page:100}).subscribe({next:r=>this.products.set(r.data||[])}); }
   load(p?:any) { this.loading.set(true); this.api.get('/penalty-rules',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
   onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }
-  openForm(row?:any) { if(row){this.editId=row.id;this.form={product_id:row.product_id,name:row.name,calculation_type:row.calculation_type,value:row.value,grace_period_days:row.grace_period_days,max_amount:row.max_amount};}else{this.editId=null;this.form={product_id:'',name:'',calculation_type:'flat',value:'',grace_period_days:0,max_amount:''};} this.showForm.set(true); }
+  openForm(row?:any) { if(row){this.editId=row.id;this.form={product_id:row.product_id,name:row.name,calculation_type:row.calculation_type,value:row.value,grace_period_days:row.grace_period_days,max_amount:row.max_amount,apply_after_maturity_only:!!row.apply_after_maturity_only};}else{this.editId=null;this.form={product_id:'',name:'',calculation_type:'flat',value:'',grace_period_days:0,max_amount:'',apply_after_maturity_only:false};} this.showForm.set(true); }
   saveForm() { this.saving.set(true); (this.editId?this.api.put('/penalty-rules/'+this.editId,this.form):this.api.post('/penalty-rules',this.form)).subscribe({next:r=>{this.saving.set(false);this.toast.success(r.message||'Saved');this.showForm.set(false);this.load(this.q);},error:e=>{this.saving.set(false);this.toast.error(e.error?.message||'Failed');}}); }
 }

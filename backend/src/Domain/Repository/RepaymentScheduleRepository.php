@@ -35,4 +35,16 @@ class RepaymentScheduleRepository extends BaseRepository
             ->setParameter('pending', 'pending')->setParameter('today', new \DateTime('today'))
             ->getQuery()->getResult();
     }
+
+    /**
+     * Loan maturity date = the latest installment due date. Null if the
+     * loan has no schedule. Used to gate penalties to post-maturity only.
+     */
+    public function getMaturityDate(string $loanId): ?\DateTimeImmutable
+    {
+        $sql = 'SELECT MAX(due_date) AS maturity FROM repayment_schedules WHERE loan_id = :loanId';
+        $row = $this->em->getConnection()->executeQuery($sql, ['loanId' => $loanId])->fetchAssociative();
+        $val = $row['maturity'] ?? null;
+        return $val !== null ? new \DateTimeImmutable((string) $val) : null;
+    }
 }

@@ -29,6 +29,7 @@ final class UpdatePenaltyRuleAction
             $rule->setMaxAmount($data['max_amount'] === null ? null : (string) $data['max_amount']);
         }
         if (isset($data['is_compounding'])) $rule->setIsCompounding(filter_var($data['is_compounding'], FILTER_VALIDATE_BOOLEAN));
+        if (isset($data['apply_after_maturity_only'])) $rule->setApplyAfterMaturityOnly(filter_var($data['apply_after_maturity_only'], FILTER_VALIDATE_BOOLEAN));
         if (isset($data['is_active'])) $rule->setIsActive(filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN));
 
         $this->repo->flush();

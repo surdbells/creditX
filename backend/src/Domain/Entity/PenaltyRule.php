@@ -41,6 +41,14 @@ class PenaltyRule
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isCompounding = false;
 
+    /**
+     * When true, this rule only penalises a loan AFTER its maturity date
+     * (the last installment's due date) — late interim installments are
+     * marked overdue but not penalised until the whole loan matures.
+     */
+    #[ORM\Column(name: 'apply_after_maturity_only', type: 'boolean', options: ['default' => false])]
+    private bool $applyAfterMaturityOnly = false;
+
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isActive = true;
 
@@ -61,6 +69,8 @@ class PenaltyRule
     public function setMaxAmount(?string $v): void { $this->maxAmount = $v; }
     public function isCompounding(): bool { return $this->isCompounding; }
     public function setIsCompounding(bool $v): void { $this->isCompounding = $v; }
+    public function isApplyAfterMaturityOnly(): bool { return $this->applyAfterMaturityOnly; }
+    public function setApplyAfterMaturityOnly(bool $v): void { $this->applyAfterMaturityOnly = $v; }
     public function isActive(): bool { return $this->isActive; }
     public function setIsActive(bool $v): void { $this->isActive = $v; }
 
@@ -90,6 +100,7 @@ class PenaltyRule
             'name' => $this->name, 'grace_period_days' => $this->gracePeriodDays,
             'calculation_type' => $this->calculationType->value, 'value' => $this->value,
             'max_amount' => $this->maxAmount, 'is_compounding' => $this->isCompounding,
+            'apply_after_maturity_only' => $this->applyAfterMaturityOnly,
             'is_active' => $this->isActive, 'created_at' => $this->createdAt->format('Y-m-d H:i:s'),
         ];
     }

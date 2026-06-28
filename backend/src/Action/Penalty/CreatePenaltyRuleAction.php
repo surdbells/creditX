@@ -38,6 +38,7 @@ final class CreatePenaltyRuleAction
             'value'            => ['required' => true, 'type' => 'string'],
             'max_amount'       => ['required' => false, 'type' => 'string'],
             'is_compounding'   => ['required' => false, 'type' => 'bool', 'default' => false],
+            'apply_after_maturity_only' => ['required' => false, 'type' => 'bool', 'default' => false],
         ]);
         if (!empty($v['errors'])) return $this->validationError($v['errors']);
 
@@ -52,6 +53,7 @@ final class CreatePenaltyRuleAction
         $rule->setValue($v['clean']['value']);
         $rule->setMaxAmount($v['clean']['max_amount'] ?? null);
         $rule->setIsCompounding($v['clean']['is_compounding']);
+        $rule->setApplyAfterMaturityOnly($v['clean']['apply_after_maturity_only']);
         $this->repo->save($rule);
 
         $this->audit->logCreate($request->getAttribute('user_id'), 'PenaltyRule', $rule->getId(), $rule->toArray(), $this->getClientIp($request), $this->getUserAgent($request));

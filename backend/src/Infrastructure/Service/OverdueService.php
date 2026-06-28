@@ -98,8 +98,28 @@ final class OverdueService
                 // Get penalty rules for this product
                 $rules = $this->penaltyRepo->findActiveByProduct($loan->getProduct()->getId());
 
+                // Maturity-only gate: a global setting or a per-rule flag can
+                // restrict penalties to AFTER the loan's maturity date (the
+                // last installment's due date). Interim late installments are
+                // still marked overdue above, just not penalised yet.
+                $globalAfterMaturity = $this->settings->getBool('penalty.apply_after_maturity_only', false);
+                $maturityDate = null; // lazily resolved when needed
+
                 foreach ($rules as $rule) {
-                    if ($daysPastDue <= $rule->getGracePeriodDays()) {
+                    $afterMaturityOnly = $globalAfterMaturity || $rule->isApplyAfterMaturityOnly();
+                    if ($afterMaturityOnly) {
+                        if ($maturityDate === null) {
+                            $maturityDate = $this->scheduleRepo->getMaturityDate($loanId);
+                        }
+                        // Not matured yet, or no schedule → no penalty.
+                        if ($maturityDate === null || $today <= $maturityDate) {
+                            continue;
+                        }
+                        $daysPastMaturity = (int) $maturityDate->diff($today)->days;
+                        if ($daysPastMaturity <= $rule->getGracePeriodDays()) {
+                            continue;
+                        }
+                    } elseif ($daysPastDue <= $rule->getGracePeriodDays()) {
                         continue;
                     }
 
