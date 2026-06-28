@@ -59,7 +59,12 @@ final class RegisterAction
 
         $existing = $this->customerRepo->findByEmail($clean['email']);
 
-        if ($existing !== null && $existing->isPortalEnabled()) {
+        // Existing emails are allowed for subsequent registrations: an email
+        // already on file (agent-captured, pending, awaiting approval, or
+        // previously rejected) is reused so history stays linked to one
+        // customer. Only a fully ACTIVE portal account is blocked (the holder
+        // should sign in, not silently re-register and reset their access).
+        if ($existing !== null && $existing->getPortalStatus() === CustomerPortalStatus::ACTIVE) {
             return $this->error('An account with this email already exists. Please sign in instead.', 409);
         }
 
@@ -74,6 +79,8 @@ final class RegisterAction
         $customer->setPortalStatus(CustomerPortalStatus::PENDING);
         // Portal access stays disabled until the email is verified.
         $customer->setIsPortalEnabled(false);
+        // Fresh approval cycle (clears any prior rejection/approval state).
+        $customer->resetRegistrationApproval();
 
         $this->customerRepo->save($customer);
 

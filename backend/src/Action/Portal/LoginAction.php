@@ -52,6 +52,14 @@ final class LoginAction
             return $this->error('Please verify your email before signing in.', 403, ['requires_verification' => true]);
         }
 
+        if ($customer->getPortalStatus() === CustomerPortalStatus::AWAITING_APPROVAL) {
+            return $this->error('Your account is awaiting staff approval. You will be notified once it is activated.', 403, ['awaiting_approval' => true]);
+        }
+
+        if ($customer->getPortalStatus() === CustomerPortalStatus::REJECTED) {
+            return $this->error('Your registration was not approved. Please contact support.', 403);
+        }
+
         if ($customer->getPortalStatus() === CustomerPortalStatus::SUSPENDED || !$customer->isPortalEnabled()) {
             return $this->error('Your account access has been suspended. Please contact support.', 403);
         }

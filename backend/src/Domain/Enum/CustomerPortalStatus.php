@@ -16,15 +16,19 @@ namespace App\Domain\Enum;
 enum CustomerPortalStatus: string
 {
     case PENDING = 'pending';
+    case AWAITING_APPROVAL = 'awaiting_approval';
     case ACTIVE = 'active';
     case SUSPENDED = 'suspended';
+    case REJECTED = 'rejected';
 
     public function label(): string
     {
         return match ($this) {
-            self::PENDING   => 'Pending',
-            self::ACTIVE    => 'Active',
-            self::SUSPENDED => 'Suspended',
+            self::PENDING           => 'Pending',
+            self::AWAITING_APPROVAL => 'Awaiting Approval',
+            self::ACTIVE            => 'Active',
+            self::SUSPENDED         => 'Suspended',
+            self::REJECTED          => 'Rejected',
         };
     }
 }

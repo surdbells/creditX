@@ -216,6 +216,13 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('customers.view'));
             $group->post('', Customer\CreateCustomerAction::class)
                 ->add(new RbacMiddleware('customers.create'));
+            // Portal registration 2-level approval (before /{id}).
+            $group->get('/registrations/pending', Customer\RegistrationApprovalAction::class . ':pending')
+                ->add(new RbacMiddleware('customers.view'));
+            $group->post('/{id}/registration/approve', Customer\RegistrationApprovalAction::class . ':approve')
+                ->add(new RbacMiddleware('customers.edit'));
+            $group->post('/{id}/registration/reject', Customer\RegistrationApprovalAction::class . ':reject')
+                ->add(new RbacMiddleware('customers.edit'));
             // Look up a customer by IPPIS (staff_id) — used by the agent
             // loan-capture wizard to prefill the form. Route is placed
             // before /{id} so Slim doesn't treat "by-ippis" as an ID.

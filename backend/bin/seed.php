@@ -274,6 +274,7 @@ $settingsDef = [
     ['security.maker_checker_reversal', 'true', SettingType::BOOLEAN, SettingCategory::SECURITY, 'Require maker-checker for journal reversals'],
     ['security.session_timeout_minutes', '30', SettingType::INTEGER, SettingCategory::SECURITY, 'Session timeout in minutes'],
     ['security.max_login_attempts', '5', SettingType::INTEGER, SettingCategory::SECURITY, 'Maximum failed login attempts before lockout'],
+    ['registration.require_approval', 'true', SettingType::BOOLEAN, SettingCategory::SECURITY, 'Hold self-service portal registrations for 2-level staff approval after email verification'],
 
     // Penalty settings
     ['penalty.default_grace_period_days', '5', SettingType::INTEGER, SettingCategory::PENALTY, 'Default grace period before penalty applies'],

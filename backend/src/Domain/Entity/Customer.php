@@ -204,6 +204,24 @@ class Customer
     #[ORM\Column(type: 'string', length: 45, nullable: true)]
     private ?string $lastLoginIp = null;
 
+    /** True once the customer passes the 2-level registration approval / KYC. */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $verified = false;
+
+    /** First-level registration approver (staff user id). */
+    #[ORM\Column(name: 'reg_approver1_id', type: 'string', length: 36, nullable: true)]
+    private ?string $regApprover1Id = null;
+
+    /** Second-level registration approver (must differ from the first). */
+    #[ORM\Column(name: 'reg_approver2_id', type: 'string', length: 36, nullable: true)]
+    private ?string $regApprover2Id = null;
+
+    #[ORM\Column(name: 'reg_approved_at', type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $regApprovedAt = null;
+
+    #[ORM\Column(name: 'reg_rejected_reason', type: 'string', length: 300, nullable: true)]
+    private ?string $regRejectedReason = null;
+
     // ─── Relations ───
 
     /** @var Collection<int, NextOfKin> */
@@ -331,6 +349,72 @@ class Customer
         }
         $this->portalStatus = CustomerPortalStatus::ACTIVE;
         $this->isPortalEnabled = true;
+        $this->verified = true;
+    }
+
+    /**
+     * Mark email verified but hold the account for 2-level staff approval —
+     * portal access stays disabled until approveRegistration() completes.
+     */
+    public function markEmailVerifiedPendingApproval(): void
+    {
+        if ($this->emailVerifiedAt === null) {
+            $this->emailVerifiedAt = new \DateTime();
+        }
+        $this->portalStatus = CustomerPortalStatus::AWAITING_APPROVAL;
+        $this->isPortalEnabled = false;
+    }
+
+    public function isVerified(): bool { return $this->verified; }
+    public function setVerified(bool $v): void { $this->verified = $v; }
+    public function getRegApprover1Id(): ?string { return $this->regApprover1Id; }
+    public function getRegApprover2Id(): ?string { return $this->regApprover2Id; }
+    public function getRegApprovedAt(): ?\DateTimeInterface { return $this->regApprovedAt; }
+    public function getRegRejectedReason(): ?string { return $this->regRejectedReason; }
+
+    /**
+     * Record a registration approval by a staff user. First call sets the
+     * level-1 approver; a second call by a DIFFERENT user sets level-2 and
+     * activates the account (verified + portal enabled).
+     *
+     * @return string 'first'|'approved'|'noop' — outcome of this call.
+     */
+    public function approveRegistration(string $approverUserId): string
+    {
+        if ($this->portalStatus === CustomerPortalStatus::ACTIVE) {
+            return 'noop';
+        }
+        if ($this->regApprover1Id === null) {
+            $this->regApprover1Id = $approverUserId;
+            return 'first';
+        }
+        if ($this->regApprover1Id === $approverUserId) {
+            throw new \App\Domain\Exception\DomainException('A different user must give the second approval');
+        }
+        $this->regApprover2Id = $approverUserId;
+        $this->regApprovedAt = new \DateTime();
+        $this->portalStatus = CustomerPortalStatus::ACTIVE;
+        $this->isPortalEnabled = true;
+        $this->verified = true;
+        return 'approved';
+    }
+
+    public function rejectRegistration(string $approverUserId, ?string $reason): void
+    {
+        $this->portalStatus = CustomerPortalStatus::REJECTED;
+        $this->isPortalEnabled = false;
+        $this->regRejectedReason = $reason;
+    }
+
+    /** Clear any prior registration-approval state — used when a customer
+     *  (re-)registers with an existing email (e.g. after a prior rejection). */
+    public function resetRegistrationApproval(): void
+    {
+        $this->regApprover1Id = null;
+        $this->regApprover2Id = null;
+        $this->regApprovedAt = null;
+        $this->regRejectedReason = null;
+        $this->verified = false;
     }
 
     /** Stamp a successful portal login (timestamp + originating IP). */
@@ -477,7 +561,13 @@ class Customer
             'gross_pay'          => $this->grossPay,
             'is_portal_enabled'  => $this->isPortalEnabled,
             'portal_status'      => $this->portalStatus?->value,
+            'portal_status_label'=> $this->portalStatus?->label(),
+            'verified'           => $this->verified,
             'email_verified_at'  => $this->emailVerifiedAt?->format('Y-m-d H:i:s'),
+            'reg_approver1_id'   => $this->regApprover1Id,
+            'reg_approver2_id'   => $this->regApprover2Id,
+            'reg_approved_at'    => $this->regApprovedAt?->format('Y-m-d H:i:s'),
+            'reg_rejected_reason'=> $this->regRejectedReason,
             'last_login_at'      => $this->lastLoginAt?->format('Y-m-d H:i:s'),
             'created_at'         => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'         => $this->updatedAt->format('Y-m-d H:i:s'),

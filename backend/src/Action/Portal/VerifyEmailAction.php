@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Action\Portal;
 
 use App\Domain\Repository\CustomerRepository;
-use App\Infrastructure\Service\{ApiResponse, CustomerOtpService, InputValidator, JwtService};
+use App\Infrastructure\Service\{ApiResponse, CustomerOtpService, InputValidator, JwtService, SettingsCacheService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 /**
- * Confirm a registration code, activate the portal account, and sign the
- * customer in immediately (tokens issued on success).
+ * Confirm a registration code and either activate the portal account and
+ * sign the customer in (tokens issued), or — when registration.require_approval
+ * is on — mark the email verified and hold the account for 2-level staff
+ * approval before access is granted.
  */
 final class VerifyEmailAction
 {
@@ -21,6 +23,7 @@ final class VerifyEmailAction
         private readonly CustomerRepository $customerRepo,
         private readonly CustomerOtpService $otpService,
         private readonly JwtService $jwtService,
+        private readonly SettingsCacheService $settings,
     ) {
     }
 
@@ -46,6 +49,17 @@ final class VerifyEmailAction
 
         if (!$this->otpService->verify($clean['email'], $clean['code'], 'verify')) {
             return $this->error('Invalid or expired verification code.', 400);
+        }
+
+        // When 2-level approval is required, the email is verified but the
+        // account is held — no tokens are issued until staff approve it.
+        if ($this->settings->getBool('registration.require_approval', true)) {
+            $customer->markEmailVerifiedPendingApproval();
+            $this->customerRepo->flush();
+            return $this->success([
+                'customer'          => $customer->toArray(),
+                'awaiting_approval' => true,
+            ], 'Email verified. Your account is awaiting approval — you will be notified once it is activated.');
         }
 
         $customer->markEmailVerified();
