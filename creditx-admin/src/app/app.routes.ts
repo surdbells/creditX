@@ -48,6 +48,7 @@ export const routes: Routes = [
       { path: 'budgets', loadComponent: () => import('./features/budgets/budgets.component').then(m => m.BudgetsComponent) },
       { path: 'reports/budget-vs-actual', loadComponent: () => import('./features/budget-vs-actual/budget-vs-actual.component').then(m => m.BudgetVsActualComponent) },
       { path: 'provisions', loadComponent: () => import('./features/provisions/provisions.component').then(m => m.ProvisionsComponent) },
+      { path: 'interest-accrual', loadComponent: () => import('./features/interest-accrual/interest-accrual.component').then(m => m.InterestAccrualComponent) },
       { path: 'reports/cbn-returns', loadComponent: () => import('./features/cbn-returns/cbn-returns.component').then(m => m.CbnReturnsComponent) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments.component').then(m => m.PaymentsComponent) },
       { path: 'deposit-products', loadComponent: () => import('./features/deposit-products/deposit-products.component').then(m => m.DepositProductsComponent) },

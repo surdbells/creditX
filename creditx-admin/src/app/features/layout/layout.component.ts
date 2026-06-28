@@ -107,6 +107,7 @@ export class LayoutComponent {
       { label: 'Budgets', icon: 'dollar-sign', route: '/budgets', permission: 'accounting.view' },
       { label: 'Budget vs Actual', icon: 'bar-chart-3', route: '/reports/budget-vs-actual', permission: 'accounting.view' },
       { label: 'Provisions', icon: 'shield-alert', route: '/provisions', permission: 'accounting.provision' },
+      { label: 'Interest Accrual', icon: 'trending-up', route: '/interest-accrual', permission: 'accounting.provision' },
       { label: 'Reconciliation', icon: 'arrow-left-right', route: '/reconciliation', permission: 'reports.reconciliation' },
     ]},
     { label: 'System', items: [
