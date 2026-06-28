@@ -159,7 +159,8 @@ export class CustomersComponent implements OnInit {
     { key: 'full_name', label: 'Customer Name' },
     { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' },
-    { key: 'bvn', label: 'BVN' },
+    { key: 'verified', label: 'Verified', align: 'center' },
+    { key: 'portal_status_label', label: 'Portal' },
     { key: 'active_loans_count', label: 'Loans', align: 'center' },
     { key: 'created_at', label: 'Registered', type: 'date' },
   ];

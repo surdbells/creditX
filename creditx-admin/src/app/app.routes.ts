@@ -28,6 +28,7 @@ export const routes: Routes = [
       { path: 'government-records', loadComponent: () => import('./features/government-records/government-records.component').then(m => m.GovernmentRecordsComponent) },
       { path: 'customers', loadComponent: () => import('./features/customers/customers.component').then(m => m.CustomersComponent) },
       { path: 'customers/:id', loadComponent: () => import('./features/customers/customer-detail.component').then(m => m.CustomerDetailComponent) },
+      { path: 'registration-approvals', loadComponent: () => import('./features/registration-approvals/registration-approvals.component').then(m => m.RegistrationApprovalsComponent) },
       { path: 'loan-products', loadComponent: () => import('./features/loan-products/loan-products.component').then(m => m.LoanProductsComponent) },
       { path: 'fee-types', loadComponent: () => import('./features/fee-types/fee-types.component').then(m => m.FeeTypesComponent) },
       { path: 'penalty-rules', loadComponent: () => import('./features/penalty-rules/penalty-rules.component').then(m => m.PenaltyRulesComponent) },

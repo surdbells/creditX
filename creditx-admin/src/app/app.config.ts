@@ -13,7 +13,7 @@ import { LucideAngularModule,
   Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
   ALargeSmall, ChevronsUpDown, Minus, Inbox, Target, PlusCircle, Edit3,
   Scale, History, ShieldAlert, Link, UserRound, Package, ShieldCheck,
-  PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2,
+  PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2, BadgeCheck,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -43,7 +43,7 @@ export const appConfig: ApplicationConfig = {
         Columns3, FileSpreadsheet, Home, ExternalLink, Check, Lock,
         ALargeSmall, ChevronsUpDown, Minus, Inbox, Target, PlusCircle, Edit3,
         Scale, History, ShieldAlert, Link, UserRound, Package, ShieldCheck,
-        PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2,
+        PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2, BadgeCheck,
       })
     ),
   ],

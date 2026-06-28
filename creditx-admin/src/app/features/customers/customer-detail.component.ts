@@ -21,10 +21,18 @@ import { SettingsService } from '../../core/services/settings.service';
         [title]="customer()?.full_name || 'Customer'"
         [subtitle]="'Staff ID: ' + (customer()?.staff_id || '—')"
         eyebrow="Customer profile">
-        <a routerLink="/customers" class="cx-btn cx-btn-outline cx-btn-sm">
-          <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
-          <span>Back</span>
-        </a>
+        <div class="flex items-center gap-2">
+          @if (customer()?.verified) {
+            <span class="cx-verified-badge" title="Verified customer">
+              <lucide-icon name="badge-check" [size]="14"></lucide-icon>
+              <span>Verified</span>
+            </span>
+          }
+          <a routerLink="/customers" class="cx-btn cx-btn-outline cx-btn-sm">
+            <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
+            <span>Back</span>
+          </a>
+        </div>
       </cx-page-header>
 
       @if (loading()) {
@@ -288,6 +296,13 @@ import { SettingsService } from '../../core/services/settings.service';
   `,
   styles: [`
     :host { display: block; }
+
+    .cx-verified-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 999px;
+      background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;
+      font-size: 12px; font-weight: 600;
+    }
 
     .cx-cust-tabs-row { margin-bottom: 1.25rem; }
 

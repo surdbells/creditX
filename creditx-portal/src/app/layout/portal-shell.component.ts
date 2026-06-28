@@ -88,7 +88,12 @@ interface NavItem {
           <div class="hidden lg:block"></div>
           <div class="flex items-center gap-3">
             <div class="text-right hidden sm:block">
-              <p class="text-sm font-semibold leading-tight" style="color: var(--cx-text)">{{ displayName() }}</p>
+              <p class="text-sm font-semibold leading-tight flex items-center justify-end gap-1" style="color: var(--cx-text)">
+                <span>{{ displayName() }}</span>
+                @if (customer()?.verified) {
+                  <lucide-icon name="badge-check" [size]="14" style="color: #059669" aria-label="Verified"></lucide-icon>
+                }
+              </p>
               <p class="text-xs leading-tight" style="color: var(--cx-text-muted)">{{ customer()?.email }}</p>
             </div>
             <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold"

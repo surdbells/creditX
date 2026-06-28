@@ -50,6 +50,7 @@ export class LayoutComponent {
     ]},
     { label: 'Loan Operations', items: [
       { label: 'Customers', icon: 'users', route: '/customers', permission: 'customers.view' },
+      { label: 'Registration Approvals', icon: 'badge-check', route: '/registration-approvals', permission: 'customers.view' },
       { label: 'Loans', icon: 'file-text', route: '/loans', permission: 'loans.view' },
       { label: 'Approval Queue', icon: 'user-check', route: '/approval-queue', permission: 'loans.approve' },
       { label: 'Disbursement Queue', icon: 'banknote', route: '/disbursement-queue', permission: 'loans.disburse' },

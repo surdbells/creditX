@@ -59,6 +59,8 @@ export interface Customer {
   gross_pay?: string | number | null;
   is_portal_enabled?: boolean;
   portal_status?: string | null;
+  portal_status_label?: string | null;
+  verified?: boolean;
   email_verified_at?: string | null;
   last_login_at?: string | null;
   created_at?: string;
