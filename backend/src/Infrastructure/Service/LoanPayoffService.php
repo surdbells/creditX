@@ -43,6 +43,9 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class LoanPayoffService
 {
+    /** House default liquidation rate (1.2% of subtotal) when unset. */
+    private const DEFAULT_LIQUIDATION_VALUE = '0.012';
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly RepaymentScheduleRepository $scheduleRepo,
@@ -210,7 +213,7 @@ final class LoanPayoffService
             'subtotal'               => $subtotal,
             'liquidation_charge'     => $liquidation,
             'liquidation_mode'       => (string) $this->settings->get('loan.liquidation_charge_mode', 'subtotal_pct'),
-            'liquidation_value'      => (string) $this->settings->get('loan.liquidation_charge_value', '0'),
+            'liquidation_value'      => (string) $this->settings->get('loan.liquidation_charge_value', self::DEFAULT_LIQUIDATION_VALUE),
             'arrears_principal'      => $arrearsPrincipal,
             'arrears_interest'       => $arrearsInterest,
             'arrears_total'          => $arrearsTotal,
@@ -223,7 +226,7 @@ final class LoanPayoffService
     private function liquidation(string $subtotal, string $futurePrincipal): string
     {
         $mode = (string) $this->settings->get('loan.liquidation_charge_mode', 'subtotal_pct');
-        $value = (string) $this->settings->get('loan.liquidation_charge_value', '0');
+        $value = (string) $this->settings->get('loan.liquidation_charge_value', self::DEFAULT_LIQUIDATION_VALUE);
         if (!is_numeric($value)) $value = '0';
         return match ($mode) {
             'flat'          => $this->money($value),

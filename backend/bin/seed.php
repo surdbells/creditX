@@ -283,7 +283,7 @@ $settingsDef = [
     ['penalty.apply_after_maturity_only', 'false', SettingType::BOOLEAN, SettingCategory::PENALTY, 'Only apply penalties after a loan passes its maturity date (last installment due date)'],
     ['topup.calc_method', 'principal_minus_current', SettingType::STRING, SettingCategory::PAYMENT, 'Top-up carry-forward calc: principal_minus_current (future principal less current month + arrears) or full_outstanding'],
     ['loan.liquidation_charge_mode', 'subtotal_pct', SettingType::STRING, SettingCategory::PAYMENT, 'Loan payoff liquidation charge basis: subtotal_pct, principal_pct or flat'],
-    ['loan.liquidation_charge_value', '0', SettingType::STRING, SettingCategory::PAYMENT, 'Loan payoff liquidation charge value (decimal fraction for pct modes, e.g. 0.012 = 1.2%; or flat amount)'],
+    ['loan.liquidation_charge_value', '0.012', SettingType::STRING, SettingCategory::PAYMENT, 'Loan payoff liquidation charge value (decimal fraction for pct modes, e.g. 0.012 = 1.2%; or flat amount)'],
 
     // Notification settings
     ['notification.email_enabled', 'true', SettingType::BOOLEAN, SettingCategory::NOTIFICATION, 'Enable email notifications'],
