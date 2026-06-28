@@ -581,6 +581,12 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('payments.bulk_upload'));
         });
 
+        // ─── Loan payoff / liquidation ───
+        $api->get('/loans/{loanId}/payoff/quote', Payment\LoanPayoffAction::class . ':quote')
+            ->add(new RbacMiddleware('payments.view'));
+        $api->post('/loans/{loanId}/payoff', Payment\LoanPayoffAction::class . ':settle')
+            ->add(new RbacMiddleware('payments.create'));
+
         // ─── Penalty Rules ───
         $api->group('/penalty-rules', function (RouteCollectorProxy $group) {
             $group->get('', Penalty\ListPenaltyRulesAction::class)

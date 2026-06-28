@@ -368,6 +368,17 @@ return [
             $c->get(LedgerService::class),
         );
     },
+    \App\Infrastructure\Service\LoanPayoffService::class => function (ContainerInterface $c): \App\Infrastructure\Service\LoanPayoffService {
+        return new \App\Infrastructure\Service\LoanPayoffService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(RepaymentScheduleRepository::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(CustomerLedgerRepository::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
     RepaymentService::class => function (ContainerInterface $c): RepaymentService {
         return new RepaymentService(
             $c->get(EntityManagerInterface::class),

@@ -33,6 +33,12 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
                 <span>Disburse</span>
               </button>
             }
+            @if ((loan()?.status === 'active' || loan()?.status === 'overdue' || loan()?.status === 'disbursed') && auth.hasPermission('payments.create')) {
+              <button class="cx-btn cx-btn-primary" (click)="openPayoff()">
+                <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+                <span>Payoff</span>
+              </button>
+            }
             <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm">
               <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
               <span>Back</span>
@@ -374,6 +380,60 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
         }
       }
     </div>
+
+    <!-- Payoff modal -->
+    @if (showPayoff()) {
+      <div class="cx-po-backdrop" (click)="closePayoff()">
+        <div class="cx-po-modal" (click)="$event.stopPropagation()">
+          <h3 class="cx-po-title">Loan Payoff — {{ loan()?.application_id }}</h3>
+          @if (payoffLoading()) {
+            <cx-loading size="sm" message="Calculating payoff..."></cx-loading>
+          } @else if (payoffQuote(); as q) {
+            <div class="cx-po-rows">
+              <div class="cx-po-row"><span>Principal of remaining months</span><span class="tabular-nums">{{ q.future_principal | money:2 }}</span></div>
+              <div class="cx-po-row"><span>Interest of current month due</span><span class="tabular-nums">{{ q.current_month_interest | money:2 }}</span></div>
+              <div class="cx-po-row cx-po-sub"><span>Subtotal</span><span class="tabular-nums">{{ q.subtotal | money:2 }}</span></div>
+              <div class="cx-po-row"><span>Liquidation charge</span><span class="tabular-nums">{{ q.liquidation_charge | money:2 }}</span></div>
+              @if (q.arrears_total && q.arrears_total !== '0.00') {
+                <div class="cx-po-row"><span>Outstanding balance (arrears P+I)</span><span class="tabular-nums">{{ q.arrears_total | money:2 }}</span></div>
+              }
+              <div class="cx-po-row cx-po-total"><span>Total Payoff</span><span class="tabular-nums">{{ q.total | money:2 }}</span></div>
+            </div>
+
+            <label class="cx-po-check">
+              <input type="checkbox" [(ngModel)]="payoffConfirmed" />
+              <span>I have made the payment</span>
+            </label>
+
+            @if (payoffConfirmed) {
+              <div class="cx-po-modes">
+                <button class="cx-btn" [class.cx-btn-primary]="payoffMode() === 'full'" [class.cx-btn-outline]="payoffMode() !== 'full'" (click)="payoffMode.set('full')">Full payment</button>
+                <button class="cx-btn" [class.cx-btn-primary]="payoffMode() === 'partial'" [class.cx-btn-outline]="payoffMode() !== 'partial'" (click)="payoffMode.set('partial')">Partial payment</button>
+              </div>
+
+              @if (payoffMode() === 'full') {
+                <label class="cx-label">Payoff bank/cash account</label>
+                <select class="cx-input" [(ngModel)]="payoffGlCode">
+                  <option [ngValue]="''" disabled>Select account…</option>
+                  @for (gl of payoffGls(); track gl.id) { <option [ngValue]="gl.account_code">{{ gl.account_name }} ({{ gl.account_code }})</option> }
+                </select>
+                <p class="cx-po-note">Credits the customer with the total payoff and debits the selected bank account; principal clears the loan account, the balance (interest + liquidation) goes to interest income.</p>
+              } @else if (payoffMode() === 'partial') {
+                <p class="cx-po-note">Partial payment will be <strong>held</strong> — no GL posting is made until a full payoff is completed.</p>
+              }
+            }
+          }
+          <div class="cx-po-actions">
+            <button class="cx-btn cx-btn-ghost" (click)="closePayoff()" [disabled]="payingOff()">Cancel</button>
+            @if (payoffConfirmed && payoffMode() === 'full') {
+              <button class="cx-btn cx-btn-primary" (click)="submitPayoff()" [disabled]="payingOff() || !payoffGlCode">{{ payingOff() ? 'Posting…' : 'Confirm Full Payoff' }}</button>
+            } @else if (payoffConfirmed && payoffMode() === 'partial') {
+              <button class="cx-btn cx-btn-primary" (click)="submitPayoff()" [disabled]="payingOff()">{{ payingOff() ? 'Holding…' : 'Hold Partial' }}</button>
+            }
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- Disbursement Dialog — full preview + GL + top-up override -->
     <cx-form-dialog [open]="showDisburse()" title="Disburse Loan" [saving]="disbursing()"
@@ -845,6 +905,21 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
       line-height: 1.5;
     }
 
+    /* ═══ Payoff modal ═══ */
+    .cx-po-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 60; }
+    .cx-po-modal { background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-xl, 12px);
+      padding: 22px; width: 100%; max-width: 460px; }
+    .cx-po-title { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+    .cx-po-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .cx-po-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--cx-text-secondary); }
+    .cx-po-row.cx-po-sub { border-top: 1px solid var(--cx-border-subtle); padding-top: 6px; font-weight: 600; color: var(--cx-text); }
+    .cx-po-row.cx-po-total { border-top: 2px solid var(--cx-border); padding-top: 8px; margin-top: 4px; font-size: 15px; font-weight: 700; color: var(--cx-text); }
+    .cx-po-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin-bottom: 12px; }
+    .cx-po-modes { display: flex; gap: 8px; margin-bottom: 12px; }
+    .cx-po-modes .cx-btn { flex: 1; }
+    .cx-po-note { font-size: 12px; color: var(--cx-text-muted); line-height: 1.5; margin: 8px 0 0; }
+    .cx-po-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
     /* ═══ Disbursement dialog ═══ */
     .cx-dis-loading { padding: 32px 0; }
     .cx-dis-header {
@@ -1146,6 +1221,16 @@ export class LoanDetailComponent implements OnInit {
   disburseTopUpBalance = '';  // editable; bound to the override input
   disburseEffectiveDate = '';  // defaults to today when dialog opens
 
+  // Payoff modal state
+  showPayoff = signal(false);
+  payoffLoading = signal(false);
+  payoffQuote = signal<any>(null);
+  payoffConfirmed = false;
+  payoffMode = signal<'' | 'full' | 'partial'>('');
+  payoffGlCode = '';
+  payoffGls = signal<any[]>([]);
+  payingOff = signal(false);
+
   cxTabs: CxTab[] = [
     { id: 'summary', label: 'Summary' },
     { id: 'schedule', label: 'Repayment Schedule' },
@@ -1409,6 +1494,46 @@ export class LoanDetailComponent implements OnInit {
         this.ngOnInit(); // reload
       },
       error: e => { this.disbursing.set(false); this.toast.error(e.error?.message || 'Disbursement failed'); },
+    });
+  }
+
+  // ─── Payoff ───
+  openPayoff(): void {
+    this.showPayoff.set(true);
+    this.payoffConfirmed = false;
+    this.payoffMode.set('');
+    this.payoffGlCode = '';
+    this.payoffLoading.set(true);
+    this.payoffQuote.set(null);
+    this.api.get(`/loans/${this.id}/payoff/quote`).subscribe({
+      next: r => { this.payoffQuote.set(r.data); this.payoffLoading.set(false); },
+      error: e => { this.payoffLoading.set(false); this.toast.error(e.error?.message || 'Could not load payoff'); },
+    });
+    // Load asset (bank/cash) GL accounts for the payoff source.
+    this.api.get('/gl-accounts', { per_page: 200 }).subscribe({
+      next: r => this.payoffGls.set((r.data || []).filter((g: any) => g.account_type === 'asset' && g.is_active !== false)),
+      error: () => {},
+    });
+  }
+
+  closePayoff(): void { this.showPayoff.set(false); }
+
+  submitPayoff(): void {
+    const mode = this.payoffMode();
+    if (mode !== 'full' && mode !== 'partial') return;
+    if (mode === 'full' && !this.payoffGlCode) { this.toast.error('Select a payoff account'); return; }
+    this.payingOff.set(true);
+    this.api.post(`/loans/${this.id}/payoff`, {
+      mode,
+      payoff_gl_code: this.payoffGlCode || undefined,
+    }).subscribe({
+      next: r => {
+        this.payingOff.set(false);
+        this.toast.success(r.message || 'Payoff processed');
+        this.closePayoff();
+        this.ngOnInit();
+      },
+      error: e => { this.payingOff.set(false); this.toast.error(e.error?.message || 'Payoff failed'); },
     });
   }
 
