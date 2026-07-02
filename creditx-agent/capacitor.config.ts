@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   plugins: {
     // Route HTTP through the native layer on device. This bypasses the
     // WebView's CORS enforcement entirely, so the multi-tenant app can call
-    // any tenant's API (https://{slug}.api.creditx.app) without each backend
+    // any tenant's API (https://{slug}.api.creditx.cloud) without each backend
     // having to whitelist the Capacitor origin. It patches window.fetch and
     // XMLHttpRequest natively, so Angular's HttpClient uses it transparently.
     // No-op on web (dev/PWA still use normal fetch + CORS).

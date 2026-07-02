@@ -5,7 +5,7 @@ export const environment = {
   apiUrl: 'https://api.dostsuite.com/api',
   // Template used to build a tenant's API base from an org code entered at
   // first run. `{slug}` is replaced with the code (e.g. "acme").
-  apiUrlTemplate: 'https://{slug}.api.creditx.app/api',
+  apiUrlTemplate: 'https://{slug}.api.creditx.cloud/api',
   // In dev we don't force org selection (uses apiUrl above).
   requireTenantSelection: false,
   // This build's version — compared against the tenant's mobile.min_agent_version.

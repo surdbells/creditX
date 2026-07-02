@@ -380,13 +380,13 @@ finishes, browse to each custom domain.
 `creditx-agent` is an Ionic + Capacitor app. It ships as **one native binary
 that serves every client** — it does **not** bake a per-client API URL. On
 first launch the agent enters their **organization code** (the client slug);
-the app builds `https://{slug}.api.creditx.app/api`, validates it against the
+the app builds `https://{slug}.api.creditx.cloud/api`, validates it against the
 tenant's public settings, stores it, and points all requests there. "Switch
 Organization" (Profile) clears it.
 
 ### 10.1 What each new client needs (usually nothing app-side)
 
-- The client's backend must be reachable at `https://<CLIENT_SLUG>.api.creditx.app`
+- The client's backend must be reachable at `https://<CLIENT_SLUG>.api.creditx.cloud`
   (the per-role wildcard from the subdomain scheme — see the domains doc).
 - Give the client's agents their **org code** (`<CLIENT_SLUG>`). That's it —
   no rebuild, no new store listing.
@@ -400,7 +400,7 @@ Organization" (Profile) clears it.
 cd creditx-agent
 # Confirm the tenant template + this build's version in
 # src/environments/environment.prod.ts:
-#   apiUrlTemplate: 'https://{slug}.api.creditx.app/api'
+#   apiUrlTemplate: 'https://{slug}.api.creditx.cloud/api'
 #   requireTenantSelection: true
 #   appVersion: '1.0.0'   # bump on each release
 npm ci
@@ -421,7 +421,7 @@ npx cap sync
 
 If a client wants their **own** branded app in their **own** store account,
 build a dedicated binary with `requireTenantSelection: false` and
-`apiUrl: 'https://<CLIENT_SLUG>.api.creditx.app/api'` baked into
+`apiUrl: 'https://<CLIENT_SLUG>.api.creditx.cloud/api'` baked into
 `environment.prod.ts`, then submit under the client's developer account. This
 is the exception, not the default.
 
