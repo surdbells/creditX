@@ -46,33 +46,34 @@ The platform-wide `creditx.cloud` setup (domain, wildcard certs) is done
                          ┌─────────────────── Cloudflare ───────────────────┐
   Admin staff  ─────────▶│  Pages:  <ADMIN_DOMAIN>   (creditx-admin)         │
   Customers    ─────────▶│  Pages:  <PORTAL_DOMAIN>  (creditx-portal)        │
-                         └───────────────────────┬───────────────────────────┘
-                                                  │  HTTPS (CORS)
+                         │  *.api.creditx.cloud  ── proxied ──┐              │
+                         └────────────────────────────────────┼──────────────┘
+                                                  │  HTTPS (Origin cert, Full strict)
                                                   ▼
-  Agents (mobile app) ───────────────▶  ┌──── aaPanel server ────┐
-                                         │  Nginx → backend/public │
-                                         │  PHP-FPM 8.2/8.3        │
-                                         │  PostgreSQL  + Redis    │
-                                         │  Cron workers           │
-                                         └─────────────────────────┘
-                                            <API_DOMAIN>
+  Agents (mobile app) ───────────────▶  ┌──── 159.195.82.117 (aaPanel) ────┐
+                                         │  Nginx vhost per client → its dir │
+                                         │  PHP-FPM 8.2/8.3                   │
+                                         │  Shared PostgreSQL + Redis        │
+                                         │   (per-client DB + REDIS_PREFIX)  │
+                                         │  Cron workers                     │
+                                         └───────────────────────────────────┘
 ```
 
-**Per-client DNS records to create** (in the `creditx.cloud` Cloudflare zone):
+**Per-client DNS records** (in the `creditx.cloud` Cloudflare zone):
 
 | Type | Name | Target | Proxy |
 |---|---|---|---|
-| `A` | `<CLIENT>.api` (→ `<API_DOMAIN>`) | aaPanel server public IP | **DNS only (grey cloud)** at first, see §6 |
+| — | `<CLIENT>.api` | *covered by the `*.api` wildcard A record (§0.1) — nothing to add* | — |
 | `CNAME` | `<CLIENT>.admin` (→ `<ADMIN_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
 | `CNAME` | `<CLIENT>` (→ `<PORTAL_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
 
-> These sit under the three per-role wildcard certs issued once in §0.1, so a
-> new client needs **DNS only — no new certificates**.
+> The client's **API host needs no DNS record** — the one-time `*.api` wildcard
+> from §0.1 already resolves it to the shared server. Only the two Pages CNAMEs
+> are per-client, and even those can be automated via Cloudflare Pages.
 
-> Keep `<API_DOMAIN>` **grey-clouded (DNS-only)** until aaPanel has issued
-> its own Let's Encrypt cert (§6). Once verified, you may switch it to
-> proxied if you want Cloudflare in front of the API — if you do, set SSL
-> mode to **Full (strict)**.
+> Because the origin sits behind Cloudflare with a **Cloudflare Origin CA cert**
+> (§0.1 / §6), the API host stays **proxied (orange) from day one** — no
+> grey-cloud/ACME dance. Zone SSL mode = **Full (strict)**.
 
 ---
 
@@ -96,42 +97,66 @@ The **agent mobile app** targets `{client}.api.creditx.cloud` automatically from
 the org code the agent enters (see §10) — it needs no per-client DNS beyond the
 API record above.
 
+### This platform's topology (confirmed)
+
+- **One shared aaPanel server** hosts **every client's backend and database**.
+  Public IP: **`159.195.82.117`**.
+- **Shared PostgreSQL + Redis daemons** on that box; tenants are isolated by a
+  **separate database per client** and a **unique `REDIS_PREFIX`** (see §3.1).
+- **One Nginx vhost per client** (`{client}.api.creditx.cloud`), each pointing
+  at that client's own code directory + `.env`. Portals/admins are static and
+  live on **Cloudflare Pages** (not this server).
+
+```
+        Cloudflare (edge TLS, proxied)          ┌──────── 159.195.82.117 (aaPanel) ────────┐
+  *.creditx.cloud ........ Pages (portals)      │  vhost acme.api.creditx.cloud → creditx-acme │
+  *.admin.creditx.cloud .. Pages (admins)       │  vhost bmfb.api.creditx.cloud → creditx-bmfb │
+  *.api.creditx.cloud ──── A → 159.195.82.117 ──▶│  … shared PostgreSQL + Redis (per-DB/prefix) │
+                                                 └───────────────────────────────────────────┘
+```
+
 ### One-time steps
 
-1. **Register `creditx.cloud`** and add it as a zone in Cloudflare. Point the
-   registrar's nameservers at the ones Cloudflare assigns.
+1. **Register `creditx.cloud`** and add it as a zone in Cloudflare (done). Point
+   the registrar's nameservers at Cloudflare's.
 2. **Reserve system labels** so no client slug can shadow them — never issue a
    client the slug: `www`, `app`, `api`, `admin`, `portal`, `id`, `auth`,
    `status`, `docs`, `help`, `billing`, `console`, `dashboard`, `cdn`, `static`,
    `mail`, `support`. (Enforce with a slug validator at onboarding:
    lowercase, `[a-z0-9-]`, length 2–40, not in the reserved set.)
-3. **Issue the three per-role wildcard certificates** (Cloudflare → SSL/TLS →
-   Edge Certificates → **Total TLS** on, plus **Advanced Certificate** orders
-   for the deeper levels):
-   - `*.creditx.cloud`  (client portals — covered by Universal SSL / Total TLS)
-   - `*.admin.creditx.cloud`  (client admin consoles — needs an Advanced cert)
-   - `*.api.creditx.cloud`  (client APIs — needs an Advanced cert)
+3. **Wildcard DNS for all client APIs** — one record covers every client since
+   they share the server:
 
-   > Cloudflare's free Universal wildcard only covers **one** level
-   > (`*.creditx.cloud`). The two-label wildcards (`*.admin…`, `*.api…`) require
-   > **Advanced Certificate Manager**. Order all three so new clients never need
-   > a certificate.
-4. **Set the zone SSL/TLS mode** to **Full (strict)** (the aaPanel origin has
-   its own Let's Encrypt cert per §6).
-5. **Portal & admin Pages projects**: in each Cloudflare Pages project add the
-   wildcard/custom hostnames as clients come online (or use one Pages project
-   per role and attach `{client}.creditx.cloud` / `{client}.admin.creditx.cloud`
-   custom domains per client).
-6. **(Optional) wildcard DNS for the API** — if all client backends share one
-   aaPanel server, a single `A` record `*.api → <server IP>` covers every
-   client's API host at once; otherwise add the per-client `A` record from §0.
-7. **(Optional) white-label** — enable **Cloudflare for SaaS** if you'll let
-   some clients bring their own domain (`portal.firstmfb.com` → CNAME to the
-   platform). Custom hostnames get certs issued automatically.
+   | Type | Name | Content | Proxy |
+   |---|---|---|---|
+   | `A` | `*.api` | `159.195.82.117` | **Proxied (orange)** |
 
-After §0.1, provisioning a new client is just: the three DNS records in §0 (or
-none, if you used wildcard DNS) + that client's `.env` (`APP_URL`,
-`CORS_ALLOWED_ORIGINS`, `FRONTEND_URL` set to its `creditx.cloud` subdomains).
+   (`acme.api.creditx.cloud`, `bmfb.api.creditx.cloud`, … all resolve to the box
+   automatically — no per-client API DNS needed.)
+4. **Edge certs** (Cloudflare → SSL/TLS → Edge Certificates):
+   - Turn on **Total TLS**; `*.creditx.cloud` is covered by Universal SSL.
+   - Order **Advanced Certificates** for the two-label wildcards
+     `*.admin.creditx.cloud` and `*.api.creditx.cloud` (Universal covers only one
+     level).
+5. **Origin cert on the shared server (recommended — replaces per-vhost
+   Let's Encrypt).** Because the box sits behind Cloudflare, issue **one
+   Cloudflare Origin CA certificate** covering `*.api.creditx.cloud` (and add
+   `*.creditx.cloud` if the server ever serves other roles), valid up to 15
+   years, and install it once in aaPanel. **Every** client API vhost uses this
+   same cert — no Let's Encrypt, no ACME, no per-client cert step, and DNS can
+   stay **proxied from day one**. Then set the zone SSL/TLS mode to
+   **Full (strict)**. (See §6 for the install steps.)
+6. **Portal & admin Pages projects** — one Cloudflare Pages project per role;
+   attach `{client}.creditx.cloud` / `{client}.admin.creditx.cloud` as a custom
+   domain per client as they come online (§9).
+7. **(Optional) white-label** — enable **Cloudflare for SaaS** if some clients
+   bring their own domain (`portal.firstmfb.com` → CNAME to the platform);
+   custom hostnames get certs issued automatically.
+
+After §0.1, provisioning a new client on this server is just: create its
+database + code dir + vhost, fill its `.env` (its own `DB_NAME`, unique
+`REDIS_PREFIX`, and `APP_URL`/`CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` on its
+`creditx.cloud` subdomains) — **no new DNS, no new certificate**.
 
 ---
 
@@ -182,11 +207,17 @@ psql "host=127.0.0.1 port=5432 dbname=<DB_NAME> user=<DB_USER> password=<DB_PASS
 
 ## 3. Deploy the backend code
 
+> **Shared server:** each client gets its **own code directory** so its `.env`
+> and database stay isolated. Use `/www/wwwroot/creditx-<CLIENT>` per client
+> (e.g. `/www/wwwroot/creditx-acme`) and substitute that for `/www/wwwroot/creditx`
+> everywhere below. The shared PostgreSQL and Redis daemons are reused —
+> isolation comes from a per-client `DB_NAME` and `REDIS_PREFIX` (§3.1).
+
 ```bash
-# Clone into the aaPanel web root
+# One directory per client under the aaPanel web root
 cd /www/wwwroot
-git clone <REPO_URL> creditx
-cd creditx/backend
+git clone <REPO_URL> creditx-<CLIENT>
+cd creditx-<CLIENT>/backend
 
 # PHP dependencies (production)
 composer install --no-dev --optimize-autoloader --no-interaction
@@ -335,12 +366,24 @@ Leaving the default credentials live is a critical security hole.
 
 ## 6. SSL for the API
 
-In aaPanel → **Website → `<API_DOMAIN>` → SSL**:
+**Recommended for this platform — one Cloudflare Origin CA cert for all
+clients (do the install once):**
 
-- Issue a **Let's Encrypt** certificate (requires the `A` record to resolve
-  to this server — keep it **grey-clouded / DNS-only** in Cloudflare during
-  issuance so the ACME HTTP-01 challenge reaches aaPanel directly).
-- Enable **Force HTTPS**.
+Because every client API vhost sits behind Cloudflare on the shared server, a
+single **Cloudflare Origin CA** wildcard cert covers them all — no Let's
+Encrypt, no ACME, no per-client cert.
+
+1. Cloudflare → **SSL/TLS → Origin Server → Create Certificate**. Hostnames:
+   `*.api.creditx.cloud` (and `api.creditx.cloud`). Copy the **certificate**
+   and **private key** (RSA, 15-year validity).
+2. On the server, save them once, e.g.
+   `/www/server/panel/vhost/cert/creditx-origin/fullchain.pem` and `privkey.pem`.
+3. For each client's aaPanel site → **SSL → Custom** → paste the **same** cert +
+   key (or point the vhost at the shared files). Enable **Force HTTPS**.
+4. Cloudflare → **SSL/TLS → Overview** → set mode to **Full (strict)**.
+
+The API host stays **proxied (orange)** the whole time. Adding a client later
+reuses this cert — nothing to issue.
 
 Verify:
 
@@ -348,8 +391,10 @@ Verify:
 curl -sI https://<API_DOMAIN>/api/banks | head -1     # expect: HTTP/2 200
 ```
 
-Only after this succeeds, optionally switch the `A` record to **Proxied**
-(orange) in Cloudflare and set the zone SSL mode to **Full (strict)**.
+> **Alternative (origin not behind Cloudflare):** issue a per-vhost **Let's
+> Encrypt** cert in aaPanel instead — but then the `A` record must be
+> **grey-clouded (DNS-only)** during ACME issuance, then re-proxied. The Origin
+> CA path above avoids this entirely and is preferred here.
 
 ---
 
@@ -732,12 +777,14 @@ Before handing over, walk one full cycle on real config:
 ## 13. Per-client checklist (copy this into the client's ticket)
 
 **Platform (one-time, §0.1) — do once, not per client:**
-- [ ] `creditx.cloud` registered + Cloudflare zone active
-- [ ] Three wildcard certs issued (`*.creditx.cloud`, `*.admin.creditx.cloud`, `*.api.creditx.cloud`); zone SSL = Full (strict)
+- [ ] `creditx.cloud` Cloudflare zone active
+- [ ] Wildcard `A *.api → 159.195.82.117` (proxied); Advanced certs for `*.admin` / `*.api`; Universal covers `*.creditx.cloud`
+- [ ] Cloudflare **Origin CA** cert (`*.api.creditx.cloud`) installed on the server; zone SSL = **Full (strict)**
 - [ ] Reserved system labels enforced by the slug validator
 
 **Per client:**
-- [ ] DNS records created (`<API_DOMAIN>` A, admin/portal CNAMEs)
+- [ ] Portal + admin CNAMEs added (API host needs no DNS — wildcard covers it)
+- [ ] Own code dir `/www/wwwroot/creditx-<CLIENT>` + own database on the shared PostgreSQL
 - [ ] aaPanel: PHP 8.2/8.3 + extensions, PostgreSQL, Redis installed
 - [ ] Database + dedicated user created
 - [ ] `.env` filled (unique `JWT_SECRET`, unique `REDIS_PREFIX`, CORS origins)
