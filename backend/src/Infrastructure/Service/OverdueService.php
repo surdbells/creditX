@@ -208,14 +208,22 @@ final class OverdueService
                 try {
                     $loan = $this->em->find(\App\Domain\Entity\Loan::class, $loanId);
                     if ($loan !== null) {
+                        // Customer-facing overdue templates still fire; the
+                        // agent is notified via notifyAgent (in-app+push+email).
                         $this->notifService->dispatchEvent('overdue_reminder', [
                             'customer_name' => $loan->getCustomer()->getFullName(),
                             'customer_email' => $loan->getCustomer()->getEmail(),
                             'customer_phone' => $loan->getCustomer()->getPhone(),
                             'loan_amount' => $loan->getAmountRequested(),
                             'application_id' => $loan->getApplicationId(),
-                            'user_id' => $loan->getAgent()?->getId(),
-                        ], $loan->getAgent()?->getId(), $loan->getCustomer()->getId());
+                            'user_id' => null,
+                        ], null, $loan->getCustomer()->getId());
+                        $this->notifService->notifyAgent(
+                            $loan->getAgent(),
+                            'Loan overdue',
+                            "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} is now overdue.",
+                            $loan->getCustomer()->getId(),
+                        );
                     }
                 } catch (\Exception $e) { /* notification failure should not block */ }
             }

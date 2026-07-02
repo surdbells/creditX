@@ -54,6 +54,7 @@ final class LoanPayoffService
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly ?NotificationDispatchService $notifService = null,
     ) {}
 
     /** Compute the payoff breakdown without posting. */
@@ -150,6 +151,20 @@ final class LoanPayoffService
 
             $this->em->flush();
             $this->em->commit();
+
+            // Notify the field agent that the loan was paid off / closed
+            // (in-app + push + email). Post-commit, best-effort.
+            if ($this->notifService !== null) {
+                try {
+                    $this->notifService->notifyAgent(
+                        $loan->getAgent(),
+                        'Loan closed',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been paid off and closed.",
+                        $loan->getCustomer()->getId(),
+                    );
+                } catch (\Throwable $e) { /* best-effort */ }
+            }
+
             return ['status' => 'paid_off', 'message' => 'Loan paid off and closed', 'quote' => $q];
         } catch (\Throwable $e) {
             if ($this->em->getConnection()->isTransactionActive()) $this->em->rollback();

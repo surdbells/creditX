@@ -74,17 +74,15 @@ final class DisburseLoanAction
             return $this->error($e->getMessage(), 400);
         }
 
-        // Dispatch disbursement notification (Gap 4)
-        try {
-            $this->notifService->dispatchEvent('loan_disbursed', [
-                'customer_name' => $loan->getCustomer()->getFullName(),
-                'customer_email' => $loan->getCustomer()->getEmail(),
-                'customer_phone' => $loan->getCustomer()->getPhone(),
-                'loan_amount' => $result['net_disbursed'] ?? '',
-                'application_id' => $loan->getApplicationId(),
-                'user_id' => $userId,
-            ], $userId, $loan->getCustomer()->getId());
-        } catch (\Exception $e) { /* notification failure should not block disbursement */ }
+        // Notify the field agent that the loan was disbursed (in-app + push +
+        // email). Previously this routed to the operator ($userId) rather than
+        // the loan's agent — corrected to notify the owning agent.
+        $this->notifService->notifyAgent(
+            $loan->getAgent(),
+            'Loan disbursed',
+            "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been disbursed (net " . ($result['net_disbursed'] ?? '') . ").",
+            $loan->getCustomer()->getId(),
+        );
 
         $this->audit->logCreate($userId, 'Disbursement', $loan->getId(), $result, $this->getClientIp($request), $this->getUserAgent($request));
         return $this->success($result, 'Loan disbursed successfully');

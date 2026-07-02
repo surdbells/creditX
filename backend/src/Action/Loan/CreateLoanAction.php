@@ -305,22 +305,15 @@ final class CreateLoanAction
 
             $this->audit->logCreate($userId, 'Loan', $loan->getId(), $loan->toArray(), $this->getClientIp($request), $this->getUserAgent($request));
 
-            // Fire loan_captured event — templates on this event (push, email,
-            // etc.) will notify the agent that the application is in the system.
-            // Best-effort: failures inside dispatchEvent are caught there and
-            // don't affect the loan creation result. We pass agent_id as
-            // user_id so PUSH channel routes to the agent's device tokens.
-            $agentId = $loan->getAgent()?->getId();
-            if ($agentId) {
-                $this->notifService->dispatchEvent('loan_captured', [
-                    'customer_name'  => $customer->getFullName(),
-                    'customer_email' => $customer->getEmail(),
-                    'customer_phone' => $customer->getPhone(),
-                    'loan_amount'    => $c['amount'],
-                    'application_id' => $loan->getApplicationId(),
-                    'user_id'        => $agentId,
-                ], $agentId, $customer->getId());
-            }
+            // Notify the field agent (in-app + push + email). Best-effort —
+            // failures are swallowed inside the service and never affect the
+            // loan-creation result.
+            $this->notifService->notifyAgent(
+                $loan->getAgent(),
+                'Loan captured',
+                "Loan {$loan->getApplicationId()} for {$customer->getFullName()} ({$c['amount']}) has been captured.",
+                $customer->getId(),
+            );
 
             return $this->created($loan->toArray(true), 'Loan application created successfully');
         } catch (\Throwable $e) {

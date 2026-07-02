@@ -312,6 +312,10 @@ final class ApprovalEngineService
                 elseif ($result['loan_status'] === LoanStatus::REJECTED->value) $event = 'loan_rejected';
                 else $event = 'loan_approval_step';
 
+                // Customer-facing templates (e.g. rejection email) still fire
+                // via the event system. Agent-facing (user_id) is left null so
+                // the agent isn't double-notified — notifyAgent() below owns
+                // the agent's in-app + push + email delivery.
                 $this->notifService->dispatchEvent($event, [
                     'customer_name' => $loan->getCustomer()->getFullName(),
                     'customer_email' => $loan->getCustomer()->getEmail(),
@@ -320,16 +324,26 @@ final class ApprovalEngineService
                     'application_id' => $loan->getApplicationId(),
                     'step_name' => $approval->getStep()->getName(),
                     'action' => $action,
-                    'user_id' => $loan->getAgent()?->getId(),
+                    'user_id' => null,
                     // Reviewer's comment — drives the rejection-reason
                     // template (see seed-loan-rejected-templates.php).
-                    // For approvals, comment is optional and may be null.
-                    // Template engine's missing-variable tolerance handles
-                    // the null case gracefully ({comment} renders empty).
                     'comment' => $comment ?? '',
                     // Reviewer name so the agent knows who decided
                     'reviewer_name' => $user->getFullName(),
-                ], $loan->getAgent()?->getId(), $loan->getCustomer()->getId());
+                ], null, $loan->getCustomer()->getId());
+
+                // Notify the field agent (in-app + push + email) with copy
+                // matched to what actually happened.
+                [$subject, $body] = match ($event) {
+                    'loan_approved' => ['Loan approved',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been approved."],
+                    'loan_rejected' => ['Loan rejected',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} was rejected"
+                        . ($comment ? " — {$comment}" : '.')],
+                    default => ["Loan {$action}d at {$approval->getStep()->getName()}",
+                        "{$user->getFullName()} {$action}d the '{$approval->getStep()->getName()}' step on loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()}."],
+                };
+                $this->notifService->notifyAgent($loan->getAgent(), $subject, $body, $loan->getCustomer()->getId());
             } catch (\Exception $e) { /* notification failure should not block */ }
         }
 

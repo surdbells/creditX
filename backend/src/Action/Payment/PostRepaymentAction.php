@@ -43,22 +43,15 @@ final class PostRepaymentAction
 
         $this->audit->logCreate($userId, 'Payment', $payment->getId(), $payment->toArray(), $this->getClientIp($request), $this->getUserAgent($request));
 
-        // Fire payment_received — route to agent's devices for PUSH.
-        // Use loan->amount_requested context shape for consistency with
-        // other loan events; payment amount in its own variable.
-        $agentId = $loan->getAgent()?->getId();
-        if ($agentId) {
-            $customer = $loan->getCustomer();
-            $this->notifService->dispatchEvent('payment_received', [
-                'customer_name'  => $customer->getFullName(),
-                'customer_email' => $customer->getEmail(),
-                'customer_phone' => $customer->getPhone(),
-                'application_id' => $loan->getApplicationId(),
-                'loan_amount'    => $loan->getAmountRequested(),
-                'payment_amount' => $amount,
-                'user_id'        => $agentId,
-            ], $agentId, $customer->getId());
-        }
+        // Notify the field agent that a repayment was posted (in-app + push +
+        // email).
+        $customer = $loan->getCustomer();
+        $this->notifService->notifyAgent(
+            $loan->getAgent(),
+            'Repayment received',
+            "A repayment of {$amount} was posted on loan {$loan->getApplicationId()} for {$customer->getFullName()}.",
+            $customer->getId(),
+        );
 
         return $this->created($payment->toArray(), 'Repayment posted successfully');
     }

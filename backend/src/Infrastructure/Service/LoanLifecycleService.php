@@ -27,6 +27,7 @@ final class LoanLifecycleService
         private readonly LoanCalculationService $calcService,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
 
@@ -118,6 +119,17 @@ final class LoanLifecycleService
             // schedule waivers, trail).
             $this->em->commit();
 
+            if ($this->notifService !== null) {
+                try {
+                    $this->notifService->notifyAgent(
+                        $loan->getAgent(),
+                        'Loan written off',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been written off (outstanding {$outstanding}).",
+                        $loan->getCustomer()->getId(),
+                    );
+                } catch (\Throwable $e) { /* best-effort */ }
+            }
+
             return ['loan_id' => $loan->getId(), 'status' => 'written_off', 'outstanding_written_off' => $outstanding];
         } catch (\Exception $e) {
             $this->em->rollback();
@@ -200,6 +212,17 @@ final class LoanLifecycleService
 
             $this->em->flush();
             $this->em->commit();
+
+            if ($this->notifService !== null) {
+                try {
+                    $this->notifService->notifyAgent(
+                        $loan->getAgent(),
+                        'Loan restructured',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been restructured — new tenure {$newTenure} month(s).",
+                        $loan->getCustomer()->getId(),
+                    );
+                } catch (\Throwable $e) { /* best-effort */ }
+            }
 
             return ['loan_id' => $loan->getId(), 'status' => 'restructured', 'outstanding' => $outstanding, 'new_tenure' => $newTenure];
         } catch (\Exception $e) {

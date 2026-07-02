@@ -52,20 +52,14 @@ final class SubmitLoanAction
             $this->repo->flush();
         }
 
-        // Fire loan_submitted event. Routes to agent's devices for PUSH.
-        // Same context shape as other loan events for template consistency.
-        $agentId = $loan->getAgent()?->getId();
-        if ($agentId) {
-            $customer = $loan->getCustomer();
-            $this->notifService->dispatchEvent('loan_submitted', [
-                'customer_name'  => $customer->getFullName(),
-                'customer_email' => $customer->getEmail(),
-                'customer_phone' => $customer->getPhone(),
-                'loan_amount'    => $loan->getAmountRequested(),
-                'application_id' => $loan->getApplicationId(),
-                'user_id'        => $agentId,
-            ], $agentId, $customer->getId());
-        }
+        // Notify the field agent (in-app + push + email).
+        $customer = $loan->getCustomer();
+        $this->notifService->notifyAgent(
+            $loan->getAgent(),
+            'Loan submitted for approval',
+            "Loan {$loan->getApplicationId()} for {$customer->getFullName()} has been submitted for approval.",
+            $customer->getId(),
+        );
 
         $this->audit->logUpdate($userId, 'Loan', $loan->getId(), ['status' => 'previous'], ['status' => $loan->getStatus()->value], $this->getClientIp($request), $this->getUserAgent($request));
         return $this->success($loan->toArray(true), 'Loan submitted for approval');

@@ -33,6 +33,7 @@ final class RepaymentService
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
         private readonly LedgerTransactionRepository $ledgerTxnRepo,
+        private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
 
@@ -258,10 +259,12 @@ final class RepaymentService
                 }
             }
 
+            $loanClosed = false;
             if ($allPaid) {
                 $loan->transitionTo(LoanStatus::CLOSED);
                 $loan->setClosedAt(new \DateTimeImmutable('now', new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos')));
                 $customerLedger->close();
+                $loanClosed = true;
 
                 $trail = new LoanTrail();
                 $trail->setUserId($userId);
@@ -295,6 +298,20 @@ final class RepaymentService
             // (Payment, allocations, schedule status updates, loan
             // status, trail) atomically with the journal.
             $this->em->commit();
+
+            // Notify the field agent once the loan is fully repaid and closed
+            // (in-app + push + email). Post-commit and best-effort so a
+            // notification hiccup can't roll back a settled payment.
+            if ($loanClosed && $this->notifService !== null) {
+                try {
+                    $this->notifService->notifyAgent(
+                        $loan->getAgent(),
+                        'Loan closed',
+                        "Loan {$loan->getApplicationId()} for {$loan->getCustomer()->getFullName()} has been fully repaid and closed.",
+                        $loan->getCustomer()->getId(),
+                    );
+                } catch (\Throwable $e) { /* best-effort */ }
+            }
 
             return $payment;
 
