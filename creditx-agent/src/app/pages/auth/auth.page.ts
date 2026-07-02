@@ -21,7 +21,7 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
           <!-- Logo -->
           <div class="cxm-auth-logo-wrap">
             <div class="cxm-auth-logo">
-              <span>CX</span>
+              <img src="assets/icon/logo.png" alt="CreditX" />
             </div>
             <h1 class="cxm-auth-brand">
               <span class="cxm-auth-brand-credit">Credit</span><span class="cxm-auth-brand-x">X</span>
@@ -149,19 +149,15 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
     }
     .cxm-auth-logo {
       width: 56px; height: 56px;
-      background: linear-gradient(135deg, var(--cx-primary-600), var(--cx-primary-500));
       border-radius: var(--cx-radius-xl);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      overflow: hidden;
       margin: 0 auto 12px;
       box-shadow: 0 8px 20px rgba(10, 79, 42, 0.3);
     }
-    .cxm-auth-logo span {
-      font-size: var(--cx-text-xl);
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -0.02em;
+    .cxm-auth-logo img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
     }
     .cxm-auth-brand {
       margin: 0;

@@ -10,10 +10,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden"
         style="background: linear-gradient(160deg, var(--cx-primary-700) 0%, var(--cx-primary-600) 55%, var(--cx-primary-800) 100%)">
         <div class="flex items-center gap-2.5">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center"
-            style="background: var(--cx-accent-500); color: var(--cx-accent-900)">
-            <lucide-icon name="wallet" [size]="22"></lucide-icon>
-          </div>
+          <img src="creditx-logo.png" alt="CreditX" class="w-10 h-10 rounded-xl" />
           <span class="text-white text-xl font-bold tracking-tight">CreditX</span>
         </div>
 
@@ -40,10 +37,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="flex items-center justify-center p-6 sm:p-12">
         <div class="w-full max-w-sm cx-animate-in">
           <div class="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
-            <div class="w-9 h-9 rounded-lg flex items-center justify-center"
-              style="background: var(--cx-primary-600); color: #fff">
-              <lucide-icon name="wallet" [size]="20"></lucide-icon>
-            </div>
+            <img src="creditx-logo.png" alt="CreditX" class="w-9 h-9 rounded-lg" />
             <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">CreditX</span>
           </div>
 
