@@ -59,23 +59,49 @@ final class BroadcastToAgentsAction
         $agents = $this->resolveAgents($recipientType, $data);
         if (empty($agents)) return $this->error('No matching agents found.', 400);
 
-        $delivered = 0;
-        $channelTotals = ['in_app' => 0, 'email' => 0, 'push' => 0];
+        // Deliver the in-app notification inline (DB-only, fast) so every
+        // agent's notification list is populated immediately and we can report
+        // an accurate count.
+        $inAppCount = 0;
         foreach ($agents as $agent) {
-            $res = $this->dispatch->deliverToUser($agent, $subject, $message, $channels);
-            $delivered++;
+            $res = $this->dispatch->deliverToUser($agent, $subject, $message, ['in_app']);
             foreach ($res as $r) {
-                if (($r['status'] ?? '') === 'sent' && isset($channelTotals[$r['channel']])) {
-                    $channelTotals[$r['channel']]++;
-                }
+                if (($r['status'] ?? '') === 'sent' && $r['channel'] === 'in_app') $inAppCount++;
             }
         }
 
+        // The external channels (email/push) each make a per-agent HTTP call to
+        // the provider — for a large audience that easily exceeds the request
+        // timeout. Run them AFTER the response is flushed to the client so the
+        // admin gets an immediate confirmation instead of a hung spinner.
+        if (!empty($external)) {
+            $dispatch = $this->dispatch;
+            register_shutdown_function(static function () use ($agents, $subject, $message, $external, $dispatch): void {
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();   // return the response, keep working
+                }
+                @set_time_limit(0);
+                foreach ($agents as $agent) {
+                    try { $dispatch->deliverToUser($agent, $subject, $message, $external); }
+                    catch (\Throwable $e) { /* best-effort; per-channel errors are logged inside */ }
+                }
+            });
+        }
+
+        $count = count($agents);
+        $queued = !empty($external);
         return $this->success([
-            'agents'   => $delivered,
+            'agents'   => $count,
             'channels' => $channels,
-            'sent'     => $channelTotals,
-        ], "Broadcast delivered to {$delivered} agent(s)");
+            'queued'   => $queued,
+            'sent'     => [
+                'in_app' => $inAppCount,
+                'email'  => in_array('email', $external, true) ? $count : 0,
+                'push'   => in_array('push', $external, true) ? $count : 0,
+            ],
+        ], $queued
+            ? "In-app delivered to {$count} agent(s); email/push are sending in the background."
+            : "Broadcast delivered to {$count} agent(s).");
     }
 
     /** @return User[] */

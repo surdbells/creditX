@@ -61,7 +61,11 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
         @if (result(); as r) {
           <div class="cx-bc-result">
             <lucide-icon name="check-circle" [size]="16"></lucide-icon>
-            <span>Delivered to {{ r.agents }} agent(s) — in-app {{ r.sent.in_app }}, email {{ r.sent.email }}, push {{ r.sent.push }}.</span>
+            @if (r.queued) {
+              <span>In-app delivered to {{ r.agents }} agent(s). Email/push are being sent in the background.</span>
+            } @else {
+              <span>Delivered to {{ r.agents }} agent(s) — in-app {{ r.sent.in_app }}.</span>
+            }
           </div>
         }
       </div>
