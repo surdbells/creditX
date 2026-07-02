@@ -6,7 +6,7 @@ import { environment } from '../../../environments/environment';
  * this install of the agent app talks to.
  *
  * A single app binary serves every CreditX client. Each client has its own
- * isolated backend at `{slug}.api.creditx.cloud`. On first run the agent enters
+ * isolated backend at `{slug}-api.creditx.cloud`. On first run the agent enters
  * their org code; the app builds the API base URL, validates it against the
  * tenant's public settings, and stores it. Every request then uses the stored
  * base URL (see ApiService / AuthService). "Switch organisation" clears it.

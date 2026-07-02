@@ -13,7 +13,7 @@ import { firstValueFrom } from 'rxjs';
  * Tenant selection — the first screen a fresh install shows (production).
  *
  * The agent enters their organisation code; the app builds
- * `https://{code}.api.creditx.cloud/api`, validates it by fetching the tenant's
+ * `https://{code}-api.creditx.cloud/api`, validates it by fetching the tenant's
  * public settings (unauthenticated), checks the app isn't below the tenant's
  * minimum supported version, then stores the tenant and continues to login.
  */

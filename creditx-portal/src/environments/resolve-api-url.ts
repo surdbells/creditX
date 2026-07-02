@@ -1,21 +1,21 @@
 /**
  * Per-tenant API base derived from the current hostname, so ONE build of the
  * portal serves every client. The tenant slug is the first DNS label of the
- * host (a trailing `-admin` / `-portal` is stripped for the flat scheme).
+ * host (a trailing `-admin` / `-portal` is stripped).
  *
- * Examples (nested scheme, default):
- *   acme.creditx.cloud → https://acme.api.creditx.cloud/api
+ * Examples (flat scheme, default — all covered by the free *.creditx.cloud cert):
+ *   acme.creditx.cloud → https://acme-api.creditx.cloud/api
  *
  * Non-tenant hosts (localhost, *.pages.dev, *.github.io, the bare apex) fall
  * back to `fallback` — used only for local dev / previews.
  */
 
 // ── Choose the scheme that matches your DNS + Cloudflare certs ──
-// Nested (needs an ACM wildcard cert for *.api.creditx.cloud):
-const TENANT_API_TEMPLATE = 'https://{slug}.api.creditx.cloud/api';
-// Flat (covered by the FREE *.creditx.cloud Universal cert — no ACM). To use
-// it, comment the line above and uncomment this one:
-// const TENANT_API_TEMPLATE = 'https://{slug}-api.creditx.cloud/api';
+// Flat (single-label hosts, covered by the FREE *.creditx.cloud Universal cert):
+const TENANT_API_TEMPLATE = 'https://{slug}-api.creditx.cloud/api';
+// Nested (needs an ACM wildcard cert for *.api.creditx.cloud). To use it,
+// comment the line above and uncomment this one:
+// const TENANT_API_TEMPLATE = 'https://{slug}.api.creditx.cloud/api';
 
 const ROOT = 'creditx.cloud';
 const RESERVED = ['api', 'admin', 'portal', 'www', 'app', 'status', 'docs'];

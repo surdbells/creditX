@@ -25,10 +25,10 @@ with the client's real values:
 |---|---|
 | `<CLIENT>` | `acme` (short slug, lowercase) |
 | `<PORTAL_DOMAIN>` | `acme.creditx.cloud` |
-| `<ADMIN_DOMAIN>` | `acme.admin.creditx.cloud` |
-| `<API_DOMAIN>` | `acme.api.creditx.cloud` |
+| `<ADMIN_DOMAIN>` | `acme-admin.creditx.cloud` |
+| `<API_DOMAIN>` | `acme-api.creditx.cloud` |
 | `<DB_NAME>` / `<DB_USER>` / `<DB_PASS>` | `creditx_acme` / `creditx_acme` / *(generated)* |
-| `/www/wwwroot/creditx` | the per-client site directory aaPanel creates when you Add Site — i.e. `/www/wwwroot/<API_DOMAIN>` (e.g. `/www/wwwroot/acme.api.creditx.cloud`). Substitute it everywhere. |
+| `/www/wwwroot/creditx` | the per-client site directory aaPanel creates when you Add Site — i.e. `/www/wwwroot/<API_DOMAIN>` (e.g. `/www/wwwroot/acme-api.creditx.cloud`). Substitute it everywhere. |
 
 > A client that wants full brand ownership can instead **bring their own
 > domain** (e.g. `portal.firstmfb.com`) via Cloudflare for SaaS custom
@@ -46,12 +46,12 @@ The platform-wide `creditx.cloud` setup (domain, wildcard certs) is done
                          ┌─────────────────── Cloudflare ───────────────────┐
   Admin staff  ─────────▶│  Pages:  <ADMIN_DOMAIN>   (creditx-admin)         │
   Customers    ─────────▶│  Pages:  <PORTAL_DOMAIN>  (creditx-portal)        │
-                         │  *.api.creditx.cloud  ── proxied ──┐              │
+                         │  <API_DOMAIN>  ── proxied ─────────┐              │
                          └────────────────────────────────────┼──────────────┘
                                                   │  HTTPS (Origin cert, Full strict)
                                                   ▼
   Agents (mobile app) ───────────────▶  ┌──── 159.195.82.117 (aaPanel) ────┐
-                                         │  Nginx vhost per client → its dir │
+                                         │  Nginx site per client → its dir  │
                                          │  PHP-FPM 8.2/8.3                   │
                                          │  Shared PostgreSQL + Redis        │
                                          │   (per-client DB + REDIS_PREFIX)  │
@@ -59,21 +59,22 @@ The platform-wide `creditx.cloud` setup (domain, wildcard certs) is done
                                          └───────────────────────────────────┘
 ```
 
-**Per-client DNS records** (in the `creditx.cloud` Cloudflare zone):
+**Flat single-label scheme** (all under the free `*.creditx.cloud` cert — no
+paid ACM). **Per-client DNS records** (in the `creditx.cloud` Cloudflare zone):
 
 | Type | Name | Target | Proxy |
 |---|---|---|---|
-| — | `<CLIENT>.api` | *covered by the `*.api` wildcard A record (§0.1) — nothing to add* | — |
-| `CNAME` | `<CLIENT>.admin` (→ `<ADMIN_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
+| `A` | `<CLIENT>-api` (→ `<API_DOMAIN>`) | `159.195.82.117` | Proxied (orange) |
+| `CNAME` | `<CLIENT>-admin` (→ `<ADMIN_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
 | `CNAME` | `<CLIENT>` (→ `<PORTAL_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
 
-> The client's **API host needs no DNS record** — the one-time `*.api` wildcard
-> from §0.1 already resolves it to the shared server. Only the two Pages CNAMEs
-> are per-client, and even those can be automated via Cloudflare Pages.
+> The two Pages CNAMEs are created **automatically** when you attach the custom
+> domain in each Pages project (§9) — so per client you really only add the one
+> **`<CLIENT>-api` A record** by hand.
 
 > Because the origin sits behind Cloudflare with a **Cloudflare Origin CA cert**
-> (§0.1 / §6), the API host stays **proxied (orange) from day one** — no
-> grey-cloud/ACME dance. Zone SSL mode = **Full (strict)**.
+> covering `*.creditx.cloud` (§0.1 / §6), the API host stays **proxied (orange)
+> from day one** — no grey-cloud/ACME dance. Zone SSL mode = **Full (strict)**.
 
 ---
 
@@ -82,20 +83,26 @@ The platform-wide `creditx.cloud` setup (domain, wildcard certs) is done
 Do this **once** when standing up the platform — not per client. It makes
 every future client a DNS-only add.
 
-### Subdomain scheme
+### Subdomain scheme (flat, single-label)
 
-Each client gets three subdomains under `creditx.cloud`, namespaced by role so
-a single wildcard per role covers **all** clients:
+Each client gets three **single-label** subdomains under `creditx.cloud`, so the
+**one free `*.creditx.cloud` Universal cert covers all of them** — no paid
+Advanced Certificate Manager:
 
-| Surface | Pattern | Example (`acme`) | Wildcard cert that covers it |
+| Surface | Pattern | Example (`acme`) | Cert |
 |---|---|---|---|
-| Customer portal | `{client}.creditx.cloud` | `acme.creditx.cloud` | `*.creditx.cloud` |
-| Admin console | `{client}.admin.creditx.cloud` | `acme.admin.creditx.cloud` | `*.admin.creditx.cloud` |
-| Backend API | `{client}.api.creditx.cloud` | `acme.api.creditx.cloud` | `*.api.creditx.cloud` |
+| Customer portal | `{client}.creditx.cloud` | `acme.creditx.cloud` | `*.creditx.cloud` (free Universal) |
+| Admin console | `{client}-admin.creditx.cloud` | `acme-admin.creditx.cloud` | `*.creditx.cloud` (free Universal) |
+| Backend API | `{client}-api.creditx.cloud` | `acme-api.creditx.cloud` | `*.creditx.cloud` (free Universal) |
 
-The **agent mobile app** targets `{client}.api.creditx.cloud` automatically from
-the org code the agent enters (see §10) — it needs no per-client DNS beyond the
-API record above.
+> **Why flat, not nested** (`acme.api.creditx.cloud`): Cloudflare's free wildcard
+> only covers **one** label level, so nested hosts would need the paid ACM add-on
+> and otherwise fail with `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`. Single-label
+> hosts all sit directly under `*.creditx.cloud` → free.
+
+The **agent mobile app** builds `{client}-api.creditx.cloud` automatically from
+the org code the agent enters (see §10) — no per-client DNS beyond the API `A`
+record.
 
 ### This platform's topology (confirmed)
 
@@ -103,16 +110,16 @@ API record above.
   Public IP: **`159.195.82.117`**.
 - **Shared PostgreSQL + Redis daemons** on that box; tenants are isolated by a
   **separate database per client** and a **unique `REDIS_PREFIX`** (see §3.1).
-- **One Nginx vhost per client** (`{client}.api.creditx.cloud`), each pointing
-  at that client's own code directory + `.env`. Portals/admins are static and
-  live on **Cloudflare Pages** (not this server).
+- **One Nginx site per client** (`{client}-api.creditx.cloud`), each pointing at
+  that client's own code directory + `.env`. Portals/admins are static and live
+  on **Cloudflare Pages** (not this server).
 
 ```
-   Cloudflare (edge TLS, proxied)          ┌──────────── 159.195.82.117 (aaPanel) ────────────┐
-  *.creditx.cloud ....... Pages (portals)  │ site acme.api.creditx.cloud → /www/wwwroot/acme.api… │
-  *.admin.creditx.cloud . Pages (admins)   │ site bmfb.api.creditx.cloud → /www/wwwroot/bmfb.api… │
-  *.api.creditx.cloud ─── A → 159.195.82.117 ▶│ … shared PostgreSQL + Redis (per-DB / per-prefix)   │
-                                           └───────────────────────────────────────────────────┘
+   Cloudflare (edge TLS, proxied)             ┌──────────── 159.195.82.117 (aaPanel) ─────────────┐
+  *.creditx.cloud (free cert) ─┬─ Pages: portals  │ site acme-api.creditx.cloud → /www/wwwroot/acme-api…│
+                               ├─ Pages: admins    │ site bmfb-api.creditx.cloud → /www/wwwroot/bmfb-api…│
+                               └─ A {slug}-api → 159.195.82.117 ▶│ … shared PostgreSQL + Redis (per-DB/prefix)│
+                                                  └────────────────────────────────────────────────────┘
 ```
 
 ### One-time steps
@@ -124,40 +131,29 @@ API record above.
    `status`, `docs`, `help`, `billing`, `console`, `dashboard`, `cdn`, `static`,
    `mail`, `support`. (Enforce with a slug validator at onboarding:
    lowercase, `[a-z0-9-]`, length 2–40, not in the reserved set.)
-3. **Wildcard DNS for all client APIs** — one record covers every client since
-   they share the server:
-
-   | Type | Name | Content | Proxy |
-   |---|---|---|---|
-   | `A` | `*.api` | `159.195.82.117` | **Proxied (orange)** |
-
-   (`acme.api.creditx.cloud`, `bmfb.api.creditx.cloud`, … all resolve to the box
-   automatically — no per-client API DNS needed.)
-4. **Edge certs** (Cloudflare → SSL/TLS → Edge Certificates):
-   - Turn on **Total TLS**; `*.creditx.cloud` is covered by Universal SSL.
-   - Order **Advanced Certificates** for the two-label wildcards
-     `*.admin.creditx.cloud` and `*.api.creditx.cloud` (Universal covers only one
-     level).
-5. **Origin cert on the shared server (recommended — replaces per-vhost
-   Let's Encrypt).** Because the box sits behind Cloudflare, issue **one
-   Cloudflare Origin CA certificate** covering `*.api.creditx.cloud` (and add
-   `*.creditx.cloud` if the server ever serves other roles), valid up to 15
-   years, and install it once in aaPanel. **Every** client API vhost uses this
-   same cert — no Let's Encrypt, no ACME, no per-client cert step, and DNS can
-   stay **proxied from day one**. Then set the zone SSL/TLS mode to
-   **Full (strict)**. (See §6 for the install steps.)
-6. **Portal & admin Pages projects** — one Cloudflare Pages project per role;
-   attach `{client}.creditx.cloud` / `{client}.admin.creditx.cloud` as a custom
-   domain per client as they come online (§9).
-7. **(Optional) white-label** — enable **Cloudflare for SaaS** if some clients
+3. **Edge cert — nothing to buy.** The **free Universal `*.creditx.cloud`**
+   certificate already covers every single-label host (`acme.creditx.cloud`,
+   `acme-admin.creditx.cloud`, `acme-api.creditx.cloud`). Just confirm Universal
+   SSL is **On** (SSL/TLS → Edge Certificates). No Advanced Certificate Manager
+   needed.
+4. **Origin cert on the shared server (once).** Cloudflare → **SSL/TLS → Origin
+   Server → Create Certificate** for **`*.creditx.cloud`** (and `creditx.cloud`),
+   15-year. Install it once in aaPanel; **every** client API site reuses this one
+   cert (§6). Then set the zone SSL/TLS mode to **Full (strict)**.
+5. **Two Cloudflare Pages projects** — one for the admin app, one for the portal
+   (each is one build serving all clients, §8/§9). Attach each client's custom
+   domain to them as clients come online (`{client}-admin.creditx.cloud` →
+   admin project; `{client}.creditx.cloud` → portal project) — Pages auto-creates
+   the CNAME + issues the edge cert.
+6. **(Optional) white-label** — enable **Cloudflare for SaaS** if some clients
    bring their own domain (`portal.firstmfb.com` → CNAME to the platform);
    custom hostnames get certs issued automatically.
 
-After §0.1, provisioning a new client on this server is just: create its
-database, **Add Site `<API_DOMAIN>` in aaPanel** (which creates the directory),
-deploy the code into it, and fill its `.env` (its own `DB_NAME`, unique
-`REDIS_PREFIX`, and `APP_URL`/`CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` on its
-`creditx.cloud` subdomains) — **no new DNS, no new certificate**.
+After §0.1, provisioning a new client is: create its database, **Add Site
+`<API_DOMAIN>` in aaPanel** (creates the directory) + deploy code, fill its
+`.env`, add the one **`<CLIENT>-api` A record**, and attach its two custom
+domains to the Pages projects — **no new certificate**, and the frontends need
+**no rebuild** (they auto-derive the API from their hostname, §8).
 
 ---
 
@@ -212,14 +208,14 @@ psql "host=127.0.0.1 port=5432 dbname=<DB_NAME> user=<DB_USER> password=<DB_PASS
 `git clone` a directory by hand; let aaPanel make it, then deploy into it.
 
 1. aaPanel → **Website → Add site**:
-   - **Domain:** `<API_DOMAIN>` (e.g. `acme.api.creditx.cloud`)
+   - **Domain:** `<API_DOMAIN>` (e.g. `acme-api.creditx.cloud`)
    - **PHP version:** 8.2 or 8.3 (from §1)
    - This creates the site directory **`/www/wwwroot/<API_DOMAIN>`** — that is
      this client's directory.
 
    > **Path convention:** in the rest of this doc, `/www/wwwroot/creditx` means
    > this per-client site directory `/www/wwwroot/<API_DOMAIN>` (e.g.
-   > `/www/wwwroot/acme.api.creditx.cloud`). Substitute accordingly in every
+   > `/www/wwwroot/acme-api.creditx.cloud`). Substitute accordingly in every
    > command and cron path below.
 
 2. Deploy the CreditX code **into that directory** (replacing aaPanel's default
@@ -448,13 +444,14 @@ it at the Slim front controller:
 **Recommended for this platform — one Cloudflare Origin CA cert for all
 clients (do the install once):**
 
-Because every client API vhost sits behind Cloudflare on the shared server, a
+Because every client API site sits behind Cloudflare on the shared server, a
 single **Cloudflare Origin CA** wildcard cert covers them all — no Let's
 Encrypt, no ACME, no per-client cert.
 
 1. Cloudflare → **SSL/TLS → Origin Server → Create Certificate**. Hostnames:
-   `*.api.creditx.cloud` (and `api.creditx.cloud`). Copy the **certificate**
-   and **private key** (RSA, 15-year validity).
+   **`*.creditx.cloud`** (and `creditx.cloud`) — this covers every client's
+   `{slug}-api.creditx.cloud`. Copy the **certificate** and **private key**
+   (RSA, 15-year validity).
 2. On the server, save them once, e.g.
    `/www/server/panel/vhost/cert/creditx-origin/fullchain.pem` and `privkey.pem`.
 3. For each client's aaPanel site → **SSL → Custom** → paste the **same** cert +
@@ -509,19 +506,18 @@ first DNS label and builds the API URL:
 
 | App host | Derived API |
 |---|---|
-| `acme.creditx.cloud` (portal) | `https://acme.api.creditx.cloud/api` |
-| `acme.admin.creditx.cloud` (admin) | `https://acme.api.creditx.cloud/api` |
+| `acme.creditx.cloud` (portal) | `https://acme-api.creditx.cloud/api` |
+| `acme-admin.creditx.cloud` (admin) | `https://acme-api.creditx.cloud/api` |
 
 Off-platform hosts (localhost, `*.pages.dev`, `*.github.io`, the bare apex)
 fall back to the `resolveApiUrl(...)` fallback — used only for local dev /
 previews.
 
-**Scheme switch (do once, matches your DNS/cert choice):** the API URL template
-lives at the top of `resolve-api-url.ts` in **both** apps. Default is the
-**nested** scheme (`https://{slug}.api.creditx.cloud/api`, needs the ACM
-`*.api.creditx.cloud` cert). To use the **flat**, free-cert scheme, switch the
-template to `https://{slug}-api.creditx.cloud/api` (and name your API hosts
-`{slug}-api.creditx.cloud`).
+**Scheme (already set to flat):** the API URL template lives at the top of
+`resolve-api-url.ts` in **both** apps and is set to the **flat**, free-cert
+scheme (`https://{slug}-api.creditx.cloud/api`). If you ever move to the nested
+scheme (needs the paid ACM `*.api.creditx.cloud` cert), switch it to
+`https://{slug}.api.creditx.cloud/api` in both files.
 
 > The trailing `/api` is required — backend routes are mounted under `/api`.
 
@@ -576,14 +572,14 @@ finishes, browse to each custom domain.
 `creditx-agent` is an Ionic + Capacitor app. It ships as **one native binary
 that serves every client** — it does **not** bake a per-client API URL. On
 first launch the agent enters their **organization code** (the client slug);
-the app builds `https://{slug}.api.creditx.cloud/api`, validates it against the
+the app builds `https://{slug}-api.creditx.cloud/api`, validates it against the
 tenant's public settings, stores it, and points all requests there. "Switch
 Organization" (Profile) clears it.
 
 ### 10.1 What each new client needs (usually nothing app-side)
 
-- The client's backend must be reachable at `https://<CLIENT_SLUG>.api.creditx.cloud`
-  (the per-role wildcard from the subdomain scheme — see the domains doc).
+- The client's backend must be reachable at `https://<CLIENT_SLUG>-api.creditx.cloud`
+  (the flat single-label API host — see §0.1).
 - Give the client's agents their **org code** (`<CLIENT_SLUG>`). That's it —
   no rebuild, no new store listing.
 - Optionally set the tenant's **minimum supported app version** so old installs
@@ -596,7 +592,7 @@ Organization" (Profile) clears it.
 cd creditx-agent
 # Confirm the tenant template + this build's version in
 # src/environments/environment.prod.ts:
-#   apiUrlTemplate: 'https://{slug}.api.creditx.cloud/api'
+#   apiUrlTemplate: 'https://{slug}-api.creditx.cloud/api'
 #   requireTenantSelection: true
 #   appVersion: '1.0.0'   # bump on each release
 npm ci
@@ -617,7 +613,7 @@ npx cap sync
 
 If a client wants their **own** branded app in their **own** store account,
 build a dedicated binary with `requireTenantSelection: false` and
-`apiUrl: 'https://<CLIENT_SLUG>.api.creditx.cloud/api'` baked into
+`apiUrl: 'https://<CLIENT_SLUG>-api.creditx.cloud/api'` baked into
 `environment.prod.ts`, then submit under the client's developer account. This
 is the exception, not the default.
 
@@ -856,13 +852,12 @@ Before handing over, walk one full cycle on real config:
 ## 13. Per-client checklist (copy this into the client's ticket)
 
 **Platform (one-time, §0.1) — do once, not per client:**
-- [ ] `creditx.cloud` Cloudflare zone active
-- [ ] Wildcard `A *.api → 159.195.82.117` (proxied); Advanced certs for `*.admin` / `*.api`; Universal covers `*.creditx.cloud`
-- [ ] Cloudflare **Origin CA** cert (`*.api.creditx.cloud`) installed on the server; zone SSL = **Full (strict)**
-- [ ] Reserved system labels enforced by the slug validator
+- [ ] `creditx.cloud` Cloudflare zone active; **Universal SSL on** (free `*.creditx.cloud` — no ACM)
+- [ ] Cloudflare **Origin CA** cert (`*.creditx.cloud`) installed on the server; zone SSL = **Full (strict)**
+- [ ] Two Pages projects (admin, portal) created; reserved system labels enforced by the slug validator
 
 **Per client:**
-- [ ] Portal + admin CNAMEs added (API host needs no DNS — wildcard covers it)
+- [ ] `A <CLIENT>-api → 159.195.82.117` (proxied) added; two custom domains attached to the Pages projects (auto-CNAMEs)
 - [ ] aaPanel **Add Site** `<API_DOMAIN>` (creates `/www/wwwroot/<API_DOMAIN>`); code deployed into it; own database on shared PostgreSQL
 - [ ] aaPanel: PHP 8.2/8.3 + extensions, PostgreSQL, Redis installed
 - [ ] Database + dedicated user created
