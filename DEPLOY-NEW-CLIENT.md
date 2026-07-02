@@ -395,6 +395,15 @@ php bin/migrate-legacy.php --dry-run
 php bin/migrate-legacy.php
 #    flags: --skip-records / --skip-users to run one side only
 
+# 1b. Branch locations + user→location mapping (needs step 1's users).
+#     The legacy branch column is auto-detected — the --dry-run prints which
+#     column it picked and the branch list; CONFIRM that before applying.
+php bin/migrate-legacy-locations.php --dry-run
+php bin/migrate-legacy-locations.php
+#    if auto-detect picks the wrong column: --list-columns to see them, then
+#    --branch-col=NAME  (or --branch-table=NAME --branch-label-col=NAME for a
+#    lookup table). Also sets is_agent on role=agent users (--no-agent-flag to skip).
+
 # 2. Loan products + standard fees (idempotent; skips existing by code)
 php bin/migrate-products.php
 
@@ -405,8 +414,9 @@ php bin/migrate-customers.php
 #    flag: --limit=N to import a first batch and eyeball it
 ```
 
-All three are **idempotent** — re-running skips rows that already exist
-(records by key, products by code, customers by `staff_id`).
+All of these are **idempotent** — re-running skips rows that already exist
+(records by key, products by code, customers by `staff_id`, locations by
+code, user→location links by pair).
 
 **After migration**
 
