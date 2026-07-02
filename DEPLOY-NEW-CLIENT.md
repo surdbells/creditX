@@ -28,7 +28,7 @@ with the client's real values:
 | `<ADMIN_DOMAIN>` | `acme.admin.creditx.cloud` |
 | `<API_DOMAIN>` | `acme.api.creditx.cloud` |
 | `<DB_NAME>` / `<DB_USER>` / `<DB_PASS>` | `creditx_acme` / `creditx_acme` / *(generated)* |
-| `/www/wwwroot/creditx` | server install path (aaPanel default web root) |
+| `/www/wwwroot/creditx` | the per-client site directory aaPanel creates when you Add Site — i.e. `/www/wwwroot/<API_DOMAIN>` (e.g. `/www/wwwroot/acme.api.creditx.cloud`). Substitute it everywhere. |
 
 > A client that wants full brand ownership can instead **bring their own
 > domain** (e.g. `portal.firstmfb.com`) via Cloudflare for SaaS custom
@@ -108,11 +108,11 @@ API record above.
   live on **Cloudflare Pages** (not this server).
 
 ```
-        Cloudflare (edge TLS, proxied)          ┌──────── 159.195.82.117 (aaPanel) ────────┐
-  *.creditx.cloud ........ Pages (portals)      │  vhost acme.api.creditx.cloud → creditx-acme │
-  *.admin.creditx.cloud .. Pages (admins)       │  vhost bmfb.api.creditx.cloud → creditx-bmfb │
-  *.api.creditx.cloud ──── A → 159.195.82.117 ──▶│  … shared PostgreSQL + Redis (per-DB/prefix) │
-                                                 └───────────────────────────────────────────┘
+   Cloudflare (edge TLS, proxied)          ┌──────────── 159.195.82.117 (aaPanel) ────────────┐
+  *.creditx.cloud ....... Pages (portals)  │ site acme.api.creditx.cloud → /www/wwwroot/acme.api… │
+  *.admin.creditx.cloud . Pages (admins)   │ site bmfb.api.creditx.cloud → /www/wwwroot/bmfb.api… │
+  *.api.creditx.cloud ─── A → 159.195.82.117 ▶│ … shared PostgreSQL + Redis (per-DB / per-prefix)   │
+                                           └───────────────────────────────────────────────────┘
 ```
 
 ### One-time steps
@@ -154,7 +154,8 @@ API record above.
    custom hostnames get certs issued automatically.
 
 After §0.1, provisioning a new client on this server is just: create its
-database + code dir + vhost, fill its `.env` (its own `DB_NAME`, unique
+database, **Add Site `<API_DOMAIN>` in aaPanel** (which creates the directory),
+deploy the code into it, and fill its `.env` (its own `DB_NAME`, unique
 `REDIS_PREFIX`, and `APP_URL`/`CORS_ALLOWED_ORIGINS`/`FRONTEND_URL` on its
 `creditx.cloud` subdomains) — **no new DNS, no new certificate**.
 
@@ -205,23 +206,37 @@ psql "host=127.0.0.1 port=5432 dbname=<DB_NAME> user=<DB_USER> password=<DB_PASS
 
 ---
 
-## 3. Deploy the backend code
+## 3. Create the aaPanel website, then deploy the code
 
-> **Shared server:** each client gets its **own code directory** so its `.env`
-> and database stay isolated. Use `/www/wwwroot/creditx-<CLIENT>` per client
-> (e.g. `/www/wwwroot/creditx-acme`) and substitute that for `/www/wwwroot/creditx`
-> everywhere below. The shared PostgreSQL and Redis daemons are reused —
-> isolation comes from a per-client `DB_NAME` and `REDIS_PREFIX` (§3.1).
+**Create the site first — aaPanel creates the per-client directory.** Don't
+`git clone` a directory by hand; let aaPanel make it, then deploy into it.
+
+1. aaPanel → **Website → Add site**:
+   - **Domain:** `<API_DOMAIN>` (e.g. `acme.api.creditx.cloud`)
+   - **PHP version:** 8.2 or 8.3 (from §1)
+   - This creates the site directory **`/www/wwwroot/<API_DOMAIN>`** — that is
+     this client's directory.
+
+   > **Path convention:** in the rest of this doc, `/www/wwwroot/creditx` means
+   > this per-client site directory `/www/wwwroot/<API_DOMAIN>` (e.g.
+   > `/www/wwwroot/acme.api.creditx.cloud`). Substitute accordingly in every
+   > command and cron path below.
+
+2. Deploy the CreditX code **into that directory** (replacing aaPanel's default
+   placeholder files):
 
 ```bash
-# One directory per client under the aaPanel web root
-cd /www/wwwroot
-git clone <REPO_URL> creditx-<CLIENT>
-cd creditx-<CLIENT>/backend
-
-# PHP dependencies (production)
+cd /www/wwwroot/<API_DOMAIN>
+rm -f index.html 404.html .htaccess 2>/dev/null || true   # aaPanel placeholders
+git clone <REPO_URL> .            # clone INTO the site directory
+cd backend
 composer install --no-dev --optimize-autoloader --no-interaction
 ```
+
+> **Shared server:** every client is its own aaPanel **site** → its own
+> `/www/wwwroot/<API_DOMAIN>` directory, `.env`, and database. The PostgreSQL
+> and Redis daemons are shared; isolation comes from a per-client `DB_NAME` and
+> `REDIS_PREFIX` (§3.1). Finalize the site's run directory + rewrite in §5.
 
 ### 3.1 Configure environment
 
@@ -342,16 +357,15 @@ Leaving the default credentials live is a critical security hole.
 
 ---
 
-## 5. Configure the aaPanel website (Nginx → backend/public)
+## 5. Finalize the aaPanel website (run directory + rewrite)
 
-1. aaPanel → **Website → Add site**:
-   - Domain: `<API_DOMAIN>`
-   - Do **not** let it create a separate directory — point it at the repo.
-2. After creation, **Site → Site directory**:
-   - **Running directory**: set to `/backend/public` (the Slim front
-     controller lives in `backend/public/index.php`).
-3. **Site → Config / Pseudo-static (URL rewrite)** — Slim needs all requests
-   routed to the front controller:
+The site itself was created in §3 (that's what made the directory). Now point
+it at the Slim front controller:
+
+1. **Site → Site directory → Running directory**: set to `/backend/public`
+   (the Slim front controller is `backend/public/index.php`).
+2. **Site → Config / Pseudo-static (URL rewrite)** — route all requests to the
+   front controller:
 
    ```nginx
    location / {
@@ -359,8 +373,8 @@ Leaving the default credentials live is a critical security hole.
    }
    ```
 
-4. **Site → PHP version**: select 8.2 or 8.3 (the one you configured in §1).
-5. Confirm document-root permissions: `chown -R www:www /www/wwwroot/creditx`.
+3. **Site → PHP version**: confirm 8.2 or 8.3 (set at creation in §3).
+4. Confirm directory permissions: `chown -R www:www /www/wwwroot/<API_DOMAIN>`.
 
 ---
 
@@ -784,7 +798,7 @@ Before handing over, walk one full cycle on real config:
 
 **Per client:**
 - [ ] Portal + admin CNAMEs added (API host needs no DNS — wildcard covers it)
-- [ ] Own code dir `/www/wwwroot/creditx-<CLIENT>` + own database on the shared PostgreSQL
+- [ ] aaPanel **Add Site** `<API_DOMAIN>` (creates `/www/wwwroot/<API_DOMAIN>`); code deployed into it; own database on shared PostgreSQL
 - [ ] aaPanel: PHP 8.2/8.3 + extensions, PostgreSQL, Redis installed
 - [ ] Database + dedicated user created
 - [ ] `.env` filled (unique `JWT_SECRET`, unique `REDIS_PREFIX`, CORS origins)
