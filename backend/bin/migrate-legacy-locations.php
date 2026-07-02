@@ -33,10 +33,18 @@ declare(strict_types=1);
  *                             (skip auto-detect). In lookup mode this is the
  *                             FK column on `user`.
  *   --branch-table=NAME       Resolve branch via a lookup table instead of a
- *                             plain text column on `user`.
+ *                             plain text column on `user`. The user column may
+ *                             hold a comma-separated list of ids (multi-branch);
+ *                             each id is resolved and linked independently.
  *   --branch-id-col=NAME      PK column on the lookup table (default: id).
  *   --branch-label-col=NAME   Label column on the lookup table (default: name).
+ *   --branch-address-col=NAME Optional address/state column on the lookup table.
  *   --no-agent-flag           Do NOT set is_agent on role=agent users.
+ *
+ * FTI Pay (legacy `locations` table, comma-separated ids in `user`.`location`):
+ *   php bin/migrate-legacy-locations.php --dry-run \
+ *       --branch-table=locations --branch-id-col=lid \
+ *       --branch-label-col=lname --branch-address-col=address
  *
  * Env (backend/.env), same as migrate-legacy.php:
  *   LEGACY_DB_HOST/PORT/NAME/USER/PASSWORD   (source MySQL)
@@ -59,10 +67,11 @@ function argVal(array $argv, string $name): ?string {
     return null;
 }
 
-$forceBranchCol = argVal($argv, 'branch-col');
-$branchTable    = argVal($argv, 'branch-table');
-$branchIdCol    = argVal($argv, 'branch-id-col') ?? 'id';
-$branchLabelCol = argVal($argv, 'branch-label-col') ?? 'name';
+$forceBranchCol   = argVal($argv, 'branch-col');
+$branchTable      = argVal($argv, 'branch-table');
+$branchIdCol      = argVal($argv, 'branch-id-col') ?? 'id';
+$branchLabelCol   = argVal($argv, 'branch-label-col') ?? 'name';
+$branchAddressCol = argVal($argv, 'branch-address-col');   // optional
 
 echo "╔══════════════════════════════════════════════════════╗\n";
 echo "║  Legacy → CreditX  ·  Locations + user mapping        ║\n";
@@ -115,7 +124,7 @@ function now(): string { return (new DateTimeImmutable('now', new DateTimeZone('
 
 /** Derive a stable, unique uppercase location code from a branch name. */
 function makeCode(string $name, array &$seen): string {
-    $base = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $name));
+    $base = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $name));
     if ($base === '') $base = 'BR';
     $base = substr($base, 0, 16);
     $code = $base;
@@ -162,43 +171,76 @@ if (!in_array($branchCol, $cols, true)) {
 
 echo "Branch source column : `user`.`{$branchCol}`" . ($forceBranchCol ? " (forced)" : " (auto-detected)") . "\n";
 if ($branchTable) {
-    echo "Lookup table         : `{$branchTable}` ({$branchIdCol} → {$branchLabelCol})\n";
+    echo "Lookup table         : `{$branchTable}` ({$branchIdCol} → {$branchLabelCol}"
+        . ($branchAddressCol ? ", addr {$branchAddressCol}" : "") . ")\n";
 }
 
-// ─── Build id/key → label resolver ───
-$labelFor = static fn($raw): ?string => ($raw === null || trim((string)$raw) === '') ? null : trim((string)$raw);
+// ─── Build id/key → {label, address} resolver ───
+// The legacy `user` column may hold a single value or a comma-separated list
+// of ids (a user assigned to several branches). Each token is resolved
+// independently. In lookup-table mode the token is a foreign key into that
+// table; otherwise the token IS the label.
+$lookup = null;
 if ($branchTable !== null) {
+    $addrSel = $branchAddressCol ? ", `{$branchAddressCol}` AS a" : "";
     $lookup = [];
-    foreach ($mysql->query("SELECT `{$branchIdCol}` AS k, `{$branchLabelCol}` AS v FROM `{$branchTable}`") as $r) {
-        $lookup[(string)$r['k']] = trim((string)$r['v']);
+    foreach ($mysql->query("SELECT `{$branchIdCol}` AS k, `{$branchLabelCol}` AS v{$addrSel} FROM `{$branchTable}`") as $r) {
+        $lookup[trim((string)$r['k'])] = [
+            'label'   => trim((string)$r['v']),
+            'address' => isset($r['a']) ? trim((string)$r['a']) : null,
+        ];
     }
-    $labelFor = static function ($raw) use ($lookup): ?string {
-        if ($raw === null || trim((string)$raw) === '') return null;
-        return $lookup[(string)$raw] ?? null;
-    };
     echo "Lookup rows          : " . count($lookup) . "\n";
 }
 
-// ─── Pass 1: collect distinct branches + per-user branch label ───
+$resolve = static function (string $token) use ($lookup): ?array {
+    $token = trim($token);
+    if ($token === '') return null;
+    if ($lookup !== null) {
+        return $lookup[$token] ?? null;   // unknown id → orphan
+    }
+    return ['label' => $token, 'address' => null];
+};
+
+// ─── Pass 1: collect distinct branches + each user's branch set ───
 $userRows = $mysql->query("SELECT `email_address`, `{$branchCol}` AS branch_raw FROM `user`");
-$branches = [];          // label => count of users
-$userBranch = [];        // lower(email) => label
-$noBranch = 0; $noEmail = 0;
+$branches = [];          // label => ['count' => int, 'address' => ?string]
+$userBranches = [];      // lower(email) => [label, ...]
+$noBranch = 0; $noEmail = 0; $orphans = [];   // unresolved token => count
 foreach ($userRows as $r) {
     $email = strtolower(trim((string)($r['email_address'] ?? '')));
     if ($email === '') { $noEmail++; continue; }
-    $label = $labelFor($r['branch_raw']);
-    if ($label === null) { $noBranch++; continue; }
-    $branches[$label] = ($branches[$label] ?? 0) + 1;
-    $userBranch[$email] = $label;
+
+    $labels = [];
+    foreach (explode(',', (string)($r['branch_raw'] ?? '')) as $token) {
+        $token = trim($token);
+        if ($token === '') continue;
+        $info = $resolve($token);
+        if ($info === null) { $orphans[$token] = ($orphans[$token] ?? 0) + 1; continue; }
+        $labels[$info['label']] = $info['address'];
+    }
+    if (empty($labels)) { $noBranch++; continue; }
+
+    foreach ($labels as $label => $address) {
+        if (!isset($branches[$label])) $branches[$label] = ['count' => 0, 'address' => $address];
+        $branches[$label]['count']++;
+    }
+    $userBranches[$email] = array_keys($labels);
 }
 ksort($branches);
 
-echo "\nDistinct branches found: " . count($branches) . "\n";
-foreach ($branches as $label => $cnt) {
-    echo sprintf("  %-32s  %d user(s)\n", $label, $cnt);
+echo "\nDistinct branches resolved: " . count($branches) . "\n";
+foreach ($branches as $label => $meta) {
+    echo sprintf("  %-28s  %d user(s)\n", $label, $meta['count']);
 }
-echo "  (users with no branch value: {$noBranch}; with no email: {$noEmail})\n\n";
+echo "  (users with no resolvable branch: {$noBranch}; with no email: {$noEmail})\n";
+if ($orphans) {
+    ksort($orphans);
+    $parts = [];
+    foreach ($orphans as $tok => $cnt) $parts[] = "{$tok}×{$cnt}";
+    echo "  Unresolved ids (skipped): " . implode(', ', $parts) . "\n";
+}
+echo "\n";
 
 if (empty($branches)) {
     echo "Nothing to migrate — no branch values resolved from `{$branchCol}`.\n";
@@ -214,19 +256,23 @@ foreach (array_keys($branches) as $label) {
 }
 
 $locInsert = $pg->prepare(
-    "INSERT INTO locations (id, name, code, type, is_active, created_at, updated_at)
-     VALUES (:id, :name, :code, 'branch', true, :now, :now)
+    "INSERT INTO locations (id, name, code, address, state, type, is_active, created_at, updated_at)
+     VALUES (:id, :name, :code, :address, :state, 'branch', true, :now, :now)
      ON CONFLICT (code) DO NOTHING"
 );
 
 $locCreated = 0; $locExisting = 0;
-foreach ($branches as $label => $_cnt) {
+foreach ($branches as $label => $meta) {
     $code = $labelToCode[$label];
+    $addr = $meta['address'] ?: null;
     if ($dryRun) {
-        echo "  [dry] Location  {$code}  ←  {$label}\n";
+        echo "  [dry] Location  {$code}  ←  {$label}" . ($addr ? "  ({$addr})" : "") . "\n";
         continue;
     }
-    $locInsert->execute([':id' => uuid(), ':name' => $label, ':code' => $code, ':now' => now()]);
+    $locInsert->execute([
+        ':id' => uuid(), ':name' => $label, ':code' => $code,
+        ':address' => $addr, ':state' => $addr, ':now' => now(),
+    ]);
     if ($locInsert->rowCount() > 0) $locCreated++; else $locExisting++;
 }
 
@@ -246,20 +292,23 @@ $mapInsert = $pg->prepare(
     "INSERT INTO user_locations (user_id, location_id) VALUES (:uid, :lid) ON CONFLICT DO NOTHING"
 );
 
-$mapped = 0; $alreadyMapped = 0; $unmatchedUser = 0; $noLocId = 0;
-foreach ($userBranch as $email => $label) {
-    $code = $labelToCode[$label];
-    if ($dryRun) { $mapped++; continue; }
+$usersMapped = 0; $links = 0; $alreadyLinked = 0; $unmatchedUser = 0; $noLocId = 0;
+foreach ($userBranches as $email => $labels) {
+    if ($dryRun) { $usersMapped++; $links += count($labels); continue; }
 
     $findUser->execute([':email' => $email]);
     $uid = $findUser->fetchColumn();
     if ($uid === false) { $unmatchedUser++; continue; }
 
-    $lid = $codeToId[$code] ?? null;
-    if ($lid === null) { $noLocId++; continue; }
-
-    $mapInsert->execute([':uid' => $uid, ':lid' => $lid]);
-    if ($mapInsert->rowCount() > 0) $mapped++; else $alreadyMapped++;
+    $linkedThisUser = false;
+    foreach ($labels as $label) {
+        $lid = $codeToId[$labelToCode[$label]] ?? null;
+        if ($lid === null) { $noLocId++; continue; }
+        $mapInsert->execute([':uid' => $uid, ':lid' => $lid]);
+        if ($mapInsert->rowCount() > 0) { $links++; $linkedThisUser = true; }
+        else $alreadyLinked++;
+    }
+    if ($linkedThisUser) $usersMapped++;
 }
 
 // ─── Flag role=agent users as is_agent ───
@@ -279,15 +328,16 @@ echo "║  Summary                                             ║\n";
 echo "╚══════════════════════════════════════════════════════╝\n";
 if ($dryRun) {
     echo "  DRY RUN — nothing written.\n";
-    echo "  Would create up to " . count($branches) . " location(s) and map {$mapped} user(s).\n";
+    echo "  Would create up to " . count($branches) . " location(s), map {$usersMapped} user(s) "
+       . "via {$links} user→location link(s).\n";
     echo "  Re-run without --dry-run to apply.\n";
 } else {
     echo "  Locations created     : {$locCreated}\n";
     echo "  Locations pre-existing: {$locExisting}\n";
-    echo "  Users mapped          : {$mapped}\n";
-    echo "  Users already mapped  : {$alreadyMapped}\n";
+    echo "  Users mapped          : {$usersMapped}\n";
+    echo "  User→location links   : {$links} new, {$alreadyLinked} already present\n";
     echo "  Users not found in PG : {$unmatchedUser}\n";
-    if ($noLocId > 0) echo "  Mapping skipped (no loc id): {$noLocId}\n";
+    if ($noLocId > 0) echo "  Links skipped (no loc id): {$noLocId}\n";
     if ($setAgentFlag) echo "  Users flagged is_agent : {$agentFlagged}\n";
 }
 echo "\nDone.\n";
