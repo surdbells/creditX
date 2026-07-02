@@ -17,16 +17,26 @@ administrator performs after the software is technically live.
 > For **updating an already-deployed** instance, use [`DEPLOY.md`](DEPLOY.md)
 > instead. This document is only for the first-time setup of a new tenant.
 
-Throughout, replace these placeholders with the client's real values:
+The platform root domain is **`creditx.cloud`**. Each client (`<CLIENT>` slug)
+runs on its own subdomains under it. Throughout, replace these placeholders
+with the client's real values:
 
-| Placeholder | Example |
+| Placeholder | Example (`<CLIENT>` = `acme`) |
 |---|---|
 | `<CLIENT>` | `acme` (short slug, lowercase) |
-| `<API_DOMAIN>` | `api.acme-mfb.com` |
-| `<ADMIN_DOMAIN>` | `admin.acme-mfb.com` |
-| `<PORTAL_DOMAIN>` | `portal.acme-mfb.com` |
+| `<PORTAL_DOMAIN>` | `acme.creditx.cloud` |
+| `<ADMIN_DOMAIN>` | `acme.admin.creditx.cloud` |
+| `<API_DOMAIN>` | `acme.api.creditx.cloud` |
 | `<DB_NAME>` / `<DB_USER>` / `<DB_PASS>` | `creditx_acme` / `creditx_acme` / *(generated)* |
 | `/www/wwwroot/creditx` | server install path (aaPanel default web root) |
+
+> A client that wants full brand ownership can instead **bring their own
+> domain** (e.g. `portal.firstmfb.com`) via Cloudflare for SaaS custom
+> hostnames — the exception, not the default. Everything below assumes the
+> shared `creditx.cloud` scheme.
+
+The platform-wide `creditx.cloud` setup (domain, wildcard certs) is done
+**once for the whole platform** — see §0.1 — not per client.
 
 ---
 
@@ -48,18 +58,80 @@ Throughout, replace these placeholders with the client's real values:
                                             <API_DOMAIN>
 ```
 
-**DNS records to create** (in Cloudflare DNS for the client's zone):
+**Per-client DNS records to create** (in the `creditx.cloud` Cloudflare zone):
 
 | Type | Name | Target | Proxy |
 |---|---|---|---|
-| `A` | `<API_DOMAIN>` | aaPanel server public IP | **DNS only (grey cloud)** at first, see §6 |
-| `CNAME` | `<ADMIN_DOMAIN>` | Cloudflare Pages project | Proxied (orange) |
-| `CNAME` | `<PORTAL_DOMAIN>` | Cloudflare Pages project | Proxied (orange) |
+| `A` | `<CLIENT>.api` (→ `<API_DOMAIN>`) | aaPanel server public IP | **DNS only (grey cloud)** at first, see §6 |
+| `CNAME` | `<CLIENT>.admin` (→ `<ADMIN_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
+| `CNAME` | `<CLIENT>` (→ `<PORTAL_DOMAIN>`) | Cloudflare Pages project | Proxied (orange) |
+
+> These sit under the three per-role wildcard certs issued once in §0.1, so a
+> new client needs **DNS only — no new certificates**.
 
 > Keep `<API_DOMAIN>` **grey-clouded (DNS-only)** until aaPanel has issued
 > its own Let's Encrypt cert (§6). Once verified, you may switch it to
 > proxied if you want Cloudflare in front of the API — if you do, set SSL
 > mode to **Full (strict)**.
+
+---
+
+## 0.1 Platform domain setup — `creditx.cloud` (ONE-TIME, whole platform)
+
+Do this **once** when standing up the platform — not per client. It makes
+every future client a DNS-only add.
+
+### Subdomain scheme
+
+Each client gets three subdomains under `creditx.cloud`, namespaced by role so
+a single wildcard per role covers **all** clients:
+
+| Surface | Pattern | Example (`acme`) | Wildcard cert that covers it |
+|---|---|---|---|
+| Customer portal | `{client}.creditx.cloud` | `acme.creditx.cloud` | `*.creditx.cloud` |
+| Admin console | `{client}.admin.creditx.cloud` | `acme.admin.creditx.cloud` | `*.admin.creditx.cloud` |
+| Backend API | `{client}.api.creditx.cloud` | `acme.api.creditx.cloud` | `*.api.creditx.cloud` |
+
+The **agent mobile app** targets `{client}.api.creditx.cloud` automatically from
+the org code the agent enters (see §10) — it needs no per-client DNS beyond the
+API record above.
+
+### One-time steps
+
+1. **Register `creditx.cloud`** and add it as a zone in Cloudflare. Point the
+   registrar's nameservers at the ones Cloudflare assigns.
+2. **Reserve system labels** so no client slug can shadow them — never issue a
+   client the slug: `www`, `app`, `api`, `admin`, `portal`, `id`, `auth`,
+   `status`, `docs`, `help`, `billing`, `console`, `dashboard`, `cdn`, `static`,
+   `mail`, `support`. (Enforce with a slug validator at onboarding:
+   lowercase, `[a-z0-9-]`, length 2–40, not in the reserved set.)
+3. **Issue the three per-role wildcard certificates** (Cloudflare → SSL/TLS →
+   Edge Certificates → **Total TLS** on, plus **Advanced Certificate** orders
+   for the deeper levels):
+   - `*.creditx.cloud`  (client portals — covered by Universal SSL / Total TLS)
+   - `*.admin.creditx.cloud`  (client admin consoles — needs an Advanced cert)
+   - `*.api.creditx.cloud`  (client APIs — needs an Advanced cert)
+
+   > Cloudflare's free Universal wildcard only covers **one** level
+   > (`*.creditx.cloud`). The two-label wildcards (`*.admin…`, `*.api…`) require
+   > **Advanced Certificate Manager**. Order all three so new clients never need
+   > a certificate.
+4. **Set the zone SSL/TLS mode** to **Full (strict)** (the aaPanel origin has
+   its own Let's Encrypt cert per §6).
+5. **Portal & admin Pages projects**: in each Cloudflare Pages project add the
+   wildcard/custom hostnames as clients come online (or use one Pages project
+   per role and attach `{client}.creditx.cloud` / `{client}.admin.creditx.cloud`
+   custom domains per client).
+6. **(Optional) wildcard DNS for the API** — if all client backends share one
+   aaPanel server, a single `A` record `*.api → <server IP>` covers every
+   client's API host at once; otherwise add the per-client `A` record from §0.
+7. **(Optional) white-label** — enable **Cloudflare for SaaS** if you'll let
+   some clients bring their own domain (`portal.firstmfb.com` → CNAME to the
+   platform). Custom hostnames get certs issued automatically.
+
+After §0.1, provisioning a new client is just: the three DNS records in §0 (or
+none, if you used wildcard DNS) + that client's `.env` (`APP_URL`,
+`CORS_ALLOWED_ORIGINS`, `FRONTEND_URL` set to its `creditx.cloud` subdomains).
 
 ---
 
@@ -659,6 +731,12 @@ Before handing over, walk one full cycle on real config:
 
 ## 13. Per-client checklist (copy this into the client's ticket)
 
+**Platform (one-time, §0.1) — do once, not per client:**
+- [ ] `creditx.cloud` registered + Cloudflare zone active
+- [ ] Three wildcard certs issued (`*.creditx.cloud`, `*.admin.creditx.cloud`, `*.api.creditx.cloud`); zone SSL = Full (strict)
+- [ ] Reserved system labels enforced by the slug validator
+
+**Per client:**
 - [ ] DNS records created (`<API_DOMAIN>` A, admin/portal CNAMEs)
 - [ ] aaPanel: PHP 8.2/8.3 + extensions, PostgreSQL, Redis installed
 - [ ] Database + dedicated user created
