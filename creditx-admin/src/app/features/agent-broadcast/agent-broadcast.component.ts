@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 
 /**
  * Agent Broadcast — admin sends a message to field agents over the selected
@@ -15,7 +16,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 @Component({
   selector: 'app-agent-broadcast',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, ConfirmDialogComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -50,8 +51,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         }
 
         <div class="cx-bc-actions">
-          <button class="cx-btn cx-btn-primary" (click)="send()" [disabled]="busy() || !valid()">
-            <lucide-icon name="send" [size]="14"></lucide-icon>
+          <button class="cx-btn cx-btn-primary" (click)="openConfirm()" [disabled]="busy() || !valid()">
+            @if (busy()) { <span class="cx-bc-spinner"></span> }
+            @else { <lucide-icon name="send" [size]="14"></lucide-icon> }
             <span>{{ busy() ? 'Sending…' : 'Send Broadcast' }}</span>
           </button>
         </div>
@@ -64,6 +66,16 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         }
       </div>
     </div>
+
+    <cx-confirm-dialog
+      [open]="showConfirm()"
+      title="Send broadcast"
+      [message]="confirmMessage()"
+      confirmLabel="Send"
+      variant="warning"
+      (confirmed)="doSend()"
+      (cancelled)="showConfirm.set(false)">
+    </cx-confirm-dialog>
   `,
   styles: [`
     .cx-bc-form { max-width: 620px; display: flex; flex-direction: column; gap: 8px;
@@ -74,6 +86,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .cx-bc-actions { margin-top: 14px; }
     .cx-bc-result { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px;
       border-radius: var(--cx-radius-md); background: #f0fdf4; color: #166534; border: 1px solid #dcfce7; font-size: 13px; }
+    .cx-bc-spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+      border-radius: 50%; display: inline-block; animation: cx-bc-spin 0.6s linear infinite; }
+    @keyframes cx-bc-spin { to { transform: rotate(360deg); } }
   `],
 })
 export class AgentBroadcastComponent {
@@ -81,6 +96,7 @@ export class AgentBroadcastComponent {
   locations = signal<any[]>([]);
   busy = signal(false);
   result = signal<any>(null);
+  showConfirm = signal(false);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {
     this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.locations.set(r.data || []), error: () => {} });
@@ -92,22 +108,38 @@ export class AgentBroadcastComponent {
     return true;
   }
 
-  send(): void {
+  private channels(): string[] {
+    const c: string[] = [];
+    if (this.form.email) c.push('email');
+    if (this.form.push) c.push('push');
+    return c;
+  }
+
+  confirmMessage(): string {
+    const who = this.form.recipient_type === 'by_location'
+      ? 'agents in the selected branch'
+      : 'all field agents';
+    const ch = ['in-app', ...this.channels().map(c => c === 'email' ? 'email' : 'push')].join(', ');
+    return `Send “${this.form.subject.trim()}” to ${who} via ${ch}?`;
+  }
+
+  openConfirm(): void {
     if (!this.valid()) return;
-    if (!confirm('Send this broadcast to the selected agents?')) return;
-    const channels: string[] = [];
-    if (this.form.email) channels.push('email');
-    if (this.form.push) channels.push('push');
+    this.showConfirm.set(true);
+  }
+
+  doSend(): void {
+    this.showConfirm.set(false);
     this.busy.set(true);
     this.result.set(null);
     this.api.post('/notifications/broadcast', {
       subject: this.form.subject,
       message: this.form.message,
-      channels,
+      channels: this.channels(),
       recipient_type: this.form.recipient_type,
       location_id: this.form.location_id || undefined,
     }).subscribe({
-      next: r => { this.busy.set(false); this.result.set(r.data); this.toast.success(r.message || 'Sent'); },
+      next: r => { this.busy.set(false); this.result.set(r.data); this.toast.success(r.message || 'Broadcast sent'); },
       error: e => { this.busy.set(false); this.toast.error(e.error?.message || 'Broadcast failed'); },
     });
   }
