@@ -81,6 +81,7 @@ export const routes: Routes = [
       { path: 'disbursement/bulk', loadComponent: () => import('./features/disbursement/bulk-disburse.component').then(m => m.BulkDisburseComponent) },
       { path: 'reconciliation', loadComponent: () => import('./features/reconciliation/reconciliation.component').then(m => m.ReconciliationComponent) },
       { path: 'notifications', loadComponent: () => import('./features/notifications/notifications.component').then(m => m.NotificationsComponent) },
+      { path: 'agent-broadcast', loadComponent: () => import('./features/agent-broadcast/agent-broadcast.component').then(m => m.AgentBroadcastComponent) },
       { path: 'messaging', loadComponent: () => import('./features/messaging/messaging.component').then(m => m.MessagingComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],

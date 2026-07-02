@@ -124,6 +124,7 @@ export class LayoutComponent {
       { label: 'Settings', icon: 'settings', route: '/settings', permission: 'settings.view' },
       { label: 'Agent Targets', icon: 'target', route: '/agent-targets', permission: 'settings.view' },
       { label: 'Notifications', icon: 'bell', route: '/notifications', permission: 'notifications.manage' },
+      { label: 'Agent Broadcast', icon: 'send', route: '/agent-broadcast', permission: 'notifications.manage' },
       { label: 'Messages', icon: 'message-square', route: '/messaging', permission: 'messaging.view' },
       { label: 'Audit Logs', icon: 'scroll-text', route: '/audit-logs', permission: 'audit.view' },
     ]},

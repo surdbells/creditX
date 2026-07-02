@@ -6,6 +6,7 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\Notification;
 use App\Domain\Entity\NotificationTemplate;
+use App\Domain\Entity\User;
 use App\Domain\Enum\NotificationChannel;
 use App\Domain\Enum\NotificationStatus;
 use App\Domain\Repository\NotificationRepository;
@@ -71,6 +72,76 @@ final class NotificationDispatchService
 
         $this->em->flush();
         return $dispatched;
+    }
+
+    /**
+     * Deliver a free-form message directly to a specific user over the given
+     * channels (any of: 'in_app', 'email', 'push', 'sms', 'whatsapp'), NOT
+     * template/event based. One Notification row is created per channel and
+     * sent via the same tested channel senders as templated notifications.
+     *
+     * Used by the admin→agent broadcast and by the per-loan agent
+     * notifications (so a field agent gets in-app + push + email at every
+     * lifecycle event). Email uses the user's own email; push uses their
+     * registered devices; in-app populates their notification list.
+     *
+     * @param string[]|NotificationChannel[] $channels
+     * @return array<int, array{channel:string, status:string, error?:string}>
+     */
+    public function deliverToUser(User $user, string $subject, string $body, array $channels, ?string $customerId = null): array
+    {
+        $out = [];
+        foreach ($channels as $ch) {
+            $channel = $ch instanceof NotificationChannel ? $ch : NotificationChannel::tryFrom((string) $ch);
+            if ($channel === null) continue;
+
+            $enabled = match ($channel) {
+                NotificationChannel::EMAIL    => $this->settings->getBool('notification.email_enabled', true),
+                NotificationChannel::SMS      => $this->settings->getBool('notification.sms_enabled', true),
+                NotificationChannel::WHATSAPP => $this->settings->getBool('notification.whatsapp_enabled', false),
+                NotificationChannel::PUSH     => $this->settings->getBool('notification.push_enabled', true),
+                NotificationChannel::IN_APP   => true,
+            };
+            if (!$enabled) { $out[] = ['channel' => $channel->value, 'status' => 'disabled']; continue; }
+
+            $recipient = match ($channel) {
+                NotificationChannel::EMAIL                        => $user->getEmail(),
+                NotificationChannel::SMS, NotificationChannel::WHATSAPP => method_exists($user, 'getPhone') ? $user->getPhone() : null,
+                default                                           => $user->getId(),
+            };
+            if ($recipient === null || $recipient === '') { $out[] = ['channel' => $channel->value, 'status' => 'no_recipient']; continue; }
+
+            $n = new Notification();
+            $n->setUserId($user->getId());
+            $n->setCustomerId($customerId);
+            $n->setChannel($channel);
+            $n->setRecipient($recipient);
+            $n->setSubject($subject);
+            $n->setBody($body);
+
+            try {
+                $this->send($n);
+                $out[] = ['channel' => $channel->value, 'status' => 'sent'];
+            } catch (\Throwable $e) {
+                $n->markFailed($e->getMessage());
+                $out[] = ['channel' => $channel->value, 'status' => 'failed', 'error' => $e->getMessage()];
+                $this->logger->error('deliverToUser failed', ['channel' => $channel->value, 'error' => $e->getMessage()]);
+            }
+            $this->em->persist($n);
+        }
+        $this->em->flush();
+        return $out;
+    }
+
+    /**
+     * Notify a loan's field agent over in-app + push + email at once. No-op if
+     * the loan has no agent. Convenience wrapper over deliverToUser used across
+     * the loan lifecycle.
+     */
+    public function notifyAgent(?User $agent, string $subject, string $body, ?string $customerId = null): array
+    {
+        if ($agent === null) return [];
+        return $this->deliverToUser($agent, $subject, $body, ['in_app', 'push', 'email'], $customerId);
     }
 
     /**

@@ -626,6 +626,9 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('notifications.view'));
             $group->post('/mark-read', Notification\MarkNotificationsReadAction::class)
                 ->add(new RbacMiddleware('notifications.view'));
+            // Admin → field-agent broadcast (in-app + email/push).
+            $group->post('/broadcast', Notification\BroadcastToAgentsAction::class)
+                ->add(new RbacMiddleware('notifications.manage'));
         });
 
         // ─── Messaging (Agent ↔ Backoffice) ───
