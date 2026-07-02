@@ -8,7 +8,7 @@ import { addIcons } from 'ionicons';
 import { eyeOutline, eyeOffOutline, logInOutline, shieldCheckmarkOutline, arrowBackOutline } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { PushService } from '../../core/services/push.service';
-import { environment } from '../../../environments/environment';
+import { TenantConfigService } from '../../core/services/tenant-config.service';
 
 @Component({
   selector: 'app-auth', standalone: true,
@@ -355,7 +355,7 @@ export class AuthPage {
 
   private readonly ALLOWED_ROLES = ['agent', 'dsa', 'field_agent', 'loan_officer'];
 
-  constructor(private auth: AuthService, private router: Router, private push: PushService, private http: HttpClient) {
+  constructor(private auth: AuthService, private router: Router, private push: PushService, private http: HttpClient, public tenant: TenantConfigService) {
     addIcons({ eyeOutline, eyeOffOutline, logInOutline, shieldCheckmarkOutline, arrowBackOutline });
   }
 
@@ -389,7 +389,7 @@ export class AuthPage {
   verifyOtp(): void {
     if (this.otpCode.length < 6) { this.error.set('Enter 6-digit code'); return; }
     this.loading.set(true); this.error.set(null);
-    this.http.post<any>(`${environment.apiUrl}/auth/verify-otp`, { user_id: this.otpUserId, code: this.otpCode }).subscribe({
+    this.http.post<any>(`${this.tenant.getApiUrl()}/auth/verify-otp`, { user_id: this.otpUserId, code: this.otpCode }).subscribe({
       next: (res) => {
         this.loading.set(false);
         if (res.status === 'success' && res.data?.tokens) {

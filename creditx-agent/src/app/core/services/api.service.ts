@@ -1,8 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpRequest, HttpEvent, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models';
+import { TenantConfigService } from './tenant-config.service';
 
 /**
  * Options for requests that should not fire an error toast via
@@ -16,7 +16,9 @@ export interface RequestOptions {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly base = environment.apiUrl;
+  private readonly tenant = inject(TenantConfigService);
+  /** Resolved per active tenant (not a build-time constant). */
+  private get base(): string { return this.tenant.getApiUrl(); }
   constructor(private http: HttpClient) {}
 
   private silentHeaders(opts?: RequestOptions): HttpHeaders | undefined {

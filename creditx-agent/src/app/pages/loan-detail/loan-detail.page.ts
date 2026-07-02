@@ -10,9 +10,9 @@ import {
   documentTextOutline, eyeOutline, arrowBackOutline, downloadOutline,
 } from 'ionicons/icons';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { environment } from '../../../environments/environment';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
+import { TenantConfigService } from '../../core/services/tenant-config.service';
 
 @Component({
   selector: 'app-loan-detail',
@@ -839,6 +839,7 @@ export class LoanDetailPage implements OnInit {
     private api: ApiService,
     private router: Router,
     private toast: ToastService,
+    private tenant: TenantConfigService,
   ) {
     addIcons({
       timeOutline, checkmarkCircleOutline, closeCircleOutline, walletOutline, checkmark, close,
@@ -1090,7 +1091,7 @@ export class LoanDetailPage implements OnInit {
    */
   docUrl(doc: any): string {
     if (!doc?.file_path) return '';
-    return `${environment.apiUrl}/storage/${doc.file_path}`;
+    return `${this.tenant.getApiUrl()}/storage/${doc.file_path}`;
   }
   docUrlSafe(doc: any): SafeResourceUrl {
     return this.sanitizer.bypassSecurityTrustResourceUrl(this.docUrl(doc));

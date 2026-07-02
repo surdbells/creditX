@@ -1,13 +1,15 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, catchError, throwError } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { ApiResponse, LoginRequest, LoginResponse, User } from '../models';
+import { TenantConfigService } from './tenant-config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly API = environment.apiUrl;
+  private readonly tenant = inject(TenantConfigService);
+  /** Resolved per active tenant. */
+  private get API(): string { return this.tenant.getApiUrl(); }
   private readonly ACCESS_KEY = 'cxa_access_token';
   private readonly REFRESH_KEY = 'cxa_refresh_token';
   private readonly USER_KEY = 'cxa_user';

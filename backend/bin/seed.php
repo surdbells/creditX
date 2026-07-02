@@ -294,6 +294,7 @@ $settingsDef = [
     ['general.company_name', 'CreditX', SettingType::STRING, SettingCategory::GENERAL, 'Company display name'],
     ['general.currency', 'NGN', SettingType::STRING, SettingCategory::GENERAL, 'Default currency code'],
     ['general.currency_symbol', '₦', SettingType::STRING, SettingCategory::GENERAL, 'Currency display symbol'],
+    ['mobile.min_agent_version', '1.0.0', SettingType::STRING, SettingCategory::GENERAL, 'Minimum agent mobile app version this API supports (semver); older apps are asked to update'],
     ['general.max_customer_age', '57', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum customer age for eligibility'],
     ['general.max_service_years', '33', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum years of service for eligibility'],
     ['agent.monthly_target', '1000000', SettingType::INTEGER, SettingCategory::GENERAL, 'Default monthly disbursement target (naira) for agents without an individual target set'],

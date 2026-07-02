@@ -1,7 +1,7 @@
-import { Injectable, effect, signal } from '@angular/core';
+import { Injectable, effect, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
+import { TenantConfigService } from './tenant-config.service';
 import { debounceTime, Subject } from 'rxjs';
 
 export type FontScaleStep = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -41,6 +41,7 @@ export class FontScaleService {
 
   private persistSubject = new Subject<number>();
 
+  private readonly tenant = inject(TenantConfigService);
   constructor(private http: HttpClient, private auth: AuthService) {
     // Hydrate from auth.user() synchronously if it's already loaded.
     // auth.user() is backed by localStorage on service init, so this will
@@ -73,7 +74,7 @@ export class FontScaleService {
 
     this.persistSubject.pipe(debounceTime(600)).subscribe(value => {
       if (!this.auth.isAuthenticated()) return;
-      this.http.patch(`${environment.apiUrl}/users/me/preferences`, { font_scale: value }).subscribe({
+      this.http.patch(`${this.tenant.getApiUrl()}/users/me/preferences`, { font_scale: value }).subscribe({
         error: () => { /* silent — localStorage keeps it working */ },
       });
     });

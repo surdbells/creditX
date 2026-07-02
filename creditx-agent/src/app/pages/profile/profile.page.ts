@@ -7,10 +7,11 @@ import { addIcons } from 'ionicons';
 import {
   personOutline, mailOutline, callOutline, shieldCheckmarkOutline,
   logOutOutline, moonOutline, informationCircleOutline, textOutline,
-  refreshOutline,
+  refreshOutline, swapHorizontalOutline, businessOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { FontScaleService } from '../../core/services/font-scale.service';
+import { TenantConfigService } from '../../core/services/tenant-config.service';
 
 @Component({
   selector: 'app-profile',
@@ -85,6 +86,16 @@ import { FontScaleService } from '../../core/services/font-scale.service';
 
         <!-- Actions -->
         <div class="cx-profile-section">
+          @if (tenant.tenantName()) {
+            <div class="cx-profile-org">
+              <ion-icon name="business-outline"></ion-icon>
+              <span>{{ tenant.tenantName() }}</span>
+            </div>
+          }
+          <button class="cx-profile-signout cx-profile-switch" (click)="switchOrg()">
+            <ion-icon name="swap-horizontal-outline"></ion-icon>
+            <span>Switch Organization</span>
+          </button>
           <button class="cx-profile-signout" (click)="logout()">
             <ion-icon name="log-out-outline"></ion-icon>
             <span>Sign Out</span>
@@ -282,11 +293,12 @@ export class ProfilePage {
     public auth: AuthService,
     private router: Router,
     private fs: FontScaleService,
+    public tenant: TenantConfigService,
   ) {
     addIcons({
       personOutline, mailOutline, callOutline, shieldCheckmarkOutline,
       logOutOutline, moonOutline, informationCircleOutline, textOutline,
-      refreshOutline,
+      refreshOutline, swapHorizontalOutline, businessOutline,
     });
   }
 
@@ -330,4 +342,11 @@ export class ProfilePage {
   resetFontScale(): void { this.fs.reset(); }
 
   logout(): void { this.auth.logout(); }
+
+  /** Forget the current organisation and return to tenant selection. */
+  switchOrg(): void {
+    this.tenant.clear();
+    this.auth.logout(); // clears tokens; guestGuard then routes to /tenant
+    this.router.navigate(['/tenant'], { replaceUrl: true });
+  }
 }

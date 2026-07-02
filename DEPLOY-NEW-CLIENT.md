@@ -375,24 +375,52 @@ finishes, browse to each custom domain.
 
 ---
 
-## 10. Agent mobile app (optional / separate track)
+## 10. Agent mobile app (multi-tenant, single binary)
 
-`creditx-agent` is an Ionic + Capacitor app. It is **not** a Cloudflare Pages
-target by default — it ships as a native mobile binary:
+`creditx-agent` is an Ionic + Capacitor app. It ships as **one native binary
+that serves every client** — it does **not** bake a per-client API URL. On
+first launch the agent enters their **organization code** (the client slug);
+the app builds `https://{slug}.api.creditx.app/api`, validates it against the
+tenant's public settings, stores it, and points all requests there. "Switch
+Organization" (Profile) clears it.
+
+### 10.1 What each new client needs (usually nothing app-side)
+
+- The client's backend must be reachable at `https://<CLIENT_SLUG>.api.creditx.app`
+  (the per-role wildcard from the subdomain scheme — see the domains doc).
+- Give the client's agents their **org code** (`<CLIENT_SLUG>`). That's it —
+  no rebuild, no new store listing.
+- Optionally set the tenant's **minimum supported app version** so old installs
+  are forced to update: Settings key `mobile.min_agent_version` (semver, e.g.
+  `1.2.0`). The app compares its build's `appVersion` and blocks if older.
+
+### 10.2 Build & release (done once per app version, not per client)
 
 ```bash
 cd creditx-agent
-# set apiUrl in src/environments/environment.prod.ts to https://<API_DOMAIN>/api
+# Confirm the tenant template + this build's version in
+# src/environments/environment.prod.ts:
+#   apiUrlTemplate: 'https://{slug}.api.creditx.app/api'
+#   requireTenantSelection: true
+#   appVersion: '1.0.0'   # bump on each release
 npm ci
 npm run build:prod
 npx cap sync
-# then build the APK/IPA in Android Studio / Xcode
+# then build the signed APK/IPA in Android Studio / Xcode and submit to stores
 ```
 
-If the client wants a browser-based agent experience instead, you *can*
-publish its web build to a third Cloudflare Pages project the same way as
-§9 (output `dist/creditx-agent/browser`, add a `_redirects`), but confirm
-the agent app's features don't depend on native plugins first.
+> **CORS / native HTTP:** the Capacitor WebView enforces CORS. Either add the
+> Capacitor origin (`capacitor://localhost` / `https://localhost`) to every
+> tenant's `CORS_ALLOWED_ORIGINS`, or (preferred) use the native HTTP layer
+> (`CapacitorHttp`) which bypasses CORS. Confirm this before store release.
+
+### 10.3 White-label per client (optional premium)
+
+If a client wants their **own** branded app in their **own** store account,
+build a dedicated binary with `requireTenantSelection: false` and
+`apiUrl: 'https://<CLIENT_SLUG>.api.creditx.app/api'` baked into
+`environment.prod.ts`, then submit under the client's developer account. This
+is the exception, not the default.
 
 ---
 

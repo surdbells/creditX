@@ -3,11 +3,13 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, ActionPerformed, PushNotificationSchema } from '@capacitor/push-notifications';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
+import { inject } from '@angular/core';
+import { TenantConfigService } from './tenant-config.service';
 
 @Injectable({ providedIn: 'root' })
 export class PushService {
   private registered = false;
+  private readonly tenant = inject(TenantConfigService);
 
   constructor(private router: Router, private http: HttpClient) {}
 
@@ -51,7 +53,7 @@ export class PushService {
   private registerToken(token: string): void {
     const accessToken = localStorage.getItem('cxa_access_token');
     if (!accessToken) return;
-    this.http.post(`${environment.apiUrl}/devices/register`, {
+    this.http.post(`${this.tenant.getApiUrl()}/devices/register`, {
       token, platform: Capacitor.getPlatform(),
     }, { headers: { Authorization: `Bearer ${accessToken}` } }).subscribe({
       next: () => console.log('[Push] Token registered'),

@@ -47,6 +47,10 @@ final class PublicSettingsAction
         'general.company_name',
         'general.support_email',
         'general.date_format',
+        // Minimum agent-app version this tenant's API supports. The mobile
+        // app reads this during tenant resolution and forces an update when
+        // its build is older. Presentation/compat only — safe to expose.
+        'mobile.min_agent_version',
     ];
 
     public function __construct(
