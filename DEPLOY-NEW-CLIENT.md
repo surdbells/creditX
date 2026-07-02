@@ -409,10 +409,13 @@ npx cap sync
 # then build the signed APK/IPA in Android Studio / Xcode and submit to stores
 ```
 
-> **CORS / native HTTP:** the Capacitor WebView enforces CORS. Either add the
-> Capacitor origin (`capacitor://localhost` / `https://localhost`) to every
-> tenant's `CORS_ALLOWED_ORIGINS`, or (preferred) use the native HTTP layer
-> (`CapacitorHttp`) which bypasses CORS. Confirm this before store release.
+> **CORS / native HTTP:** the app enables **`CapacitorHttp`** in
+> `capacitor.config.ts`, so on device all HTTP goes through the native stack
+> and **CORS does not apply** — no tenant needs to whitelist the Capacitor
+> origin for the mobile app. (A browser-based/PWA build of the agent app is
+> the exception: it still needs its origin in each tenant's
+> `CORS_ALLOWED_ORIGINS`.) Caveat: native HTTP doesn't emit upload progress
+> events, so document-upload progress bars are indeterminate on device.
 
 ### 10.3 White-label per client (optional premium)
 
