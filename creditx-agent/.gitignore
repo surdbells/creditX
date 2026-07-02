@@ -2,8 +2,22 @@
 /dist/
 /.angular/
 /www/
-/android/
 /ios/
 .env
 *.local
 creditx-agent/package-lock.json
+
+# ── Android native project ──
+# The android/ project is committed for reproducible builds (manifest
+# permissions, capacitor config, google-services.json). Only build outputs,
+# machine-specific files, and signing secrets are excluded.
+/android/build/
+/android/app/build/
+/android/.gradle/
+/android/gradle/wrapper/gradle-wrapper.properties.lock
+/android/captures/
+/android/.idea/
+/android/local.properties
+/android/keystore.properties
+/android/**/*.keystore
+/android/**/*.jks

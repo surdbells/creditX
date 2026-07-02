@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "775914041306",
+    "project_id": "creditx-c7495",
+    "storage_bucket": "creditx-c7495.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:775914041306:android:614fb827a887b1a2e11ae3",
+        "android_client_info": {
+          "package_name": "com.dosthq.creditxagent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLfKB3J00IDqy3qH997pC94OdmlnUWvI8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
