@@ -1,4 +1,8 @@
+import { resolveApiUrl } from './resolve-api-url';
+
 export const environment = {
   production: true,
-  apiUrl: 'https://api.dostsuite.com/api',
+  // Auto-derived from the hostname on *.creditx.cloud (one build → all clients).
+  // The fallback is used only off-platform (localhost / preview URLs).
+  apiUrl: resolveApiUrl('http://localhost:8080/api'),
 };

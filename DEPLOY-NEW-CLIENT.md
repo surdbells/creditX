@@ -355,6 +355,71 @@ Before handing the system over:
 
 Leaving the default credentials live is a critical security hole.
 
+### 4.5 Legacy data migration (clients coming from FTI Pay)
+
+If this client is migrating from the legacy **FTI Pay** system (MySQL
+`u931799113_ftipay`), import its master data now — after §4's schema + seed,
+before the operational config in §12. The repo ships idempotent, dry-runnable
+importers.
+
+**Migrated:** government records (IPPIS / TESCOM / LASG / SUBEB), staff users,
+loan products (+ standard fees), customers (+ next of kin).
+
+**NOT migrated:** historical **loans, repayment schedules, and GL/ledger
+balances**. Bring the financial position over as **opening balances** (§12.4);
+if you need in-flight loans, load their repayment schedules separately. The
+importers cover *who/what*, not the historical loan book.
+
+**Prerequisites**
+
+1. **`pdo_mysql` PHP extension** on the server (aaPanel → PHP → Install
+   extensions) — the importers read the legacy MySQL directly (this is in
+   addition to `pdo_pgsql` from §1).
+2. The legacy MySQL reachable from the server (host + credentials).
+3. Schema created and **seeded** (§4) — `seed.php` provides the record types +
+   roles the importers map onto.
+4. Add the legacy source to `backend/.env` (it's **not** in `.env.example` —
+   add it by hand):
+
+   ```ini
+   LEGACY_DB_HOST=127.0.0.1
+   LEGACY_DB_PORT=3306
+   LEGACY_DB_NAME=u931799113_ftipay
+   LEGACY_DB_USER=<legacy_user>
+   LEGACY_DB_PASSWORD=<legacy_pass>
+   ```
+
+**Run order — always `--dry-run` first, reconcile counts, then apply**
+
+```bash
+cd /www/wwwroot/<API_DOMAIN>/backend
+
+# 1. Government records + users
+php bin/migrate-legacy.php --dry-run
+php bin/migrate-legacy.php
+#    flags: --skip-records / --skip-users to run one side only
+
+# 2. Loan products + standard fees (idempotent; skips existing by code)
+php bin/migrate-products.php
+
+# 3. Customers + next of kin — needs step 1 (joins customers to government
+#    records by service_id → staff_id)
+php bin/migrate-customers.php --dry-run
+php bin/migrate-customers.php
+#    flag: --limit=N to import a first batch and eyeball it
+```
+
+All three are **idempotent** — re-running skips rows that already exist
+(records by key, products by code, customers by `staff_id`).
+
+**After migration**
+
+- Spot-check in the admin app: Customers, Government Records, Loan Products,
+  Users (confirm role + branch assignments — legacy role mapping may need a
+  review).
+- Post **opening balances** (§12.4) so the GL and reports tie out, then
+  continue with operational config (§12).
+
 ---
 
 ## 5. Finalize the aaPanel website (run directory + rewrite)
@@ -434,36 +499,36 @@ tasks (adjust PHP path to the version installed):
 
 ---
 
-## 8. Point the frontends at this client's API
+## 8. Frontend → API wiring (automatic, one build for all clients)
 
-The Angular apps read `apiUrl` from `src/environments/environment.ts`. There
-is **no `environment.prod.ts` file-replacement configured**, so the build
-uses `environment.ts` directly — it must contain the client's API URL.
+The admin and portal apps **derive their API base from their own hostname at
+runtime** (`src/environments/resolve-api-url.ts`), so **one build serves every
+client** — no per-client branch, no per-client edit, no rebuild when adding a
+tenant. On any `*.creditx.cloud` host the app takes the tenant slug from the
+first DNS label and builds the API URL:
 
-Two options:
+| App host | Derived API |
+|---|---|
+| `acme.creditx.cloud` (portal) | `https://acme.api.creditx.cloud/api` |
+| `acme.admin.creditx.cloud` (admin) | `https://acme.api.creditx.cloud/api` |
 
-**A. Branch/fork per client (recommended for many tenants).** Keep a
-per-client branch where `environment.ts` is set to that client's API.
+Off-platform hosts (localhost, `*.pages.dev`, `*.github.io`, the bare apex)
+fall back to the `resolveApiUrl(...)` fallback — used only for local dev /
+previews.
 
-**B. Set it at build time on Cloudflare** by committing a build that reads
-the value. Simplest reliable path today: edit the file.
-
-Set in **both** apps:
-
-```ts
-// creditx-admin/src/environments/environment.ts
-// creditx-portal/src/environments/environment.ts
-export const environment = {
-  production: true,
-  apiUrl: 'https://<API_DOMAIN>/api',
-};
-```
+**Scheme switch (do once, matches your DNS/cert choice):** the API URL template
+lives at the top of `resolve-api-url.ts` in **both** apps. Default is the
+**nested** scheme (`https://{slug}.api.creditx.cloud/api`, needs the ACM
+`*.api.creditx.cloud` cert). To use the **flat**, free-cert scheme, switch the
+template to `https://{slug}-api.creditx.cloud/api` (and name your API hosts
+`{slug}-api.creditx.cloud`).
 
 > The trailing `/api` is required — backend routes are mounted under `/api`.
 
 A SPA fallback file is already committed at `public/_redirects` in both apps
-(`/* /index.html 200`) so deep links and refreshes resolve correctly on
-Cloudflare Pages.
+(`/* /index.html 200`) for Cloudflare Pages. (For **GitHub Pages**, copy
+`index.html` → `404.html` in the build output instead — Pages ignores
+`_redirects`.)
 
 ---
 
@@ -805,10 +870,11 @@ Before handing over, walk one full cycle on real config:
 - [ ] Schema created (`doctrine schema-tool` + `init-*` scripts)
 - [ ] `seed.php` run; **default admin replaced/deleted**
 - [ ] Notification templates seeded
+- [ ] (Legacy clients only, §4.5) `pdo_mysql` + `LEGACY_DB_*` set; migrate-legacy → products → customers run (dry-run first); opening balances posted
 - [ ] aaPanel site running-directory = `/backend/public`, rewrite rule set
 - [ ] API SSL issued + Force HTTPS; `curl` returns 200
 - [ ] Cron jobs added (SLA, overdue, reconciliation)
-- [ ] `environment.ts` apiUrl set in admin + portal
+- [ ] Frontend API URL auto-derives (no per-client edit); scheme template in `resolve-api-url.ts` matches DNS/cert choice
 - [ ] Cloudflare Pages projects built with output `dist/<app>/browser`
 - [ ] Custom domains attached; SPA `_redirects` working (deep-link refresh)
 - [ ] Provider keys live (mail, SMS, Paystack, FCM) and test-sent
