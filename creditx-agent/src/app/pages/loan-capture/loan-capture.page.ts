@@ -186,7 +186,8 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="cxm-lc-label">Amount (₦)</label>
-                    <input type="number" class="cxm-lc-input tabular-nums" [(ngModel)]="form['amount']" placeholder="500,000" />
+                    <input type="number" class="cxm-lc-input tabular-nums" [(ngModel)]="form['amount']"
+                           (ngModelChange)="onAmountChange()" placeholder="500,000" />
                   </div>
                   <div>
                     <label class="cxm-lc-label">Tenure (months)</label>
@@ -431,7 +432,8 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                 <div class="flex flex-col gap-3">
                   <div>
                     <label class="cxm-lc-label">Amount in Words</label>
-                    <input class="cxm-lc-input" [(ngModel)]="form['loan_amount_words']" placeholder="e.g. Five hundred thousand naira only" />
+                    <input class="cxm-lc-input cxm-lc-readonly" [(ngModel)]="form['loan_amount_words']" readonly
+                           placeholder="Computed from the amount above" />
                   </div>
                   <div>
                     <label class="cxm-lc-label">Loan Purpose</label>
@@ -472,38 +474,54 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                 <div class="cxm-lc-section-title">Disbursement Bank</div>
                 <div class="flex flex-col gap-3">
                   <div>
-                    <label class="cxm-lc-label">Account Number <span class="cxm-lc-req">*</span></label>
-                    <input type="text" maxlength="10" class="cxm-lc-input"
-                           [(ngModel)]="form['account_number']" placeholder="0123456789" />
-                  </div>
-                  <div>
-                    <label class="cxm-lc-label">Account Name</label>
-                    <input class="cxm-lc-input" [(ngModel)]="form['account_name']" />
-                  </div>
-                  <div>
                     <label class="cxm-lc-label">Bank Name <span class="cxm-lc-req">*</span></label>
                     <input type="text" class="cxm-lc-input"
-                           [(ngModel)]="form['bank_name']" placeholder="e.g. Access Bank"
-                           list="banks-list" autocomplete="off" />
+                           [(ngModel)]="form['bank_name']" (ngModelChange)="onAccountInput('main')"
+                           placeholder="e.g. Access Bank" list="banks-list" autocomplete="off" />
                     <datalist id="banks-list">
                       @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
                     </datalist>
                   </div>
                   <div>
+                    <label class="cxm-lc-label">Account Number <span class="cxm-lc-req">*</span></label>
+                    <input type="text" maxlength="10" inputmode="numeric" class="cxm-lc-input"
+                           [(ngModel)]="form['account_number']" (ngModelChange)="onAccountInput('main')"
+                           placeholder="0123456789" />
+                  </div>
+                  <div>
+                    <label class="cxm-lc-label">Account Name</label>
+                    <input class="cxm-lc-input cxm-lc-readonly" [(ngModel)]="form['account_name']" readonly
+                           placeholder="Auto-filled from account number" />
+                    @if (resolvingMain()) {
+                      <div class="cxm-lc-acct-hint">Verifying account…</div>
+                    } @else if (acctErrMain()) {
+                      <div class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrMain() }}</div>
+                    } @else if (form['account_name']) {
+                      <div class="cxm-lc-acct-hint cxm-lc-acct-ok">✓ Verified</div>
+                    }
+                  </div>
+                  <div>
                     <label class="cxm-lc-label">Alternate Bank</label>
-                    <input class="cxm-lc-input" [(ngModel)]="form['alt_bank_name']"
+                    <input class="cxm-lc-input" [(ngModel)]="form['alt_bank_name']" (ngModelChange)="onAccountInput('alt')"
                            list="banks-list" autocomplete="off" />
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <label class="cxm-lc-label">Alt Account #</label>
-                      <input type="text" maxlength="10" class="cxm-lc-input" [(ngModel)]="form['alt_account_number']" />
+                      <input type="text" maxlength="10" inputmode="numeric" class="cxm-lc-input"
+                             [(ngModel)]="form['alt_account_number']" (ngModelChange)="onAccountInput('alt')" />
                     </div>
                     <div>
                       <label class="cxm-lc-label">Alt Account Name</label>
-                      <input class="cxm-lc-input" [(ngModel)]="form['alt_account_name']" />
+                      <input class="cxm-lc-input cxm-lc-readonly" [(ngModel)]="form['alt_account_name']" readonly
+                             placeholder="Auto-filled" />
                     </div>
                   </div>
+                  @if (resolvingAlt()) {
+                    <div class="cxm-lc-acct-hint">Verifying alternate account…</div>
+                  } @else if (acctErrAlt()) {
+                    <div class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrAlt() }}</div>
+                  }
                 </div>
               </div>
 
@@ -1222,6 +1240,19 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
       margin-left: 2px;
     }
 
+    /* Read-only (auto-computed / auto-resolved) fields */
+    .cxm-lc-readonly {
+      background: var(--cx-surface-2, rgba(0,0,0,0.03));
+      cursor: default;
+    }
+    .cxm-lc-acct-hint {
+      font-size: 12px;
+      margin-top: 4px;
+      color: var(--cx-text-muted, #64748b);
+    }
+    .cxm-lc-acct-ok { color: var(--cx-success, #16a34a); }
+    .cxm-lc-acct-err { color: var(--cx-danger, #dc2626); }
+
     /* ─── Product cards (step 1) ─── */
     .cxm-lc-product {
       display: flex;
@@ -1912,6 +1943,96 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     this.bvnError.set(null);
   }
 
+  // ─── Amount in words (computed, read-only) ───
+  private readonly W_ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  private readonly W_TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  private threeToWords(n: number): string {
+    let s = '';
+    if (n >= 100) { s += this.W_ONES[Math.floor(n / 100)] + ' Hundred'; n %= 100; if (n) s += ' and '; }
+    if (n >= 20) { s += this.W_TENS[Math.floor(n / 10)]; n %= 10; if (n) s += '-' + this.W_ONES[n]; }
+    else if (n > 0) { s += this.W_ONES[n]; }
+    return s;
+  }
+
+  /** Convert a naira amount to words, e.g. 500000 → "Five Hundred Thousand Naira Only". */
+  numberToWords(amount: any): string {
+    const naira = Math.floor(Math.abs(Number(amount) || 0));
+    if (naira === 0) return '';
+    const scales = ['', ' Thousand', ' Million', ' Billion', ' Trillion'];
+    const groups: number[] = [];
+    let num = naira;
+    while (num > 0) { groups.push(num % 1000); num = Math.floor(num / 1000); }
+    const parts: string[] = [];
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i] === 0) continue;
+      parts.push(this.threeToWords(groups[i]) + scales[i]);
+    }
+    return parts.join(' ').trim() + ' Naira Only';
+  }
+
+  onAmountChange(): void {
+    this.form['loan_amount_words'] = this.numberToWords(this.form['amount']);
+  }
+
+  // ─── Bank account resolution (via backend → Paystack) ───
+  resolvingMain = signal(false);
+  resolvingAlt = signal(false);
+  acctErrMain = signal<string | null>(null);
+  acctErrAlt = signal<string | null>(null);
+  private acctDebounce: Record<string, any> = {};
+
+  /** Exact (case-insensitive) bank-name → Paystack code lookup from the banks list. */
+  private bankCodeFor(name: string): string | null {
+    const n = (name ?? '').trim().toLowerCase();
+    if (!n) return null;
+    const b = this.banks().find(x => x.name.toLowerCase() === n);
+    return b ? b.code : null;
+  }
+
+  /**
+   * Fired when an account number or bank changes. Clears the resolved name,
+   * and once we have a 10-digit number + a recognised bank, debounces a call
+   * to the backend resolver which auto-fills the account name.
+   */
+  onAccountInput(which: 'main' | 'alt'): void {
+    const acct = which === 'main' ? this.form['account_number'] : this.form['alt_account_number'];
+    const bank = which === 'main' ? this.form['bank_name'] : this.form['alt_bank_name'];
+    const resolving = which === 'main' ? this.resolvingMain : this.resolvingAlt;
+    const err = which === 'main' ? this.acctErrMain : this.acctErrAlt;
+
+    // Any change invalidates a previously-resolved name.
+    if (which === 'main') this.form['account_name'] = ''; else this.form['alt_account_name'] = '';
+    err.set(null);
+    resolving.set(false);
+
+    const digits = String(acct ?? '').replace(/\D/g, '');
+    const code = this.bankCodeFor(bank);
+    if (digits.length !== 10 || !code) return;
+
+    clearTimeout(this.acctDebounce[which]);
+    this.acctDebounce[which] = setTimeout(() => this.resolveAccount(which, digits, code), 400);
+  }
+
+  private resolveAccount(which: 'main' | 'alt', accountNumber: string, bankCode: string): void {
+    const resolving = which === 'main' ? this.resolvingMain : this.resolvingAlt;
+    const err = which === 'main' ? this.acctErrMain : this.acctErrAlt;
+    resolving.set(true);
+    err.set(null);
+    this.api.get('/banks/resolve', { account_number: accountNumber, bank_code: bankCode }).subscribe({
+      next: (r: any) => {
+        resolving.set(false);
+        const name = r?.data?.account_name || '';
+        if (which === 'main') this.form['account_name'] = name; else this.form['alt_account_name'] = name;
+      },
+      error: (e: any) => {
+        resolving.set(false);
+        err.set(e?.error?.message || 'Could not verify this account.');
+      },
+    });
+  }
+
   /**
    * Polling timer for the agent.accepting_loans setting. Checked every
    * 15s while this page is mounted so a pause toggled by admin takes
@@ -2317,6 +2438,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     // than on submit.
     if (src['bvn']) this.onBvnChange(this.form['bvn']);
 
+    // Recompute the (read-only) amount-in-words from the prefilled amount.
+    this.onAmountChange();
+
     // If state was prefilled, populate the LGA dropdown so the prefilled
     // LGA value (if any) has a matching option. Otherwise the dropdown
     // shows blank because its options list is empty until a state is
@@ -2585,6 +2709,8 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     // but if an agent somehow invokes submit() via another path (stale
     // ref, keyboard enter on a hidden button) we still refuse.
     if (!this.canSubmit()) return;
+    // Guarantee the read-only amount-in-words matches the final amount.
+    this.onAmountChange();
     this.submitting.set(true);
 
     // Customer payload — every field we captured. Backend's fillFromArray

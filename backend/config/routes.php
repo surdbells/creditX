@@ -36,6 +36,7 @@ use App\Action\Team;
 use App\Action\Reconciliation;
 use App\Action\Portal;
 use App\Action\ListBanksAction;
+use App\Action\ResolveBankAccountAction;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\CustomerAuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
@@ -100,6 +101,9 @@ return function (App $app): void {
 
         // ─── Agent dashboard (authenticated, no specific permission — own data only) ───
         $api->get('/agent/dashboard-stats', Agent\GetDashboardStatsAction::class);
+
+        // Bank account name resolution via Paystack (server-side secret).
+        $api->get('/banks/resolve', ResolveBankAccountAction::class);
 
         // ─── Users ───
         $api->group('/users', function (RouteCollectorProxy $group) {
