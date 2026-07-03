@@ -490,15 +490,23 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                   </div>
                   <div>
                     <label class="cxm-lc-label">Account Name</label>
-                    <input class="cxm-lc-input cxm-lc-readonly" [(ngModel)]="form['account_name']" readonly
-                           placeholder="Auto-filled from account number" />
-                    @if (resolvingMain()) {
-                      <div class="cxm-lc-acct-hint">Verifying account…</div>
-                    } @else if (acctErrMain()) {
-                      <div class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrMain() }}</div>
-                    } @else if (form['account_name']) {
-                      <div class="cxm-lc-acct-hint cxm-lc-acct-ok">✓ Verified</div>
-                    }
+                    <input class="cxm-lc-input" [class.cxm-lc-readonly]="!manualMain()" [readonly]="!manualMain()"
+                           [(ngModel)]="form['account_name']"
+                           [placeholder]="manualMain() ? 'Type the account name' : 'Auto-filled from account number'" />
+                    <div class="cxm-lc-acct-row">
+                      @if (!manualMain()) {
+                        @if (resolvingMain()) {
+                          <span class="cxm-lc-acct-hint">Verifying account…</span>
+                        } @else if (acctErrMain()) {
+                          <span class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrMain() }}</span>
+                        } @else if (form['account_name']) {
+                          <span class="cxm-lc-acct-hint cxm-lc-acct-ok">✓ Verified</span>
+                        }
+                      }
+                      <button type="button" class="cxm-lc-acct-toggle" (click)="toggleManual('main')">
+                        {{ manualMain() ? 'Use auto-resolve' : 'Enter manually' }}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label class="cxm-lc-label">Alternate Bank</label>
@@ -513,15 +521,25 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                     </div>
                     <div>
                       <label class="cxm-lc-label">Alt Account Name</label>
-                      <input class="cxm-lc-input cxm-lc-readonly" [(ngModel)]="form['alt_account_name']" readonly
-                             placeholder="Auto-filled" />
+                      <input class="cxm-lc-input" [class.cxm-lc-readonly]="!manualAlt()" [readonly]="!manualAlt()"
+                             [(ngModel)]="form['alt_account_name']"
+                             [placeholder]="manualAlt() ? 'Type the name' : 'Auto-filled'" />
                     </div>
                   </div>
-                  @if (resolvingAlt()) {
-                    <div class="cxm-lc-acct-hint">Verifying alternate account…</div>
-                  } @else if (acctErrAlt()) {
-                    <div class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrAlt() }}</div>
-                  }
+                  <div class="cxm-lc-acct-row">
+                    @if (!manualAlt()) {
+                      @if (resolvingAlt()) {
+                        <span class="cxm-lc-acct-hint">Verifying alternate account…</span>
+                      } @else if (acctErrAlt()) {
+                        <span class="cxm-lc-acct-hint cxm-lc-acct-err">{{ acctErrAlt() }}</span>
+                      } @else if (form['alt_account_name']) {
+                        <span class="cxm-lc-acct-hint cxm-lc-acct-ok">✓ Verified</span>
+                      }
+                    }
+                    <button type="button" class="cxm-lc-acct-toggle" (click)="toggleManual('alt')">
+                      {{ manualAlt() ? 'Use auto-resolve' : 'Enter manually' }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1252,6 +1270,25 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
     }
     .cxm-lc-acct-ok { color: var(--cx-success, #16a34a); }
     .cxm-lc-acct-err { color: var(--cx-danger, #dc2626); }
+    .cxm-lc-acct-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .cxm-lc-acct-row .cxm-lc-acct-hint { margin-top: 0; }
+    .cxm-lc-acct-toggle {
+      margin-left: auto;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cx-primary-600, #16a34a);
+      cursor: pointer;
+    }
+    .cxm-lc-acct-toggle:active { opacity: 0.6; }
 
     /* ─── Product cards (step 1) ─── */
     .cxm-lc-product {
@@ -1981,7 +2018,27 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   resolvingAlt = signal(false);
   acctErrMain = signal<string | null>(null);
   acctErrAlt = signal<string | null>(null);
+  manualMain = signal(false);
+  manualAlt = signal(false);
   private acctDebounce: Record<string, any> = {};
+
+  /**
+   * Toggle a bank account name between auto-resolve and manual entry. Used as a
+   * fallback when Paystack can't resolve a valid account. Switching back to
+   * auto clears the typed name and re-attempts resolution from the current
+   * number + bank.
+   */
+  toggleManual(which: 'main' | 'alt'): void {
+    const manual = which === 'main' ? this.manualMain : this.manualAlt;
+    const err = which === 'main' ? this.acctErrMain : this.acctErrAlt;
+    const resolving = which === 'main' ? this.resolvingMain : this.resolvingAlt;
+    const next = !manual();
+    manual.set(next);
+    err.set(null);
+    resolving.set(false);
+    if (which === 'main') this.form['account_name'] = ''; else this.form['alt_account_name'] = '';
+    if (!next) this.onAccountInput(which); // back to auto — try resolving now
+  }
 
   /** Exact (case-insensitive) bank-name → Paystack code lookup from the banks list. */
   private bankCodeFor(name: string): string | null {
@@ -1997,6 +2054,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
    * to the backend resolver which auto-fills the account name.
    */
   onAccountInput(which: 'main' | 'alt'): void {
+    // Manual entry — leave the agent's typed name alone.
+    if ((which === 'main' ? this.manualMain : this.manualAlt)()) return;
+
     const acct = which === 'main' ? this.form['account_number'] : this.form['alt_account_number'];
     const bank = which === 'main' ? this.form['bank_name'] : this.form['alt_bank_name'];
     const resolving = which === 'main' ? this.resolvingMain : this.resolvingAlt;
