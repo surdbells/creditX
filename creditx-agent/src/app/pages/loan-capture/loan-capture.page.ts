@@ -8,11 +8,12 @@ import { chevronForwardOutline, chevronBackOutline, checkmarkCircleOutline, sear
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-states';
+import { BankSelectComponent } from '../../shared/bank-select.component';
 
 @Component({
   selector: 'app-loan-capture',
   standalone: true,
-  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon],
+  imports: [CommonModule, FormsModule, IonContent, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons, IonSpinner, IonIcon, BankSelectComponent],
   template: `
     <ion-header class="ion-no-border">
       <ion-toolbar>
@@ -475,12 +476,8 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                 <div class="flex flex-col gap-3">
                   <div>
                     <label class="cxm-lc-label">Bank Name <span class="cxm-lc-req">*</span></label>
-                    <input type="text" class="cxm-lc-input"
-                           [(ngModel)]="form['bank_name']" (ngModelChange)="onAccountInput('main')"
-                           placeholder="e.g. Access Bank" list="banks-list" autocomplete="off" />
-                    <datalist id="banks-list">
-                      @for (b of banks(); track b.code) { <option [value]="b.name"></option> }
-                    </datalist>
+                    <cxm-bank-select [banks]="banks()" [value]="form['bank_name']" placeholder="Search bank…"
+                                     (valueChange)="form['bank_name'] = $event; onAccountInput('main')"></cxm-bank-select>
                   </div>
                   <div>
                     <label class="cxm-lc-label">Account Number <span class="cxm-lc-req">*</span></label>
@@ -510,8 +507,8 @@ import { NIGERIAN_STATES, getLgasForState } from '../../core/data/nigerian-state
                   </div>
                   <div>
                     <label class="cxm-lc-label">Alternate Bank</label>
-                    <input class="cxm-lc-input" [(ngModel)]="form['alt_bank_name']" (ngModelChange)="onAccountInput('alt')"
-                           list="banks-list" autocomplete="off" />
+                    <cxm-bank-select [banks]="banks()" [value]="form['alt_bank_name']" placeholder="Search bank…"
+                                     (valueChange)="form['alt_bank_name'] = $event; onAccountInput('alt')"></cxm-bank-select>
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
