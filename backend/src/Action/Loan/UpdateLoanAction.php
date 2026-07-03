@@ -104,6 +104,14 @@ final class UpdateLoanAction
         $loan = $this->repo->find($args['id'] ?? '');
         if ($loan === null) return $this->notFound('Loan not found');
 
+        // Field agents may only touch their own jobs.
+        $callerId = $request->getAttribute('user_id');
+        $caller = $callerId ? $this->em->find(\App\Domain\Entity\User::class, $callerId) : null;
+        if ($caller instanceof \App\Domain\Entity\User && $caller->isAgent()
+            && $loan->getAgent()?->getId() !== $callerId) {
+            return $this->notFound('Loan not found');
+        }
+
         // Status guard — edit only allowed in the three pre-review states.
         $editableStatuses = [LoanStatus::DRAFT, LoanStatus::CAPTURED, LoanStatus::SUBMITTED];
         if (!in_array($loan->getStatus(), $editableStatuses, true)) {

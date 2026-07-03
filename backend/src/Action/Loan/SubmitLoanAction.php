@@ -16,12 +16,21 @@ final class SubmitLoanAction
         private readonly ApprovalEngineService $approvalEngine,
         private readonly AuditService $audit,
         private readonly NotificationDispatchService $notifService,
+        private readonly \Doctrine\ORM\EntityManagerInterface $em,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $loan = $this->repo->find($args['id'] ?? '');
         if ($loan === null) return $this->notFound('Loan not found');
+
+        // Field agents may only submit their own jobs.
+        $callerId = $request->getAttribute('user_id');
+        $caller = $callerId ? $this->em->find(\App\Domain\Entity\User::class, $callerId) : null;
+        if ($caller instanceof \App\Domain\Entity\User && $caller->isAgent()
+            && $loan->getAgent()?->getId() !== $callerId) {
+            return $this->notFound('Loan not found');
+        }
 
         try {
             $loan->transitionTo(LoanStatus::SUBMITTED);
