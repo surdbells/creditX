@@ -383,6 +383,19 @@ type ProductChartItem = { label: string; value: number; amount: number };
     @media (max-width: 700px) {
       .cx-dash-chart-with-legend { grid-template-columns: 1fr; }
     }
+    /* Wide (portfolio) card: keep the donut compact instead of stretching it
+       across the full-width card. Fixed donut column, legend beside it. */
+    .cx-dash-chart-wide { min-height: 0; }
+    .cx-dash-chart-wide .cx-dash-chart-with-legend {
+      grid-template-columns: 200px auto;
+      justify-content: start;
+      gap: 2rem;
+    }
+    .cx-dash-chart-wide .cx-dash-chart-svg { max-width: 200px; }
+    @media (max-width: 700px) {
+      .cx-dash-chart-wide .cx-dash-chart-with-legend { grid-template-columns: 1fr; }
+      .cx-dash-chart-wide .cx-dash-chart-svg { margin-inline: auto; }
+    }
     .cx-dash-chart-legend {
       list-style: none; margin: 0; padding: 0;
       max-height: 220px; overflow-y: auto;
