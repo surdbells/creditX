@@ -85,6 +85,19 @@ import { SettingsService } from '../../core/services/settings.service';
           <div><label class="cx-label">Max Service Years</label><input class="cx-input" type="number" [(ngModel)]="form.max_years_of_service" /></div>
         </div>
 
+        <!-- Status -->
+        <h4 class="cx-form-section-title">Status</h4>
+        <div class="cx-form-row cx-form-row-2">
+          <div>
+            <label class="cx-label">Product Status</label>
+            <select class="cx-select" [(ngModel)]="form.is_active">
+              <option [ngValue]="true">Active</option>
+              <option [ngValue]="false">Inactive</option>
+            </select>
+            <div class="cx-field-hint">Inactive products are hidden from new loan capture.</div>
+          </div>
+        </div>
+
         <!-- Attached Fees -->
         <div class="cx-lp-fees-section">
           <div class="cx-lp-fees-header">
@@ -271,8 +284,8 @@ export class LoanProductsComponent implements OnInit {
   load(p?:any) { this.loading.set(true); this.api.get('/loan-products',{...this.q,...p}).subscribe({next:r=>{this.rows.set(r.data||[]);this.pagination.set(r.meta||null);this.loading.set(false);},error:()=>this.loading.set(false)}); }
   onQuery(e:TableQueryEvent) { this.q=e; this.load(e); }
   openForm(row?:any) {
-    if(row){this.editId=row.id;this.form={name:row.name,code:row.code,description:row.description,interest_calculation_method:row.interest_calculation_method,interest_rate:row.interest_rate,min_amount:row.min_amount,max_amount:row.max_amount,min_tenure:row.min_tenure,max_tenure:row.max_tenure,max_age:row.max_age,max_years_of_service:row.max_years_of_service,allows_top_up:row.allows_top_up};this.fees=(row.fees||[]).map((f:any)=>({fee_type_id:f.fee_type_id,calculation_type:f.calculation_type,value:f.value,effect:f.effect||'deducted_from_disbursement',applies_to:f.applies_to||'principal'}));}
-    else{this.editId=null;this.form={name:'',code:'',description:'',interest_calculation_method:'flat_rate',interest_rate:'',min_amount:'',max_amount:'',min_tenure:1,max_tenure:24,max_age:60,max_years_of_service:35,allows_top_up:false};this.fees=[];}
+    if(row){this.editId=row.id;this.form={name:row.name,code:row.code,description:row.description,interest_calculation_method:row.interest_calculation_method,interest_rate:row.interest_rate,min_amount:row.min_amount,max_amount:row.max_amount,min_tenure:row.min_tenure,max_tenure:row.max_tenure,max_age:row.max_age,max_years_of_service:row.max_years_of_service,allows_top_up:row.allows_top_up,is_active:row.is_active};this.fees=(row.fees||[]).map((f:any)=>({fee_type_id:f.fee_type_id,calculation_type:f.calculation_type,value:f.value,effect:f.effect||'deducted_from_disbursement',applies_to:f.applies_to||'principal'}));}
+    else{this.editId=null;this.form={name:'',code:'',description:'',interest_calculation_method:'flat_rate',interest_rate:'',min_amount:'',max_amount:'',min_tenure:1,max_tenure:24,max_age:60,max_years_of_service:35,allows_top_up:false,is_active:true};this.fees=[];}
     this.showForm.set(true);
   }
   addFee() { this.fees.push({fee_type_id:'',calculation_type:'flat',value:'',effect:'deducted_from_disbursement',applies_to:'principal'}); }
