@@ -9,6 +9,7 @@ use App\Action\User;
 use App\Action\Location;
 use App\Action\Role;
 use App\Action\Setting;
+use App\Action\Branding;
 use App\Action\Audit;
 use App\Action\RecordType;
 use App\Action\GovRecord;
@@ -163,6 +164,17 @@ return function (App $app): void {
         });
 
         // ─── Settings ───
+        // ─── Branding (org logo / colours / company name) ───
+        // Separate path from /settings so it doesn't collide with /settings/{id}.
+        $api->group('/branding', function (RouteCollectorProxy $group) {
+            $group->get('', Branding\GetBrandingAction::class)
+                ->add(new RbacMiddleware('settings.view'));
+            $group->put('', Branding\UpdateBrandingAction::class)
+                ->add(new RbacMiddleware('settings.edit'));
+            $group->post('/logo', Branding\UploadBrandLogoAction::class)
+                ->add(new RbacMiddleware('settings.edit'));
+        });
+
         $api->group('/settings', function (RouteCollectorProxy $group) {
             $group->get('', Setting\ListSettingsAction::class)
                 ->add(new RbacMiddleware('settings.view'));

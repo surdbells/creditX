@@ -358,18 +358,29 @@ final class NotificationDispatchService
         $bodyHtml = nl2br(htmlspecialchars($body));
         $year = date('Y');
 
+        // Per-org branding (falls back to CreditX defaults). Read from settings
+        // so each tenant's emails match their admin/portal theme.
+        $primary = htmlspecialchars((string) $this->settings->get('brand.primary_color', '#0A4F2A'), ENT_QUOTES);
+        $accent  = htmlspecialchars((string) $this->settings->get('brand.accent_color', '#C9A227'), ENT_QUOTES);
+        $company = htmlspecialchars((string) $this->settings->get('general.company_name', 'CreditX'), ENT_QUOTES);
+        $logoUrl = trim((string) $this->settings->get('brand.logo_url', ''));
+
+        // Header mark: the uploaded logo if set, otherwise the company name.
+        $header = $logoUrl !== ''
+            ? '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES) . '" alt="' . $company . '" style="max-height:44px;max-width:200px;display:inline-block" />'
+            : '<h1 style="color:#fff;font-size:24px;margin:0;font-weight:800">' . $company . '</h1>';
+
         return <<<HTML
         <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#f8f9fa">
-            <div style="background:linear-gradient(135deg,#0A4F2A 0%,#0d6b3a 100%);padding:24px;text-align:center;border-radius:0 0 20px 20px">
-                <h1 style="color:#fff;font-size:24px;margin:0;font-weight:800">Credit<span style="color:#C9A227">X</span></h1>
-                <p style="color:rgba(255,255,255,0.6);font-size:11px;margin:6px 0 0;text-transform:uppercase;letter-spacing:2px">Loan Management System</p>
+            <div style="background:linear-gradient(135deg,{$primary} 0%,{$accent} 100%);padding:24px;text-align:center;border-radius:0 0 20px 20px">
+                {$header}
             </div>
             <div style="padding:28px 24px">
                 <h2 style="color:#1a1a2e;font-size:16px;margin:0 0 16px;font-weight:700">{$subject}</h2>
                 <div style="color:#374151;font-size:14px;line-height:1.6">{$bodyHtml}</div>
             </div>
             <div style="padding:16px 24px;border-top:1px solid #e5e7eb;text-align:center">
-                <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {$year} DOST HQ LIMITED &bull; CreditX</p>
+                <p style="color:#9ca3af;font-size:11px;margin:0">&copy; {$year} {$company}</p>
             </div>
         </div>
         HTML;

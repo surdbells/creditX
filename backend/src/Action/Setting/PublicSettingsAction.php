@@ -51,6 +51,12 @@ final class PublicSettingsAction
         // app reads this during tenant resolution and forces an update when
         // its build is older. Presentation/compat only — safe to expose.
         'mobile.min_agent_version',
+        // Per-org branding — presentation only, safe to expose. Frontends read
+        // these before auth to theme the login screen. logo_path stays private;
+        // only the public logo_url is exposed.
+        'brand.primary_color',
+        'brand.accent_color',
+        'brand.logo_url',
     ];
 
     public function __construct(
