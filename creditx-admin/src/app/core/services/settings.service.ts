@@ -2,6 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { applyBrandColors, applyFavicon } from '../util/brand-color';
 
 /**
  * Shape of the /api/settings/public response data field.
@@ -15,6 +16,9 @@ interface PublicSettingsMap {
   'general.company_name'?: string;
   'general.support_email'?: string;
   'general.date_format'?: string;
+  'brand.primary_color'?: string;
+  'brand.accent_color'?: string;
+  'brand.logo_url'?: string;
 }
 
 /**
@@ -58,6 +62,9 @@ export class SettingsService {
     'general.company_name': 'CreditX',
     'general.support_email': 'support@dostsuite.com',
     'general.date_format': 'Y-m-d',
+    'brand.primary_color': '#0A4F2A',
+    'brand.accent_color': '#C9A227',
+    'brand.logo_url': '',
   };
 
   /**
@@ -75,6 +82,7 @@ export class SettingsService {
         )
       );
       this.settings.set(res?.data || {});
+      this.applyBrand();
     } catch {
       // Intentional: keep going with fallbacks. Logging here would
       // pollute the console on offline/dev scenarios; the fallback
@@ -82,6 +90,13 @@ export class SettingsService {
       this.settings.set({});
     }
     this.loaded = true;
+  }
+
+  /** Force a re-fetch (e.g. after an admin updates branding) so the new
+   *  company name, colours, and logo propagate across the app immediately. */
+  async reload(): Promise<void> {
+    this.loaded = false;
+    await this.load();
   }
 
   // ─── Typed signal accessors ─────────────────────────────────────
@@ -109,6 +124,19 @@ export class SettingsService {
   readonly dateFormat = computed(() =>
     this.settings()['general.date_format'] || SettingsService.FALLBACKS['general.date_format']
   );
+
+  // ─── Branding ───────────────────────────────────────────────────
+  readonly primaryColor = computed(() => this.settings()['brand.primary_color'] || '#0A4F2A');
+  readonly accentColor = computed(() => this.settings()['brand.accent_color'] || '#C9A227');
+  /** Org logo URL, or null to fall back to the bundled CreditX mark. */
+  readonly logoUrl = computed(() => this.settings()['brand.logo_url'] || null);
+
+  /** Push the org's brand colours + favicon into the DOM. Called on load(). */
+  private applyBrand(): void {
+    const s = this.settings();
+    applyBrandColors(s['brand.primary_color'], s['brand.accent_color']);
+    applyFavicon(s['brand.logo_url']);
+  }
 
   // ─── Formatting helpers ─────────────────────────────────────────
   // Components that build strings (chart axes, exports, PDFs) call

@@ -1,5 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
+import { SettingsService } from '../../core/services/settings.service';
 
 @Component({
   selector: 'app-auth-shell',
@@ -10,8 +11,8 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden"
         style="background: linear-gradient(160deg, var(--cx-primary-700) 0%, var(--cx-primary-600) 55%, var(--cx-primary-800) 100%)">
         <div class="flex items-center gap-2.5">
-          <img src="creditx-logo.png" alt="CreditX" class="w-10 h-10 rounded-xl" />
-          <span class="text-white text-xl font-bold tracking-tight">CreditX</span>
+          <img [src]="settings.logoUrl() || 'creditx-logo.png'" alt="" class="w-10 h-10 rounded-xl object-contain" />
+          <span class="text-white text-xl font-bold tracking-tight">{{ settings.companyName() }}</span>
         </div>
 
         <div class="max-w-md">
@@ -37,8 +38,8 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="flex items-center justify-center p-6 sm:p-12">
         <div class="w-full max-w-sm cx-animate-in">
           <div class="lg:hidden flex items-center gap-2.5 mb-8 justify-center">
-            <img src="creditx-logo.png" alt="CreditX" class="w-9 h-9 rounded-lg" />
-            <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">CreditX</span>
+            <img [src]="settings.logoUrl() || 'creditx-logo.png'" alt="" class="w-9 h-9 rounded-lg object-contain" />
+            <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">{{ settings.companyName() }}</span>
           </div>
 
           <h2 class="cx-heading cx-heading-lg mb-1.5">{{ title }}</h2>
@@ -55,4 +56,5 @@ import { LucideAngularModule } from 'lucide-angular';
 export class AuthShell {
   @Input() title = '';
   @Input() subtitle = '';
+  constructor(public settings: SettingsService) {}
 }

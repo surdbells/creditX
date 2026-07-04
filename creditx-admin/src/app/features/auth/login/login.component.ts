@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { environment } from '../../../../environments/environment';
 
 @Component({
@@ -28,7 +29,7 @@ export class LoginComponent {
   otpEmail = '';
   otpMessage = '';
 
-  constructor(private authService: AuthService, private router: Router, private http: HttpClient) {}
+  constructor(private authService: AuthService, private router: Router, private http: HttpClient, public settings: SettingsService) {}
 
   onSubmit(): void {
     if (this.requires2FA()) { this.verifyOtp(); return; }

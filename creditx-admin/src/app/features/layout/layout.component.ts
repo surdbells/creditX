@@ -122,6 +122,7 @@ export class LayoutComponent {
       { label: 'Roles', icon: 'shield', route: '/roles', permission: 'roles.view' },
       { label: 'Locations', icon: 'map-pin', route: '/locations', permission: 'locations.view' },
       { label: 'Settings', icon: 'settings', route: '/settings', permission: 'settings.view' },
+      { label: 'Branding', icon: 'palette', route: '/branding', permission: 'settings.edit' },
       { label: 'Agent Targets', icon: 'target', route: '/agent-targets', permission: 'settings.view' },
       { label: 'Notifications', icon: 'bell', route: '/notifications', permission: 'notifications.manage' },
       { label: 'Agent Broadcast', icon: 'send', route: '/agent-broadcast', permission: 'notifications.manage' },

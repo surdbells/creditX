@@ -2,7 +2,9 @@
   <!-- Desktop Sidebar -->
   <aside class="cx-sidebar" [class.collapsed]="collapsed()">
     <div class="sidebar-header">
-      @if (!collapsed()) {
+      @if (settings.logoUrl(); as logo) {
+        <img [src]="logo" alt="" style="height:28px;max-width:150px;object-fit:contain" />
+      } @else if (!collapsed()) {
         <span class="text-lg font-bold"><span class="text-[var(--cx-accent)]">Credit</span><span class="sidebar-brand-x">X</span></span>
       } @else {
         <span class="text-lg font-bold text-[var(--cx-accent)]">CX</span>

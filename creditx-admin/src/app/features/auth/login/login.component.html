@@ -3,9 +3,13 @@
     <div class="cx-card !p-8">
       <!-- Logo -->
       <div class="text-center mb-8">
-        <img src="creditx-logo.png" alt="CreditX" class="w-16 h-16 rounded-2xl mx-auto mb-3" />
+        <img [src]="settings.logoUrl() || 'creditx-logo.png'" alt="Logo" class="w-16 h-16 rounded-2xl mx-auto mb-3 object-contain" />
         <h1 class="text-3xl font-bold">
-          <span class="text-[var(--cx-primary)]">Credit</span><span class="text-[var(--cx-accent)]">X</span>
+          @if (settings.logoUrl()) {
+            <span class="text-[var(--cx-text)]">{{ settings.companyName() }}</span>
+          } @else {
+            <span class="text-[var(--cx-primary)]">Credit</span><span class="text-[var(--cx-accent)]">X</span>
+          }
         </h1>
         <p class="text-sm text-[var(--cx-text-muted)] mt-1">Loan Management System</p>
       </div>
