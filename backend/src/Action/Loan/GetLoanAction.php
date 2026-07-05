@@ -22,12 +22,12 @@ final class GetLoanAction
         $loan = $this->repo->find($args['id'] ?? '');
         if ($loan === null) return $this->notFound('Loan not found');
 
-        // Field agents may only view their own jobs. Anyone flagged is_agent
-        // is refused a loan that isn't theirs (404, not 403, so it doesn't
-        // confirm the loan exists).
+        // Field agents may only view their own jobs (404, not 403, so it
+        // doesn't confirm the loan exists). Back-office staff with loan
+        // oversight are not scoped, even if they carry the is_agent flag.
         $userId = $request->getAttribute('user_id');
         $user = $userId ? $this->em->find(User::class, $userId) : null;
-        if ($user instanceof User && $user->isAgent()
+        if ($user instanceof User && $user->isLoanScopedToSelf()
             && $loan->getAgent()?->getId() !== $userId) {
             return $this->notFound('Loan not found');
         }

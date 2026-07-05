@@ -26,11 +26,12 @@ final class ListLoansAction
 
         // Field agents may only ever see their own jobs. Enforce it here (not
         // via client-supplied params, which can't be trusted): if the caller
-        // is flagged is_agent, force the agent filter to their own id and drop
-        // any branch filter regardless of what the request asked for.
+        // is a field-scoped agent, force the agent filter to their own id and
+        // drop any branch filter. Back-office staff (super admins/approvers)
+        // are never scoped, even if they also carry the is_agent flag.
         $userId = $request->getAttribute('user_id');
         $user = $userId ? $this->em->find(User::class, $userId) : null;
-        if ($user instanceof User && $user->isAgent()) {
+        if ($user instanceof User && $user->isLoanScopedToSelf()) {
             $agentId  = $userId;
             $branchId = null;
         }

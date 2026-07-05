@@ -228,6 +228,19 @@ class User
     public function isAgent(): bool { return $this->isAgent; }
     public function setIsAgent(bool $v): void { $this->isAgent = $v; }
 
+    /**
+     * Whether loan visibility must be restricted to this user's own jobs.
+     *
+     * True only for genuine field agents. A back-office user with loan
+     * oversight (super admins, approvers — anyone with loans.approve) is NOT
+     * restricted even if they also carry the is_agent flag, so they still see
+     * the whole portfolio in the admin app.
+     */
+    public function isLoanScopedToSelf(): bool
+    {
+        return $this->isAgent && !$this->hasPermission('loans.approve');
+    }
+
     /** Returns the target as a string (decimal string from DB) or null. */
     public function getMonthlyTarget(): ?string { return $this->monthlyTarget; }
 

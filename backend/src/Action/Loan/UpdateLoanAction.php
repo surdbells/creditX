@@ -104,10 +104,11 @@ final class UpdateLoanAction
         $loan = $this->repo->find($args['id'] ?? '');
         if ($loan === null) return $this->notFound('Loan not found');
 
-        // Field agents may only touch their own jobs.
+        // Field agents may only touch their own jobs (back-office staff aren't
+        // scoped, even if they carry the is_agent flag).
         $callerId = $request->getAttribute('user_id');
         $caller = $callerId ? $this->em->find(\App\Domain\Entity\User::class, $callerId) : null;
-        if ($caller instanceof \App\Domain\Entity\User && $caller->isAgent()
+        if ($caller instanceof \App\Domain\Entity\User && $caller->isLoanScopedToSelf()
             && $loan->getAgent()?->getId() !== $callerId) {
             return $this->notFound('Loan not found');
         }
