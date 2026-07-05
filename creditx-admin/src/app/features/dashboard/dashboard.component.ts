@@ -111,6 +111,60 @@ type ProductChartItem = { label: string; value: number; amount: number };
         </cx-stat-card>
       </div>
 
+      <!-- ─── Recent applications (above the charts) ─── -->
+      <div class="cx-dash-panel">
+        <div class="cx-dash-panel-header">
+          <div>
+            <h2 class="cx-dash-panel-title">Recent Applications</h2>
+            <span class="cx-dash-panel-subtitle">Latest 5 loans captured</span>
+          </div>
+          <div class="cx-dash-panel-actions">
+            <a routerLink="/approval-queue" class="cx-btn cx-btn-primary cx-btn-sm">
+              <lucide-icon name="user-check" [size]="14"></lucide-icon>
+              <span>Approval Queue</span>
+            </a>
+            <a routerLink="/loans" class="cx-dash-link">
+              <span>View all</span>
+              <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
+            </a>
+          </div>
+        </div>
+        @if (recentLoans.length) {
+          <div class="cx-dash-recent-table-wrap">
+            <table class="cx-dash-recent-table">
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>Customer</th>
+                  <th>Product</th>
+                  <th>Branch</th>
+                  <th class="cx-dash-right">Amount</th>
+                  <th class="cx-dash-center">Tenure</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (loan of recentLoans; track loan.id) {
+                  <tr>
+                    <td><span class="cx-dash-app-id">{{ loan.application_id }}</span></td>
+                    <td class="cx-dash-customer">{{ loan.customer_name }}</td>
+                    <td>{{ loan.product_name || '—' }}</td>
+                    <td>{{ loan.branch_name || '—' }}</td>
+                    <td class="cx-dash-right tabular-nums cx-dash-amount">{{ loan.amount_requested | money }}</td>
+                    <td class="cx-dash-center tabular-nums">{{ loan.tenure }}m</td>
+                    <td><cx-status-badge [status]="loan.status"></cx-status-badge></td>
+                    <td class="cx-dash-muted">{{ shortDate(loan.created_at) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <cx-empty-state title="No applications yet" description="New captures from agents will appear here." icon="file-text"></cx-empty-state>
+        }
+      </div>
+
       <!-- ─── Charts grid ─── -->
       <div class="cx-dash-charts">
         <!-- 1. Portfolio by status (donut, wide) -->
@@ -200,45 +254,6 @@ type ProductChartItem = { label: string; value: number; amount: number };
         </div>
       </div>
 
-      <!-- ─── Recent applications ─── -->
-      <div class="cx-dash-panel">
-        <div class="cx-dash-panel-header">
-          <div>
-            <h2 class="cx-dash-panel-title">Recent Applications</h2>
-            <span class="cx-dash-panel-subtitle">Latest 5 loans captured</span>
-          </div>
-          <a routerLink="/loans" class="cx-dash-link">
-            <span>View all</span>
-            <lucide-icon name="chevron-right" [size]="14"></lucide-icon>
-          </a>
-        </div>
-        @if (recentLoans.length) {
-          <div class="cx-dash-recent-table-wrap">
-            <table class="cx-dash-recent-table">
-              <thead>
-                <tr>
-                  <th>App ID</th>
-                  <th>Customer</th>
-                  <th class="cx-dash-right">Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (loan of recentLoans; track loan.id) {
-                  <tr>
-                    <td><span class="cx-dash-app-id">{{ loan.application_id }}</span></td>
-                    <td class="cx-dash-customer">{{ loan.customer_name }}</td>
-                    <td class="cx-dash-right tabular-nums cx-dash-amount">{{ loan.amount_requested | money }}</td>
-                    <td><cx-status-badge [status]="loan.status"></cx-status-badge></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        } @else {
-          <cx-empty-state title="No applications yet" description="New captures from agents will appear here." icon="file-text"></cx-empty-state>
-        }
-      </div>
     </div>
   `,
   styles: [`
@@ -473,7 +488,11 @@ type ProductChartItem = { label: string; value: number; amount: number };
     }
     .cx-dash-customer { font-weight: 500; }
     .cx-dash-right { text-align: right; }
-    .cx-dash-amount { color: var(--cx-text); }
+    .cx-dash-center { text-align: center; }
+    .cx-dash-amount { color: var(--cx-text); font-weight: 600; }
+    .cx-dash-muted { color: var(--cx-text-muted); font-size: var(--cx-text-xs); white-space: nowrap; }
+    .cx-dash-recent-table td { white-space: nowrap; }
+    .cx-dash-panel-actions { display: flex; align-items: center; gap: 0.75rem; }
   `],
 })
 export class DashboardComponent implements OnInit {
@@ -501,6 +520,14 @@ export class DashboardComponent implements OnInit {
   ];
   palette(i: number): string {
     return this.chartPalette[i % this.chartPalette.length];
+  }
+
+  /** Safe short date for the recent-applications table ("Jul 5"). Handles the
+   *  backend 'Y-m-d H:i:s' format (space, not ISO 'T') across browsers. */
+  shortDate(s: string | null | undefined): string {
+    if (!s) return '—';
+    const d = new Date(s.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? s.substring(0, 10) : d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
   }
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, private sanitizer: DomSanitizer, public settings: SettingsService) {
