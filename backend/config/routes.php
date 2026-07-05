@@ -336,6 +336,9 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('loans.view'));
             $group->post('/loan/{id}/decide', Approval\DecideApprovalAction::class)
                 ->add(new RbacMiddleware('loans.approve'));
+            // Underwriter top-up recalculation preview (read-only).
+            $group->get('/loan/{id}/recalculate', Approval\RecalculateLoanAction::class)
+                ->add(new RbacMiddleware('loans.approve'));
             // Batch: approve/reject many loans in one call. Per-item
             // try/catch; response has success[] + failed[] arrays.
             $group->post('/batch-decide', Approval\BatchDecideApprovalAction::class)

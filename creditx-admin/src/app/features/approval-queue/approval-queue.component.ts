@@ -389,6 +389,7 @@ import { SettingsService } from '../../core/services/settings.service';
                     <input id="aq-topup" class="cx-aq-topup-input" type="number" step="0.01" min="0"
                            placeholder="0.00"
                            [(ngModel)]="topUpBalance"
+                           (ngModelChange)="onTopUpChange()"
                            [disabled]="deciding()">
                   </div>
                   <div class="cx-aq-topup-hint">
@@ -402,6 +403,41 @@ import { SettingsService } from '../../core/services/settings.service';
                       Once approved, this value locks the disbursement field — operators cannot change it.
                     }
                   </div>
+
+                  <!-- Recalculation preview — appears when a top-up is entered.
+                       Approval is blocked until the underwriter confirms it. -->
+                  @if (topUpNeedsConfirm()) {
+                    @if (recalcBusy()) {
+                      <div class="cx-aq-recalc cx-aq-recalc-busy">
+                        <lucide-icon name="loader-2" [size]="13" class="cx-aq-spin"></lucide-icon>
+                        Recalculating…
+                      </div>
+                    } @else if (recalc(); as rc) {
+                      <div class="cx-aq-recalc">
+                        <div class="cx-aq-recalc-title">Recalculation</div>
+                        <div class="cx-aq-recalc-row">
+                          <span>Amount requested</span><span class="tabular-nums">{{ rc.amount_requested | money:2 }}</span>
+                        </div>
+                        <div class="cx-aq-recalc-row">
+                          <span>Top-up / outstanding</span><span class="tabular-nums">− {{ rc.top_up_balance | money:2 }}</span>
+                        </div>
+                        <div class="cx-aq-recalc-row cx-aq-recalc-strong">
+                          <span>Net disbursement</span>
+                          <span class="tabular-nums">
+                            <s class="cx-aq-recalc-was">{{ rc.net_disbursed_before | money:2 }}</s>
+                            {{ rc.net_disbursed | money:2 }}
+                          </span>
+                        </div>
+                        <div class="cx-aq-recalc-row cx-aq-recalc-muted">
+                          <span>Monthly repayment (unchanged)</span><span class="tabular-nums">{{ rc.monthly_repayment | money:2 }}</span>
+                        </div>
+                        <label class="cx-aq-recalc-confirm">
+                          <input type="checkbox" [ngModel]="recalcConfirmed()" (ngModelChange)="recalcConfirmed.set($event)" [disabled]="deciding()" />
+                          <span>I have reviewed the recalculated net disbursement.</span>
+                        </label>
+                      </div>
+                    }
+                  }
                 </div>
               }
               <label class="cx-aq-label" for="aq-comment">Comment (optional for approve, required for reject)</label>
@@ -417,7 +453,7 @@ import { SettingsService } from '../../core/services/settings.service';
                   <lucide-icon name="x-circle" [size]="14"></lucide-icon>
                   <span>Reject</span>
                 </button>
-                <button class="cx-btn cx-btn-primary" (click)="decideFromModal('approve')" [disabled]="deciding()">
+                <button class="cx-btn cx-btn-primary" (click)="decideFromModal('approve')" [disabled]="deciding() || approveBlocked()">
                   <lucide-icon name="check-circle" [size]="14"></lucide-icon>
                   <span>Approve</span>
                 </button>
@@ -1033,6 +1069,28 @@ import { SettingsService } from '../../core/services/settings.service';
       line-height: 1.5;
       color: var(--cx-text-secondary);
     }
+    .cx-aq-recalc {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-md);
+      background: var(--cx-surface-2);
+      font-size: 12px;
+    }
+    .cx-aq-recalc-busy { display: flex; align-items: center; gap: 6px; color: var(--cx-text-secondary); }
+    .cx-aq-recalc-title {
+      font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--cx-text-muted); margin-bottom: 6px;
+    }
+    .cx-aq-recalc-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: var(--cx-text-secondary); }
+    .cx-aq-recalc-strong { font-weight: 700; color: var(--cx-text); border-top: 1px dashed var(--cx-border); margin-top: 4px; padding-top: 6px; }
+    .cx-aq-recalc-muted { color: var(--cx-text-muted); }
+    .cx-aq-recalc-was { color: var(--cx-text-muted); margin-right: 6px; font-weight: 400; }
+    .cx-aq-recalc-confirm {
+      display: flex; align-items: flex-start; gap: 8px; margin-top: 10px;
+      font-size: 12px; color: var(--cx-text); cursor: pointer;
+    }
+    .cx-aq-recalc-confirm input { margin-top: 2px; }
   `],
 })
 export class ApprovalQueueComponent implements OnInit {
@@ -1082,6 +1140,46 @@ export class ApprovalQueueComponent implements OnInit {
     outstanding: string;
     unpaid_count: number;
   } | null>(null);
+
+  // ── Recalculation preview (underwriter, when a top-up is entered) ──
+  recalc = signal<any>(null);
+  recalcBusy = signal(false);
+  recalcConfirmed = signal(false);
+  private recalcDebounce: any = null;
+
+  /** A top-up value is in play, so a confirmed recalculation is required. */
+  topUpNeedsConfirm(): boolean {
+    const n = this.topUpBalance === '' || this.topUpBalance == null ? 0 : Number(this.topUpBalance);
+    return this.isUnderwriterStep() && n > 0;
+  }
+
+  /** Approve is blocked until the entered top-up's recalculation is confirmed. */
+  approveBlocked(): boolean {
+    if (!this.topUpNeedsConfirm()) return false;
+    return this.recalcBusy() || !this.recalc() || !this.recalcConfirmed();
+  }
+
+  /** Fired when the top-up input changes (and on prefill). Debounced fetch of
+   *  the recalculation; any change invalidates a prior confirmation. */
+  onTopUpChange(): void {
+    this.recalcConfirmed.set(false);
+    const n = this.topUpBalance === '' || this.topUpBalance == null ? 0 : Number(this.topUpBalance);
+    if (!this.isUnderwriterStep() || !(n > 0)) {
+      this.recalc.set(null);
+      this.recalcBusy.set(false);
+      return;
+    }
+    clearTimeout(this.recalcDebounce);
+    this.recalcBusy.set(true);
+    this.recalcDebounce = setTimeout(() => {
+      const loanId = this.activeRow()?.loan_id || this.activeRow()?.id;
+      if (!loanId) { this.recalcBusy.set(false); return; }
+      this.api.get(`/approvals/loan/${loanId}/recalculate`, { top_up_balance: String(n) }).subscribe({
+        next: r => { this.recalcBusy.set(false); this.recalc.set(r.data); },
+        error: () => { this.recalcBusy.set(false); this.recalc.set(null); },
+      });
+    }, 400);
+  }
 
   /**
    * True when the active step is an underwriter review — regardless of loan
@@ -1233,6 +1331,8 @@ export class ApprovalQueueComponent implements OnInit {
     this.comment = '';
     this.topUpBalance = row.top_up_balance_underwriter ?? row.top_up_balance ?? '';
     this.previousOutstandingInfo.set(null);
+    this.recalc.set(null);
+    this.onTopUpChange(); // reset + fetch recalc if a sticky value is present
     this.mode.set('review');
     this.modalOpen.set(true);
     this.detailLoading.set(true);
@@ -1261,6 +1361,7 @@ export class ApprovalQueueComponent implements OnInit {
           this.topUpPrefillBusy.set(false);
           if (!this.topUpBalance && r.data?.has_previous && r.data.outstanding) {
             this.topUpBalance = r.data.outstanding;
+            this.onTopUpChange(); // recalc for the auto-prefilled value
           }
         },
         error: () => this.topUpPrefillBusy.set(false),
@@ -1322,6 +1423,9 @@ export class ApprovalQueueComponent implements OnInit {
     this.topUpBalance = '';
     this.topUpPrefillBusy.set(false);
     this.previousOutstandingInfo.set(null);
+    this.recalc.set(null);
+    this.recalcConfirmed.set(false);
+    this.recalcBusy.set(false);
   }
 
   /**
