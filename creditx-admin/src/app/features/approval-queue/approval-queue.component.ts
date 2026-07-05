@@ -368,16 +368,15 @@ import { SettingsService } from '../../core/services/settings.service';
         <div class="cx-aq-modal-actions">
           @if (mode() === 'review') {
             <div class="cx-aq-decision-area">
-              <!-- Underwriter-only: top-up balance override for top-up loans.
-                   Shown when the active step's role is underwriter AND the
-                   loan is a top-up. Pre-filled from the previous loan's
-                   current outstanding on modal open; underwriter can edit
-                   before approving. The submitted value locks the
-                   disbursement-side field. -->
-              @if (isUnderwriterOnTopUp()) {
+              <!-- Underwriter-only: top-up / outstanding balance. Shown on any
+                   underwriter review. Auto-prefilled from a previous loan in
+                   the system when one exists; otherwise the underwriter types
+                   it manually (e.g. for an unmigrated legacy loan). The
+                   submitted value locks the disbursement-side field. -->
+              @if (isUnderwriterStep()) {
                 <div class="cx-aq-topup-block">
                   <label class="cx-aq-label" for="aq-topup">
-                    Top-up balance (previous loan outstanding)
+                    Top-up / outstanding balance
                     @if (topUpPrefillBusy()) {
                       <span class="cx-aq-topup-busy">
                         <lucide-icon name="loader-2" [size]="11" class="cx-aq-spin"></lucide-icon>
@@ -1070,10 +1069,11 @@ export class ApprovalQueueComponent implements OnInit {
   deciding = signal(false);
   comment = '';
 
-  // ── Underwriter top-up balance — only relevant when
-  // activeRow.current_step_role_slug === 'underwriter' AND
-  // activeRow.loan_type === 'top_up'. See the review modal's
-  // conditional block and decide().
+  // ── Underwriter top-up / outstanding balance — shown on any underwriter
+  // review (activeRow.current_step_role_slug === 'underwriter'). Auto-prefilled
+  // from a previous in-system loan when one exists; otherwise entered manually
+  // (e.g. unmigrated legacy loan). See isUnderwriterStep(), the review modal's
+  // conditional block, and decide().
   topUpBalance: string | number = '';
   topUpPrefillBusy = signal(false);
   previousOutstandingInfo = signal<{
@@ -1084,16 +1084,18 @@ export class ApprovalQueueComponent implements OnInit {
   } | null>(null);
 
   /**
-   * True when the active step is an underwriter review AND the loan
-   * is a top-up. Drives both the top-up input's visibility in the
-   * modal and whether decide() attaches the field to its POST.
+   * True when the active step is an underwriter review — regardless of loan
+   * type. The underwriter can always enter a top-up / outstanding balance so a
+   * customer who carries an UNMIGRATED legacy loan (which the system doesn't
+   * know about, so the app can't auto-detect it) still gets recalculated. For
+   * a genuine new loan with nothing outstanding, the underwriter just leaves it
+   * blank and no value is sent.
    *
-   * The role slug check is exact — role names in CreditX are
-   * lowercase snake_case ('underwriter', 'operations_head', etc.).
+   * The role slug check is exact — role names in CreditX are lowercase
+   * snake_case ('underwriter', 'operations_head', etc.).
    */
-  isUnderwriterOnTopUp(): boolean {
-    const r = this.activeRow();
-    return r?.current_step_role_slug === 'underwriter' && r?.loan_type === 'top_up';
+  isUnderwriterStep(): boolean {
+    return this.activeRow()?.current_step_role_slug === 'underwriter';
   }
 
   // Document preview overlay — sits on top of the review modal
@@ -1247,11 +1249,11 @@ export class ApprovalQueueComponent implements OnInit {
       error: () => {},
     });
 
-    // Auto-prefill for underwriter + top-up only. If the
-    // underwriter already set a value (sticky across re-opens), we
-    // don't overwrite — we still fetch for the hint text but leave
-    // topUpBalance alone.
-    if (this.isUnderwriterOnTopUp()) {
+    // Auto-prefill on any underwriter review. If a previous loan exists in the
+    // system its outstanding prefills; otherwise (e.g. unmigrated legacy loan)
+    // has_previous is false and the underwriter types the value manually. If a
+    // value was already set (sticky across re-opens), we don't overwrite.
+    if (this.isUnderwriterStep()) {
       this.topUpPrefillBusy.set(true);
       this.api.get(`/loans/${loanId}/previous-outstanding`).subscribe({
         next: r => {
@@ -1358,7 +1360,7 @@ export class ApprovalQueueComponent implements OnInit {
     const payload: any = { action, comment };
     if (
       action === 'approve'
-      && this.isUnderwriterOnTopUp()
+      && this.isUnderwriterStep()
       && this.topUpBalance !== '' && this.topUpBalance != null
     ) {
       payload.top_up_balance = String(this.topUpBalance);
