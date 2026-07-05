@@ -128,6 +128,22 @@ final class ApprovalEngineService
             throw new DomainException('Invalid action. Must be "approve" or "reject"');
         }
 
+        // Branch scoping: a reviewer may only process loans from a branch they
+        // are assigned to. Admins/super-admins are unscoped (null). A scoped
+        // reviewer with no branches, or acting on a loan outside their
+        // branches (or a branchless loan), is refused — this mirrors the queue
+        // visibility filter but enforces it on the write path too, so a decision
+        // can't be POSTed for an out-of-branch loan by id.
+        if ($this->branchScope !== null) {
+            $allowedBranchIds = $this->branchScope->getUserBranchIds($user);
+            if ($allowedBranchIds !== null) {
+                $loanBranchId = $loan->getBranch()?->getId();
+                if ($loanBranchId === null || !in_array($loanBranchId, $allowedBranchIds, true)) {
+                    throw new DomainException('You are not assigned to this loan\'s branch.');
+                }
+            }
+        }
+
         $workflow = $this->workflowRepo->findActiveByProductId($loan->getProduct()->getId());
         if ($workflow === null) {
             throw new DomainException('Workflow not found for this loan product');
