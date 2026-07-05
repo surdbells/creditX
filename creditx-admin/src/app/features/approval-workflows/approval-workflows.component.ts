@@ -274,8 +274,13 @@ export class ApprovalWorkflowsComponent implements OnInit {
 
   ngOnInit() {
     this.load();
-    this.api.get('/loan-products', { per_page: 100 }).subscribe({ next: r => this.products.set(r.data || []) });
-    this.api.get('/roles', { per_page: 50 }).subscribe({ next: r => this.roles.set(r.data || []) });
+    // Products + roles for the builder come from the workflow meta endpoint
+    // (gated by the workflow permission), so managing workflows doesn't also
+    // require roles.view — which was leaving the step role dropdown empty.
+    this.api.get('/approval-workflows/meta').subscribe({
+      next: r => { this.products.set(r.data?.products || []); this.roles.set(r.data?.roles || []); },
+      error: () => { this.products.set([]); this.roles.set([]); },
+    });
   }
 
   load(p?: any) { this.loading.set(true); this.api.get('/approval-workflows', { ...this.q, ...p }).subscribe({ next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); }, error: () => this.loading.set(false) }); }

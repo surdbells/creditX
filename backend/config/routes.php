@@ -312,6 +312,12 @@ return function (App $app): void {
         $api->group('/approval-workflows', function (RouteCollectorProxy $group) {
             $group->get('', ApprovalWorkflow\ListWorkflowsAction::class)
                 ->add(new RbacMiddleware('products.view'));
+            // Products + roles for the workflow builder — gated by the workflow
+            // permission (products.view) so a workflow manager doesn't also need
+            // roles.view just to populate the step role dropdown. Registered
+            // before /{id} so 'meta' isn't captured as an id.
+            $group->get('/meta', ApprovalWorkflow\GetWorkflowMetaAction::class)
+                ->add(new RbacMiddleware('products.view'));
             $group->post('', ApprovalWorkflow\CreateWorkflowAction::class)
                 ->add(new RbacMiddleware('products.create'));
             $group->get('/{id}', ApprovalWorkflow\GetWorkflowAction::class)
