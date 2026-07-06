@@ -537,7 +537,7 @@ import { SettingsService } from '../../core/services/settings.service';
           @if (isImage(pd.mime_type)) {
             <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-aq-doc-img" />
           } @else if (isPdf(pd.mime_type)) {
-            <iframe [src]="docUrlSafe(pd)" class="cx-aq-doc-frame" frameborder="0"></iframe>
+            <iframe [src]="docPreviewSafeUrl()" class="cx-aq-doc-frame" frameborder="0"></iframe>
           } @else {
             <div class="cx-aq-doc-fallback">
               <lucide-icon name="file-text" [size]="48"></lucide-icon>
@@ -1232,6 +1232,11 @@ export class ApprovalQueueComponent implements OnInit {
 
   // Document preview overlay — sits on top of the review modal
   docPreviewDoc = signal<any>(null);
+  // Memoized iframe URL — computed once per opened doc. Binding a fresh
+  // bypassSecurityTrust... object on every change-detection cycle reloaded the
+  // iframe (resetting a password-protected PDF and re-prompting), so we keep a
+  // stable reference here instead.
+  docPreviewSafeUrl = signal<SafeResourceUrl | null>(null);
 
   private sanitizer = inject(DomSanitizer);
 
@@ -1514,9 +1519,12 @@ export class ApprovalQueueComponent implements OnInit {
    */
   openDocPreview(doc: any): void {
     this.docPreviewDoc.set(doc);
+    const url = this.docUrl(doc);
+    this.docPreviewSafeUrl.set(url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null);
   }
 
   closeDocPreview(): void {
     this.docPreviewDoc.set(null);
+    this.docPreviewSafeUrl.set(null);
   }
 }

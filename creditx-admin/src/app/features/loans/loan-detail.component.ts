@@ -612,7 +612,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           @if (isImage(pd.mime_type)) {
             <img [src]="docUrl(pd)" [alt]="pd.file_name" class="cx-ld-doc-img" />
           } @else if (isPdf(pd.mime_type)) {
-            <iframe [src]="docUrlSafe(pd)" class="cx-ld-doc-frame" frameborder="0"></iframe>
+            <iframe [src]="docPreviewSafeUrl()" class="cx-ld-doc-frame" frameborder="0"></iframe>
           } @else {
             <div class="cx-ld-doc-fallback">
               <lucide-icon name="file-text" [size]="48"></lucide-icon>
@@ -1587,10 +1587,21 @@ export class LoanDetailComponent implements OnInit {
 
   // ─── Document preview ───
   docPreviewDoc = signal<any>(null);
+  // Stable iframe URL — see approval queue: re-creating the SafeResourceUrl on
+  // every change-detection cycle reloaded the iframe and re-prompted for a
+  // password-protected PDF's password. Compute once per opened doc.
+  docPreviewSafeUrl = signal<SafeResourceUrl | null>(null);
   private sanitizer = inject(DomSanitizer);
 
-  openDocPreview(doc: any): void { this.docPreviewDoc.set(doc); }
-  closeDocPreview(): void { this.docPreviewDoc.set(null); }
+  openDocPreview(doc: any): void {
+    this.docPreviewDoc.set(doc);
+    const url = this.docUrl(doc);
+    this.docPreviewSafeUrl.set(url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null);
+  }
+  closeDocPreview(): void {
+    this.docPreviewDoc.set(null);
+    this.docPreviewSafeUrl.set(null);
+  }
 
   isImage(mime: string | null | undefined): boolean {
     return !!(mime && mime.startsWith('image/'));
