@@ -55,12 +55,18 @@ import { SettingsService } from '../../core/services/settings.service';
         </div>
         <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()">
           <option value="">All Status</option>
-          <option value="pending">Pending</option>
+          <option value="draft">Draft</option>
+          <option value="captured">Captured</option>
+          <option value="submitted">Submitted</option>
+          <option value="under_review">Under Review</option>
           <option value="approved">Approved</option>
           <option value="disbursed">Disbursed</option>
           <option value="active">Active</option>
           <option value="overdue">Overdue</option>
+          <option value="restructured">Restructured</option>
           <option value="closed">Closed</option>
+          <option value="written_off">Written Off</option>
+          <option value="cancelled">Cancelled</option>
           <option value="rejected">Rejected</option>
         </select>
         <select class="cx-select" [(ngModel)]="filters.product_id" (change)="onFilterChange()">
