@@ -391,7 +391,11 @@ class User
         ];
 
         if ($includeRelations) {
-            $data['roles'] = $this->roles->map(fn(Role $r) => $r->toArray())->toArray();
+            // Include each role's permissions so the frontend can resolve what
+            // the user may see/do (nav gating, action buttons). Without this,
+            // non-super-admin users have an empty permission set client-side and
+            // only see ungated screens (the dashboard).
+            $data['roles'] = $this->roles->map(fn(Role $r) => $r->toArray(true))->toArray();
             $data['locations'] = $this->locations->map(fn(Location $l) => $l->toArray())->toArray();
         }
 
