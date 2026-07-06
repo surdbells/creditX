@@ -49,15 +49,12 @@ import { SettingsService } from '../../core/services/settings.service';
         trackBy="loan_id"
         (query)="onQuery($event)">
         <ng-template #rowActions let-row>
-          <div class="flex items-center gap-1 justify-end">
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openReview(row)" title="Review">
+          <div class="flex items-center justify-end">
+            <!-- View is the only row action: approve/reject live inside the
+                 details view so a reviewer can't decide without opening it. -->
+            <button class="cx-btn cx-btn-secondary cx-btn-sm" (click)="openReview(row)" title="View details & decide">
               <lucide-icon name="eye" [size]="14"></lucide-icon>
-            </button>
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-aq-approve" (click)="quickApprove(row)" title="Quick approve">
-              <lucide-icon name="check-circle" [size]="14"></lucide-icon>
-            </button>
-            <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-aq-reject" (click)="openReject(row)" title="Reject with reason">
-              <lucide-icon name="x-circle" [size]="14"></lucide-icon>
+              <span>View</span>
             </button>
           </div>
         </ng-template>
