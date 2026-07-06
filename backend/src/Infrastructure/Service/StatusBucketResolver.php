@@ -51,7 +51,12 @@ final class StatusBucketResolver
         if ($bucket === null) return null;
         $bucket = strtolower(trim($bucket));
         if ($bucket === '' || $bucket === 'all') return null;
-        return self::BUCKETS[$bucket] ?? null;
+        if (isset(self::BUCKETS[$bucket])) return self::BUCKETS[$bucket];
+        // Passthrough: also accept a raw loan status directly (e.g. 'active',
+        // 'under_review', 'cancelled') so reports can filter by any specific
+        // status, not just the friendly buckets.
+        if (\App\Domain\Enum\LoanStatus::tryFrom($bucket) !== null) return [$bucket];
+        return null;
     }
 
     /**
