@@ -1117,6 +1117,8 @@ export class ApprovalQueueComponent implements OnInit {
   columns: TableColumn[] = [
     { key: 'application_id', label: 'App ID' },
     { key: 'customer_name', label: 'Customer' },
+    { key: 'customer_staff_id', label: 'Staff ID' },
+    { key: 'branch_name', label: 'Branch' },
     { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right' },
     { key: 'product_name', label: 'Product' },
     { key: 'current_step', label: 'Step' },

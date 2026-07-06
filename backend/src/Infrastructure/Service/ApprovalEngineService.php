@@ -528,6 +528,7 @@ final class ApprovalEngineService
                 'application_id'   => $loanData['application_id'] ?? null,
                 'customer_name'    => $loanData['customer_name'] ?? null,
                 'customer_staff_id' => $loanData['customer_staff_id'] ?? null,
+                'branch_name'      => $loanData['branch_name'] ?? null,
                 'product_name'     => $loanData['product_name'] ?? null,
                 'amount_requested' => $loanData['amount_requested'] ?? null,
                 'loan_status'      => $loanData['status'] ?? null,
