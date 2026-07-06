@@ -152,11 +152,11 @@ class GovernmentRecord
     public function setTelephoneNumber(?string $v): void { $this->telephoneNumber = $v; }
     public function setBankName(?string $v): void { $this->bankName = $v; }
     public function setAccountNumber(?string $v): void { $this->accountNumber = $v; }
-    public function setGrossPay(?string $v): void { $this->grossPay = $v; }
+    public function setGrossPay(int|float|string|null $v): void { $this->grossPay = $v === null || $v === '' ? null : (string) $v; }
     public function setDepartment(?string $v): void { $this->department = $v; }
     public function setGradeLevel(?string $v): void { $this->gradeLevel = $v; }
     public function setStep(?string $v): void { $this->step = $v; }
-    public function setNetPay(?string $v): void { $this->netPay = $v; }
+    public function setNetPay(int|float|string|null $v): void { $this->netPay = $v === null || $v === '' ? null : (string) $v; }
     public function setPensionNumber(?string $v): void { $this->pensionNumber = $v; }
     public function setTaxId(?string $v): void { $this->taxId = $v; }
     public function setMinistry(?string $v): void { $this->ministry = $v; }
