@@ -25,20 +25,24 @@ class LoanRepository extends BaseRepository
     }
 
     /**
-     * Loans that count as "running" for the one-loan-at-a-time rule — i.e. not
-     * in a terminal state. Rejected, closed, cancelled and written-off loans do
-     * NOT block a new application; anything else (in-progress or owing) does.
+     * Loans awaiting a decision for a customer — draft/captured/submitted/
+     * under-review/approved (approved = decided but not yet disbursed). While
+     * one exists, no agent may capture another loan for the customer. A
+     * disbursed loan is NOT here (a new application against it becomes a
+     * top-up); rejected/cancelled/closed/written-off are not here either
+     * (agents may resubmit).
      * @return Loan[]
      */
-    public function findRunningByCustomer(string $customerId): array
+    public function findPendingDecisionByCustomer(string $customerId): array
     {
-        $terminal = [
-            LoanStatus::REJECTED->value, LoanStatus::CLOSED->value,
-            LoanStatus::CANCELLED->value, LoanStatus::WRITTEN_OFF->value,
+        $pending = [
+            LoanStatus::DRAFT->value, LoanStatus::CAPTURED->value,
+            LoanStatus::SUBMITTED->value, LoanStatus::UNDER_REVIEW->value,
+            LoanStatus::APPROVED->value,
         ];
         return $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
-            ->where('l.customer = :cid')->andWhere('l.status NOT IN (:terminal)')
-            ->setParameter('cid', $customerId)->setParameter('terminal', $terminal)
+            ->where('l.customer = :cid')->andWhere('l.status IN (:pending)')
+            ->setParameter('cid', $customerId)->setParameter('pending', $pending)
             ->getQuery()->getResult();
     }
 

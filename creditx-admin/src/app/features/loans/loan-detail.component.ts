@@ -39,6 +39,12 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
                 <span>Payoff</span>
               </button>
             }
+            @if (isCancellable() && auth.hasPermission('loans.edit')) {
+              <button class="cx-btn cx-btn-danger" (click)="openCancel()">
+                <lucide-icon name="x-circle" [size]="14"></lucide-icon>
+                <span>Cancel Loan</span>
+              </button>
+            }
             <a routerLink="/loans" class="cx-btn cx-btn-outline cx-btn-sm">
               <lucide-icon name="chevron-left" [size]="14"></lucide-icon>
               <span>Back</span>
@@ -430,6 +436,25 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
             } @else if (payoffConfirmed && payoffMode() === 'partial') {
               <button class="cx-btn cx-btn-primary" (click)="submitPayoff()" [disabled]="payingOff()">{{ payingOff() ? 'Holding…' : 'Hold Partial' }}</button>
             }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Cancel Loan modal — reason required -->
+    @if (showCancel()) {
+      <div class="cx-po-backdrop" (click)="closeCancel()">
+        <div class="cx-po-modal" (click)="$event.stopPropagation()" style="max-width: 460px">
+          <h3 class="cx-po-title">Cancel Loan — {{ loan()?.application_id }}</h3>
+          <p class="cx-po-note">Cancelling stops this loan. The owning agent is notified. This cannot be undone.</p>
+          <label class="cx-label" style="margin-top: 10px">Reason for cancellation <span style="color: var(--cx-danger)">*</span></label>
+          <textarea class="cx-input" rows="3" [(ngModel)]="cancelReason" [disabled]="cancelling()"
+                    placeholder="Why is this loan being cancelled? This is recorded and sent to the agent."></textarea>
+          <div class="cx-po-actions">
+            <button class="cx-btn cx-btn-ghost" (click)="closeCancel()" [disabled]="cancelling()">Back</button>
+            <button class="cx-btn cx-btn-danger" (click)="submitCancel()" [disabled]="cancelling() || !cancelReason.trim()">
+              {{ cancelling() ? 'Cancelling…' : 'Cancel Loan' }}
+            </button>
           </div>
         </div>
       </div>
@@ -1243,11 +1268,39 @@ export class LoanDetailComponent implements OnInit {
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.reloadLoan(); }
+
+  private reloadLoan(): void {
     if (!this.id) return;
     this.api.get(`/loans/${this.id}`).subscribe({
       next: r => { this.loan.set(r.data); this.loading.set(false); this.loadRelated(); },
       error: () => this.loading.set(false),
+    });
+  }
+
+  // ── Cancel loan (reason required) ──
+  showCancel = signal(false);
+  cancelReason = '';
+  cancelling = signal(false);
+
+  /** Cancellable before disbursement: draft/captured/submitted/approved. */
+  isCancellable(): boolean {
+    return ['draft', 'captured', 'submitted', 'approved'].includes(this.loan()?.status);
+  }
+  openCancel(): void { this.cancelReason = ''; this.showCancel.set(true); }
+  closeCancel(): void { this.showCancel.set(false); }
+  submitCancel(): void {
+    const reason = this.cancelReason.trim();
+    if (!reason) return;
+    this.cancelling.set(true);
+    this.api.post(`/loans/${this.id}/cancel`, { reason }).subscribe({
+      next: r => {
+        this.cancelling.set(false);
+        this.showCancel.set(false);
+        this.toast.success(r.message || 'Loan cancelled');
+        this.reloadLoan();
+      },
+      error: e => { this.cancelling.set(false); this.toast.error(e.error?.message || 'Cancellation failed'); },
     });
   }
 

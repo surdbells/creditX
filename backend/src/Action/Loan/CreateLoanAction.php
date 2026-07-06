@@ -178,24 +178,21 @@ final class CreateLoanAction
                 }
             }
 
-            // One running loan per customer. A brand-new (non-top-up) loan is
-            // blocked when the customer already has a loan that isn't terminal
-            // (rejected / closed / cancelled / written-off) — regardless of
-            // which agent captured it, so two agents can't both bring in a loan
-            // for the same customer. Top-ups are exempt (they top up the
-            // existing running loan).
-            if ($loanType !== LoanType::TOP_UP) {
-                $running = $this->loanRepo->findRunningByCustomer($customer->getId());
-                if (!empty($running)) {
-                    $existing = $running[0];
-                    $this->em->rollback();
-                    return $this->error(
-                        'This customer already has a running loan (' . $existing->getApplicationId()
-                        . ', ' . $existing->getStatus()->value . '). A new loan cannot be created until it is'
-                        . ' rejected or closed.',
-                        409
-                    );
-                }
+            // One in-flight application per customer. While the customer has a
+            // loan awaiting a decision (draft/captured/submitted/under-review/
+            // approved) no agent may capture another — regardless of who owns
+            // it. A rejected or cancelled loan lets agents resubmit; a disbursed
+            // loan turns the new application into a top-up (handled above).
+            $pending = $this->loanRepo->findPendingDecisionByCustomer($customer->getId());
+            if (!empty($pending)) {
+                $existing = $pending[0];
+                $this->em->rollback();
+                return $this->error(
+                    'This customer already has a loan pending a decision (' . $existing->getApplicationId()
+                    . ', ' . $existing->getStatus()->value . '). Another loan cannot be created until it is'
+                    . ' decided, rejected, or cancelled.',
+                    409
+                );
             }
 
             // Calculate loan numbers
