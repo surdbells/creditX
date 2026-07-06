@@ -25,6 +25,24 @@ class LoanRepository extends BaseRepository
     }
 
     /**
+     * Loans that count as "running" for the one-loan-at-a-time rule — i.e. not
+     * in a terminal state. Rejected, closed, cancelled and written-off loans do
+     * NOT block a new application; anything else (in-progress or owing) does.
+     * @return Loan[]
+     */
+    public function findRunningByCustomer(string $customerId): array
+    {
+        $terminal = [
+            LoanStatus::REJECTED->value, LoanStatus::CLOSED->value,
+            LoanStatus::CANCELLED->value, LoanStatus::WRITTEN_OFF->value,
+        ];
+        return $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
+            ->where('l.customer = :cid')->andWhere('l.status NOT IN (:terminal)')
+            ->setParameter('cid', $customerId)->setParameter('terminal', $terminal)
+            ->getQuery()->getResult();
+    }
+
+    /**
      * Find disbursed loans for a customer (for top-up detection).
      * @return Loan[]
      */

@@ -34,6 +34,29 @@ final class GetLoanAction
 
         $data = $loan->toArray(true);
 
+        // Resolve loan-trail actor names. Trails store only user_id, so the UI
+        // otherwise falls back to "System" for every entry. Batch-resolve the
+        // real names here; genuine automated entries (null / 'system:*' ids)
+        // stay null and render as "System".
+        if (!empty($data['trails'])) {
+            $ids = [];
+            foreach ($data['trails'] as $t) {
+                $uid = $t['user_id'] ?? null;
+                if ($uid && !str_starts_with($uid, 'system:')) $ids[$uid] = true;
+            }
+            $names = [];
+            if (!empty($ids)) {
+                foreach ($this->em->getRepository(User::class)->findBy(['id' => array_keys($ids)]) as $u) {
+                    $names[$u->getId()] = $u->getFullName();
+                }
+            }
+            foreach ($data['trails'] as &$t) {
+                $uid = $t['user_id'] ?? null;
+                $t['user_name'] = ($uid && isset($names[$uid])) ? $names[$uid] : null;
+            }
+            unset($t);
+        }
+
         // Documents: queried separately via DocumentRepository (there's no
         // Loan→Document ORM relation — Documents carry a nullable loan_id
         // FK for flexibility). Attached here so the agent edit-loan wizard

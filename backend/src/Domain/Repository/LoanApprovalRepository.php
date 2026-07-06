@@ -67,6 +67,7 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.step', 's')
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
+            ->leftJoin('l.branch', 'b')
             ->where('s.role = :roleId')->andWhere('a.status = :status')
             // See findAllPendingQueue for the rationale — only active
             // pending steps should surface in the queue. Role-scoped
@@ -79,6 +80,8 @@ class LoanApprovalRepository extends BaseRepository
             $qb->andWhere($qb->expr()->orX(
                 $qb->expr()->like('LOWER(l.applicationId)', ':search'),
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
+                $qb->expr()->like('LOWER(c.staffId)', ':search'),
+                $qb->expr()->like('LOWER(b.name)', ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
@@ -121,6 +124,7 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.step', 's')
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
+            ->leftJoin('l.branch', 'b')
             ->where('a.status = :status')
             // Only include 'active' pending approvals — ones where the SLA
             // clock has started. For sequential workflows this is the
@@ -141,6 +145,8 @@ class LoanApprovalRepository extends BaseRepository
             $qb->andWhere($qb->expr()->orX(
                 $qb->expr()->like('LOWER(l.applicationId)', ':search'),
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
+                $qb->expr()->like('LOWER(c.staffId)', ':search'),
+                $qb->expr()->like('LOWER(b.name)', ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
