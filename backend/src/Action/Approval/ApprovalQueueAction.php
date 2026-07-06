@@ -22,7 +22,7 @@ final class ApprovalQueueAction
 
         $params = $request->getQueryParams();
         $p = $this->getPaginationParams($params);
-        $result = $this->engine->getQueue($user, $p['offset'], $p['per_page'], $p['search'] ?: null);
+        $result = $this->engine->getQueue($user, $p['offset'], $p['per_page'], $p['search'] ?: null, $params['location_id'] ?? null);
 
         return $this->paginated($result['items'], $result['total'], $p['page'], $p['per_page']);
     }

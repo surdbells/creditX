@@ -39,6 +39,15 @@ import { SettingsService } from '../../core/services/settings.service';
         title="Approval Queue"
         subtitle="Loans awaiting your decision at this approval step"
         eyebrow="Workflow"></cx-page-header>
+
+      <div class="cx-aq-toolbar">
+        <label class="cx-aq-toolbar-label">Location</label>
+        <select class="cx-select" [(ngModel)]="locationFilter" (change)="onLocationChange()">
+          <option value="">All locations</option>
+          @for (l of locations(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
+        </select>
+      </div>
+
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search pending approvals..." [hasActions]="true"
         trackBy="loan_id"
@@ -733,6 +742,9 @@ import { SettingsService } from '../../core/services/settings.service';
     @keyframes cx-aq-spin { to { transform: rotate(360deg); } }
 
     /* Sections */
+    .cx-aq-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .cx-aq-toolbar-label { font-size: var(--cx-text-xs); font-weight: 600; color: var(--cx-text-secondary); }
+    .cx-aq-toolbar .cx-select { max-width: 260px; }
     .cx-aq-secret { display: inline-flex; align-items: center; gap: 6px; }
     .cx-aq-secret-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -1223,7 +1235,15 @@ export class ApprovalQueueComponent implements OnInit {
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
 
-  ngOnInit() { this.load(); }
+  locations = signal<any[]>([]);
+  locationFilter = '';
+
+  ngOnInit() {
+    this.load();
+    this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.locations.set(r.data || []), error: () => {} });
+  }
+
+  onLocationChange(): void { this.load(); }
 
   // Soft-flag threshold mirroring the backend default for
   // affordability.max_dsr (see AffordabilityService::DEFAULT_MAX_DSR).
@@ -1240,7 +1260,7 @@ export class ApprovalQueueComponent implements OnInit {
 
   load(p?: any) {
     this.loading.set(true);
-    this.api.get('/approvals/queue', { ...this.q, ...p }).subscribe({
+    this.api.get('/approvals/queue', { ...this.q, ...p, location_id: this.locationFilter || undefined }).subscribe({
       next: r => {
         this.rows.set(r.data || []);
         this.pagination.set(r.meta || null);

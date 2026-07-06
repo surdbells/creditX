@@ -429,7 +429,7 @@ final class ApprovalEngineService
      *
      * @return array{items: array, total: int}
      */
-    public function getQueue(User $user, int $offset, int $limit, ?string $search = null): array
+    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null): array
     {
         /*
          * Two visibility modes:
@@ -465,6 +465,17 @@ final class ApprovalEngineService
          * assigned to them.
          */
         $branchIds = $this->branchScope?->getUserBranchIds($user);
+
+        // Optional "filter by location" from the queue UI. Lets a broad-access
+        // reviewer (e.g. an underwriter who also holds an admin role, and so is
+        // otherwise unscoped) narrow the queue to a single assigned location.
+        // Never widens access: a scoped user can only narrow within their own
+        // branches; an out-of-scope selection is ignored.
+        if ($filterBranchId !== null && $filterBranchId !== '') {
+            if ($branchIds === null || in_array($filterBranchId, $branchIds, true)) {
+                $branchIds = [$filterBranchId];
+            }
+        }
 
         if ($user->hasPermission('loans.approve')) {
             $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds);
