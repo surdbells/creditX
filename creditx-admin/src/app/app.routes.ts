@@ -78,6 +78,7 @@ export const routes: Routes = [
       { path: 'reports/repayment',            loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'repayment' } },
       { path: 'reports/collection',           loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent), data: { tab: 'collection' } },
       { path: 'reports/loans', loadComponent: () => import('./features/reports/general-loan-report.component').then(m => m.GeneralLoanReportComponent) },
+      { path: 'reports/monthly-loan-summary', loadComponent: () => import('./features/monthly-loan-summary/monthly-loan-summary.component').then(m => m.MonthlyLoanSummaryComponent) },
       { path: 'disbursement/bulk', loadComponent: () => import('./features/disbursement/bulk-disburse.component').then(m => m.BulkDisburseComponent) },
       { path: 'reconciliation', loadComponent: () => import('./features/reconciliation/reconciliation.component').then(m => m.ReconciliationComponent) },
       { path: 'notifications', loadComponent: () => import('./features/notifications/notifications.component').then(m => m.NotificationsComponent) },

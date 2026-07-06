@@ -86,6 +86,7 @@ export class LayoutComponent {
       { label: 'Product Performance',    icon: 'package',         route: '/reports/product-performance',  permission: 'reports.performance.products' },
       { label: 'Approver Performance',   icon: 'shield-check',    route: '/reports/approver-performance', permission: 'reports.performance.approvers' },
       { label: 'General Loan Report',    icon: 'file-spreadsheet', route: '/reports/loans',               permission: 'reports.general_loans' },
+      { label: 'Monthly Loan Summary',   icon: 'file-spreadsheet', route: '/reports/monthly-loan-summary', permission: 'reports.general_loans' },
       { label: 'CBN Returns',            icon: 'file-spreadsheet', route: '/reports/cbn-returns',         permission: 'reports.cbn' },
     ]},
     { label: 'Configuration', items: [

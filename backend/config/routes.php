@@ -724,6 +724,8 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('reports.performance.approvers'));
             $group->get('/general-loans', Report\GeneralLoanReportAction::class)
                 ->add(new RbacMiddleware('reports.general_loans'));
+            $group->get('/monthly-loan-summary', Report\MonthlyLoanSummaryAction::class)
+                ->add(new RbacMiddleware('reports.general_loans'));
             $group->get('/dashboard-charts', Report\DashboardChartsAction::class)
                 ->add(new RbacMiddleware('reports.portfolio'));
             $group->get('/receivables', Report\ReceivablesReportAction::class)
