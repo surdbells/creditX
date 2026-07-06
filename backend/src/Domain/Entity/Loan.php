@@ -365,6 +365,10 @@ class Loan
             $data['transaction'] = $this->transaction?->toArray();
             $data['fee_breakdowns'] = $this->feeBreakdowns->map(fn(LoanFeeBreakdown $f) => $f->toArray())->toArray();
             $data['trails'] = $this->trails->map(fn(LoanTrail $t) => $t->toArray())->toArray();
+            // Bank-statement password — exposed ONLY in the detailed (single-loan)
+            // view so reviewers can open the customer's statement during approval.
+            // Deliberately absent from the list variant above.
+            $data['account_statement_password'] = $this->accountStatementPassword;
             // Full customer object with all 36+ fields — consumed by the
             // agent edit-loan wizard to pre-populate Step 3. The existing
             // flattened customer_id / customer_name / customer_staff_id
