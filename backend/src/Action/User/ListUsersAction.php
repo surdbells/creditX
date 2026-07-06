@@ -41,6 +41,8 @@ final class ListUsersAction
             $params['status'] ?? null,
             $params['role'] ?? null,
             $isAgent,
+            $params['department_id'] ?? null,
+            $params['location_id'] ?? null,
         );
 
         $items = array_map(fn($u) => $u->toArray(true), $result['items']);

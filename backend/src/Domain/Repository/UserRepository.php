@@ -51,18 +51,20 @@ class UserRepository extends BaseRepository
         ?string $status = null,
         ?string $roleSlug = null,
         ?bool $isAgent = null,
+        ?string $departmentId = null,
+        ?string $locationId = null,
     ): array {
         $qb = $this->em->createQueryBuilder()
             ->select('u')
             ->from(User::class, 'u')
             ->where('u.deletedAt IS NULL');
 
-        if ($status !== null) {
+        if ($status !== null && $status !== '') {
             $qb->andWhere('u.status = :status')
                ->setParameter('status', $status);
         }
 
-        if ($roleSlug !== null) {
+        if ($roleSlug !== null && $roleSlug !== '') {
             $qb->innerJoin('u.roles', 'r')
                ->andWhere('r.slug = :roleSlug')
                ->setParameter('roleSlug', $roleSlug);
@@ -71,6 +73,17 @@ class UserRepository extends BaseRepository
         if ($isAgent !== null) {
             $qb->andWhere('u.isAgent = :isAgent')
                ->setParameter('isAgent', $isAgent);
+        }
+
+        if ($departmentId !== null && $departmentId !== '') {
+            $qb->andWhere('u.department = :deptId')
+               ->setParameter('deptId', $departmentId);
+        }
+
+        if ($locationId !== null && $locationId !== '') {
+            $qb->innerJoin('u.locations', 'loc')
+               ->andWhere('loc.id = :locId')
+               ->setParameter('locId', $locationId);
         }
 
         return $this->paginatedQuery(

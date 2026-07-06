@@ -736,6 +736,7 @@ export class UsersComponent implements OnInit {
     if (this.filters.search) params.search = this.filters.search;
     if (this.filters.role) params.role = this.filters.role;
     if (this.filters.department_id) params.department_id = this.filters.department_id;
+    if (this.filters.location_id) params.location_id = this.filters.location_id;
     if (this.filters.status) params.status = this.filters.status;
     this.api.get('/users', params).subscribe({
       next: res => {
