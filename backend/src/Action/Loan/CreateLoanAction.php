@@ -167,14 +167,27 @@ final class CreateLoanAction
                 return $this->error('Customer already has a loan application in progress', 400);
             }
 
-            // Top-up detection unchanged — relies on staffId + product.allowsTopUp
+            // A customer with a still-owing loan (disbursed/active/overdue/
+            // restructured) can't take a second independent loan:
+            //   - product allows top-ups → the new application becomes a top-up
+            //   - product does NOT allow top-ups → refuse (no parallel loans),
+            //     rather than silently creating a second running loan.
             $loanType = LoanType::NEW_LOAN;
             $topUpBalance = '0';
-            if ($staffId && $product->allowsTopUp()) {
-                $disbursed = $this->loanRepo->findDisbursedByStaffId($staffId);
-                if (!empty($disbursed)) {
+            $owing = $this->loanRepo->findOwingByCustomer($customer->getId());
+            if (!empty($owing)) {
+                if ($product->allowsTopUp()) {
                     $loanType = LoanType::TOP_UP;
                     $topUpBalance = $data['top_up_balance'] ?? '0';
+                } else {
+                    $existing = $owing[0];
+                    $this->em->rollback();
+                    return $this->error(
+                        'This customer already has a running loan (' . $existing->getApplicationId() . ', '
+                        . $existing->getStatus()->value . '), and the selected product does not support top-ups. '
+                        . 'Choose a top-up-enabled product to add to the existing loan.',
+                        409
+                    );
                 }
             }
 

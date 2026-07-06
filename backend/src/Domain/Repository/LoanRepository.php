@@ -33,6 +33,24 @@ class LoanRepository extends BaseRepository
      * (agents may resubmit).
      * @return Loan[]
      */
+    /**
+     * Loans that are disbursed and still owing for a customer — disbursed,
+     * active, overdue, or restructured. A new application against one of these
+     * either becomes a top-up (if the product allows it) or is refused.
+     * @return Loan[]
+     */
+    public function findOwingByCustomer(string $customerId): array
+    {
+        $owing = [
+            LoanStatus::DISBURSED->value, LoanStatus::ACTIVE->value,
+            LoanStatus::OVERDUE->value, LoanStatus::RESTRUCTURED->value,
+        ];
+        return $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
+            ->where('l.customer = :cid')->andWhere('l.status IN (:owing)')
+            ->setParameter('cid', $customerId)->setParameter('owing', $owing)
+            ->getQuery()->getResult();
+    }
+
     public function findPendingDecisionByCustomer(string $customerId): array
     {
         $pending = [
