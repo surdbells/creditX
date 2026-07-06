@@ -524,13 +524,25 @@ export class GeneralLoanReportComponent implements OnInit {
   // ─── Status buckets — same vocabulary as the performance reports ───
   // (StatusBucketResolver mirror, kept inline because importing a
   // backend-shaped constant here would be over-engineering)
+  // Full status list (matches the Monthly Loan Summary report) plus the
+  // friendly aggregate buckets. The backend accepts a raw loan status directly
+  // as well as a bucket slug.
   readonly statusBuckets = [
-    { value: 'pending',        label: 'Pending' },
+    { value: 'pending',        label: 'Pending (captured/submitted)' },
+    { value: 'performing',     label: 'Performing (active)' },
+    { value: 'non_performing', label: 'Non-Performing (overdue)' },
+    { value: 'draft',          label: 'Draft' },
+    { value: 'captured',       label: 'Captured' },
+    { value: 'submitted',      label: 'Submitted' },
+    { value: 'under_review',   label: 'Under Review' },
     { value: 'approved',       label: 'Approved' },
     { value: 'disbursed',      label: 'Disbursed' },
-    { value: 'performing',     label: 'Performing' },
-    { value: 'non_performing', label: 'Non-Performing' },
+    { value: 'active',         label: 'Active' },
+    { value: 'overdue',        label: 'Overdue' },
+    { value: 'restructured',   label: 'Restructured' },
     { value: 'closed',         label: 'Closed' },
+    { value: 'written_off',    label: 'Written Off' },
+    { value: 'cancelled',      label: 'Cancelled' },
     { value: 'rejected',       label: 'Rejected' },
   ];
 
