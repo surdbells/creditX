@@ -871,9 +871,13 @@ final class ReportingService
             SELECT
                 u.id AS approver_id,
                 u.first_name || ' ' || u.last_name AS approver_name,
-                COUNT(*) AS decisions,
-                SUM(CASE WHEN la.status IN ('approved','auto_approved') THEN 1 ELSE 0 END) AS approved,
-                SUM(CASE WHEN la.status = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                -- Count DISTINCT loans, not approval-step rows: a loan with a
+                -- multi-step workflow (or one re-submitted after rejection) has
+                -- several loan_approvals rows, which would otherwise inflate an
+                -- approver's decision count far past the number of loans.
+                COUNT(DISTINCT la.loan_id) AS decisions,
+                COUNT(DISTINCT CASE WHEN la.status IN ('approved','auto_approved') THEN la.loan_id END) AS approved,
+                COUNT(DISTINCT CASE WHEN la.status = 'rejected' THEN la.loan_id END) AS rejected,
                 AVG(EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)
                     FILTER (WHERE la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL)
                     AS avg_approver_clock_hours,
@@ -888,7 +892,7 @@ final class ReportingService
               AND la.decided_at >= :df AND la.decided_at <= :dt
               {$branchFilter}
             GROUP BY u.id, u.first_name, u.last_name
-            HAVING COUNT(*) >= 1
+            HAVING COUNT(DISTINCT la.loan_id) >= 1
             ORDER BY decisions DESC
         ";
         $params = ['df' => $df, 'dt' => $dt];
@@ -980,7 +984,7 @@ final class ReportingService
 
         $submissionsSql = "
             SELECT DATE_TRUNC(:bucket, la.sla_started_at)::date AS period,
-                   COUNT(*) AS submissions
+                   COUNT(DISTINCT la.loan_id) AS submissions
             FROM loan_approvals la
             INNER JOIN loans l ON la.loan_id = l.id
             WHERE la.sla_started_at >= :df AND la.sla_started_at <= :dt
@@ -989,8 +993,8 @@ final class ReportingService
         ";
         $decisionsSql = "
             SELECT DATE_TRUNC(:bucket, la.decided_at)::date AS period,
-                   SUM(CASE WHEN la.status IN ('approved','auto_approved') THEN 1 ELSE 0 END) AS approvals,
-                   SUM(CASE WHEN la.status = 'rejected' THEN 1 ELSE 0 END) AS rejections
+                   COUNT(DISTINCT CASE WHEN la.status IN ('approved','auto_approved') THEN la.loan_id END) AS approvals,
+                   COUNT(DISTINCT CASE WHEN la.status = 'rejected' THEN la.loan_id END) AS rejections
             FROM loan_approvals la
             INNER JOIN loans l ON la.loan_id = l.id
             WHERE la.decided_at IS NOT NULL
@@ -1082,36 +1086,43 @@ final class ReportingService
             }
         }
 
+        // One row per LOAN for this approver (the most recent decision they
+        // made on it), via DISTINCT ON — so the drill count matches the
+        // approver's distinct-loan decision count in the rollup, rather than
+        // showing a separate row per workflow step.
         $sql = "
             WITH loan_first_sla AS (
                 SELECT loan_id, MIN(sla_started_at) AS first_sla
                 FROM loan_approvals WHERE sla_started_at IS NOT NULL
                 GROUP BY loan_id
             )
-            SELECT
-                la.id AS approval_id,
-                l.id AS loan_id,
-                l.application_id,
-                c.full_name AS customer_name,
-                la.status AS decision,
-                la.decided_at,
-                la.sla_started_at,
-                lfs.first_sla AS loan_submitted_at,
-                loc.name AS branch_name,
-                la.comment,
-                CASE WHEN la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL
-                     THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)::numeric, 2)
-                     ELSE NULL END AS approver_clock_hours,
-                CASE WHEN la.decided_at IS NOT NULL AND lfs.first_sla IS NOT NULL
-                     THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - lfs.first_sla)) / 3600.0)::numeric, 2)
-                     ELSE NULL END AS loan_clock_hours
-            FROM loan_approvals la
-            INNER JOIN loans l ON la.loan_id = l.id
-            INNER JOIN customers c ON l.customer_id = c.id
-            LEFT JOIN locations loc ON l.branch_id = loc.id
-            LEFT JOIN loan_first_sla lfs ON lfs.loan_id = la.loan_id
-            WHERE {$where}
-            ORDER BY la.decided_at DESC
+            SELECT * FROM (
+                SELECT DISTINCT ON (la.loan_id)
+                    la.id AS approval_id,
+                    l.id AS loan_id,
+                    l.application_id,
+                    c.full_name AS customer_name,
+                    la.status AS decision,
+                    la.decided_at,
+                    la.sla_started_at,
+                    lfs.first_sla AS loan_submitted_at,
+                    loc.name AS branch_name,
+                    la.comment,
+                    CASE WHEN la.decided_at IS NOT NULL AND la.sla_started_at IS NOT NULL
+                         THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - la.sla_started_at)) / 3600.0)::numeric, 2)
+                         ELSE NULL END AS approver_clock_hours,
+                    CASE WHEN la.decided_at IS NOT NULL AND lfs.first_sla IS NOT NULL
+                         THEN ROUND((EXTRACT(EPOCH FROM (la.decided_at - lfs.first_sla)) / 3600.0)::numeric, 2)
+                         ELSE NULL END AS loan_clock_hours
+                FROM loan_approvals la
+                INNER JOIN loans l ON la.loan_id = l.id
+                INNER JOIN customers c ON l.customer_id = c.id
+                LEFT JOIN locations loc ON l.branch_id = loc.id
+                LEFT JOIN loan_first_sla lfs ON lfs.loan_id = la.loan_id
+                WHERE {$where}
+                ORDER BY la.loan_id, la.decided_at DESC
+            ) t
+            ORDER BY decided_at DESC
             LIMIT 500
         ";
         return $conn->fetchAllAssociative($sql, $params);
