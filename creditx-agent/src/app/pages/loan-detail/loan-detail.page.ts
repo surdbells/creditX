@@ -46,6 +46,17 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
         </div>
 
         <div class="cxm-ld-body">
+          <!-- Rejection reason — surfaced prominently so agents know why -->
+          @if (rejectionReason()) {
+            <div class="cxm-ld-reject-banner">
+              <ion-icon name="alert-circle" class="cxm-ld-reject-icon"></ion-icon>
+              <div>
+                <div class="cxm-ld-reject-title">Rejection reason</div>
+                <div class="cxm-ld-reject-text">{{ rejectionReason() }}</div>
+              </div>
+            </div>
+          }
+
           <!-- Summary Cards -->
           <div class="grid grid-cols-2 gap-3">
             <div class="cxm-ld-stat">
@@ -163,6 +174,9 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
                     <span class="cxm-ld-trail-dot"></span>
                     <div class="cxm-ld-trail-body">
                       <div class="cxm-ld-trail-action">{{ trail.action }}</div>
+                      @if (trail.details?.comment || trail.details?.reason) {
+                        <div class="cxm-ld-trail-reason">“{{ trail.details.comment || trail.details.reason }}”</div>
+                      }
                       <div class="cxm-ld-trail-time tabular-nums">{{ trail.created_at }}</div>
                     </div>
                   </div>
@@ -493,6 +507,28 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
       color: var(--cx-text-muted);
       margin-top: 1px;
     }
+    .cxm-ld-trail-reason {
+      font-size: 12px;
+      color: var(--cx-danger);
+      margin: 2px 0 1px;
+      font-style: italic;
+    }
+    .cxm-ld-reject-banner {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: var(--cx-danger-soft, rgba(220, 38, 38, 0.08));
+      border: 1px solid var(--cx-danger, #dc2626);
+      border-radius: var(--cx-radius-md, 10px);
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+    .cxm-ld-reject-icon { font-size: 20px; color: var(--cx-danger, #dc2626); flex-shrink: 0; }
+    .cxm-ld-reject-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;
+      font-weight: 600; color: var(--cx-danger, #dc2626); margin-bottom: 2px;
+    }
+    .cxm-ld-reject-text { font-size: 14px; color: var(--cx-text); line-height: 1.4; }
 
     /*
      * Body wrapper. The action area is now inline at the bottom of
@@ -1026,6 +1062,32 @@ export class LoanDetailPage implements OnInit {
       },
       error: () => this.sendingMessage.set(false),
     });
+  }
+
+  /**
+   * The reason the loan was rejected, if any. Agents reported not seeing why
+   * their loans were declined. The reason is recorded on the rejection trail
+   * (details.comment/reason) and/or on the rejected approval step's comment —
+   * pull the most relevant one so it can be shown in a prominent banner.
+   */
+  rejectionReason(): string | null {
+    const l = this.loan();
+    if (!l || l.status !== 'rejected') return null;
+
+    // Prefer an explicit comment on a rejected approval step.
+    const rejectedApproval = (this.approvals() || [])
+      .filter((a: any) => a.status === 'rejected' && (a.comment || a.reason))
+      .pop();
+    if (rejectedApproval) return rejectedApproval.comment || rejectedApproval.reason;
+
+    // Fall back to the rejection trail entry's stored reason/comment.
+    const trails = (l.trails || []) as any[];
+    const rejectTrail = trails
+      .filter((t: any) => /reject/i.test(t.action || '') && (t.details?.comment || t.details?.reason))
+      .pop();
+    if (rejectTrail) return rejectTrail.details.comment || rejectTrail.details.reason;
+
+    return null;
   }
 
   infoFields(): {label:string;value:string}[] {
