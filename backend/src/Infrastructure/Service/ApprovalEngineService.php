@@ -440,7 +440,7 @@ final class ApprovalEngineService
      *
      * @return array{items: array, total: int}
      */
-    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null): array
+    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null, string $sortBy = 'created_at', string $sortDir = 'DESC'): array
     {
         /*
          * Two visibility modes:
@@ -489,7 +489,7 @@ final class ApprovalEngineService
         }
 
         if ($user->hasPermission('loans.approve')) {
-            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds);
+            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds, $sortBy, $sortDir);
             $items = $result['items'];
             $total = $result['total'];
         } else {
@@ -557,6 +557,7 @@ final class ApprovalEngineService
                 // underwriter-only fields (the top-up balance override)
                 // in the decision modal.
                 'current_step_role_slug' => $a->getStep()->getRole()->getSlug(),
+                'current_step_role'      => $a->getStep()->getRole()->getName(),
             ]);
         }, $items);
 

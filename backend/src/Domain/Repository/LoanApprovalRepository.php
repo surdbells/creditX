@@ -124,10 +124,13 @@ class LoanApprovalRepository extends BaseRepository
         int $offset,
         int $limit,
         ?string $search = null,
-        ?array $branchIds = null
+        ?array $branchIds = null,
+        string $sortBy = 'created_at',
+        string $sortDir = 'DESC'
     ): array {
         $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
             ->innerJoin('a.step', 's')
+            ->leftJoin('s.role', 'sr')
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
             ->leftJoin('l.branch', 'b')
@@ -174,7 +177,16 @@ class LoanApprovalRepository extends BaseRepository
         $countQb->select('COUNT(a.id)')->resetDQLPart('orderBy');
         $total = (int) $countQb->getQuery()->getSingleScalarResult();
 
-        $qb->orderBy('a.createdAt', 'ASC')->setFirstResult($offset)->setMaxResults($limit);
+        // Sort — whitelist Step and Role (used by the admin queue); default
+        // createdAt. Unknown sort keys fall back to createdAt.
+        $orderCol = match ($sortBy) {
+            'current_step'                                       => 's.name',
+            'current_step_role_slug', 'current_step_role', 'role' => 'sr.name',
+            default                                              => 'a.createdAt',
+        };
+        $dir = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
+        $qb->orderBy($orderCol, $dir)->addOrderBy('a.createdAt', 'ASC')
+           ->setFirstResult($offset)->setMaxResults($limit);
         return ['items' => $qb->getQuery()->getResult(), 'total' => $total];
     }
 

@@ -1116,17 +1116,10 @@ import { SettingsService } from '../../core/services/settings.service';
   `],
 })
 export class ApprovalQueueComponent implements OnInit {
-  columns: TableColumn[] = [
-    { key: 'application_id', label: 'App ID' },
-    { key: 'customer_name', label: 'Customer' },
-    { key: 'customer_staff_id', label: 'Staff ID' },
-    { key: 'branch_name', label: 'Branch' },
-    { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right' },
-    { key: 'product_name', label: 'Product' },
-    { key: 'current_step', label: 'Step' },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Submitted', type: 'date' },
-  ];
+  // Only Step and Role are sortable, and only for admin/super_admin (the queue
+  // supports server-side sort on those two). Built in the constructor so the
+  // sortable flags reflect the current user's role.
+  columns: TableColumn[] = [];
   rows = signal<any[]>([]);
   loading = signal(true);
   pagination = signal<TablePagination | null>(null);
@@ -1249,7 +1242,21 @@ export class ApprovalQueueComponent implements OnInit {
 
   private sanitizer = inject(DomSanitizer);
 
-  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
+  constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {
+    const canSort = this.auth.hasAnyRole(['admin', 'super_admin']);
+    this.columns = [
+      { key: 'application_id', label: 'App ID', sortable: false },
+      { key: 'customer_name', label: 'Customer', sortable: false },
+      { key: 'customer_staff_id', label: 'Staff ID', sortable: false },
+      { key: 'branch_name', label: 'Branch', sortable: false },
+      { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right', sortable: false },
+      { key: 'product_name', label: 'Product', sortable: false },
+      { key: 'current_step', label: 'Step', sortable: canSort },
+      { key: 'current_step_role', label: 'Role', sortable: canSort },
+      { key: 'status', label: 'Status', sortable: false },
+      { key: 'created_at', label: 'Submitted', type: 'date', sortable: false },
+    ];
+  }
 
   locations = signal<any[]>([]);
   locationFilter = '';
