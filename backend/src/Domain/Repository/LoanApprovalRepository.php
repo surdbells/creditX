@@ -126,7 +126,9 @@ class LoanApprovalRepository extends BaseRepository
         ?string $search = null,
         ?array $branchIds = null,
         string $sortBy = 'created_at',
-        string $sortDir = 'DESC'
+        string $sortDir = 'DESC',
+        ?string $roleId = null,
+        ?string $stepName = null
     ): array {
         $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
             ->innerJoin('a.step', 's')
@@ -171,6 +173,17 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->andWhere('l.branch IN (:branchIds)')
                    ->setParameter('branchIds', $branchIds);
             }
+        }
+
+        // Admin/super-admin queue filters — narrow to a specific step role
+        // and/or step name. Step is matched by name (not id) because the same
+        // logical step (e.g. "Operations Review") can exist across multiple
+        // workflows with distinct ids; filtering by name catches them all.
+        if ($roleId !== null && $roleId !== '') {
+            $qb->andWhere('sr.id = :fRoleId')->setParameter('fRoleId', $roleId);
+        }
+        if ($stepName !== null && $stepName !== '') {
+            $qb->andWhere('s.name = :fStepName')->setParameter('fStepName', $stepName);
         }
 
         $countQb = clone $qb;

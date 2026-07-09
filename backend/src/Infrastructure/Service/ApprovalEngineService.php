@@ -440,7 +440,7 @@ final class ApprovalEngineService
      *
      * @return array{items: array, total: int}
      */
-    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null, string $sortBy = 'created_at', string $sortDir = 'DESC'): array
+    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null, string $sortBy = 'created_at', string $sortDir = 'DESC', ?string $roleId = null, ?string $stepName = null): array
     {
         /*
          * Two visibility modes:
@@ -489,7 +489,7 @@ final class ApprovalEngineService
         }
 
         if ($user->hasPermission('loans.approve')) {
-            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds, $sortBy, $sortDir);
+            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds, $sortBy, $sortDir, $roleId, $stepName);
             $items = $result['items'];
             $total = $result['total'];
         } else {

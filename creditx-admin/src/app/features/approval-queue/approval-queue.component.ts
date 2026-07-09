@@ -46,6 +46,22 @@ import { SettingsService } from '../../core/services/settings.service';
           <option value="">All locations</option>
           @for (l of locations(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
         </select>
+
+        <!-- Step + Role filters — admin/super_admin only. Populated from the
+             approval workflows so the options match the live step/role set. -->
+        @if (canFilter) {
+          <label class="cx-aq-toolbar-label">Step</label>
+          <select class="cx-select" [(ngModel)]="stepFilter" (change)="onFilterChange()">
+            <option value="">All steps</option>
+            @for (s of stepOptions(); track s) { <option [value]="s">{{ s }}</option> }
+          </select>
+
+          <label class="cx-aq-toolbar-label">Role</label>
+          <select class="cx-select" [(ngModel)]="roleFilter" (change)="onFilterChange()">
+            <option value="">All roles</option>
+            @for (r of roleOptions(); track r.id) { <option [value]="r.id">{{ r.name }}</option> }
+          </select>
+        }
       </div>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
@@ -1282,12 +1298,44 @@ export class ApprovalQueueComponent implements OnInit {
   locations = signal<any[]>([]);
   locationFilter = '';
 
+  // Admin/super-admin-only Step + Role queue filters. canFilter mirrors the
+  // canSort gate in the constructor. Options are derived from the approval
+  // workflows so they match the live step/role set (deduped by name / id).
+  canFilter = false;
+  stepOptions = signal<string[]>([]);
+  roleOptions = signal<{ id: string; name: string }[]>([]);
+  stepFilter = '';
+  roleFilter = '';
+
   ngOnInit() {
     this.load();
     this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.locations.set(r.data || []), error: () => {} });
+
+    this.canFilter = this.auth.hasAnyRole(['admin', 'super_admin']);
+    if (this.canFilter) this.loadStepRoleOptions();
+  }
+
+  /** Build the Step + Role dropdown options from the approval workflows. */
+  private loadStepRoleOptions(): void {
+    this.api.get('/approval-workflows', { per_page: 200 }).subscribe({
+      next: r => {
+        const steps = new Set<string>();
+        const roles = new Map<string, string>();
+        for (const wf of r.data || []) {
+          for (const s of wf.steps || []) {
+            if (s.name) steps.add(s.name);
+            if (s.role_id && s.role_name) roles.set(s.role_id, s.role_name);
+          }
+        }
+        this.stepOptions.set([...steps].sort());
+        this.roleOptions.set([...roles].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+      },
+      error: () => {},
+    });
   }
 
   onLocationChange(): void { this.load(); }
+  onFilterChange(): void { this.load(); }
 
   // Soft-flag threshold mirroring the backend default for
   // affordability.max_dsr (see AffordabilityService::DEFAULT_MAX_DSR).
@@ -1304,7 +1352,12 @@ export class ApprovalQueueComponent implements OnInit {
 
   load(p?: any) {
     this.loading.set(true);
-    this.api.get('/approvals/queue', { ...this.q, ...p, location_id: this.locationFilter || undefined }).subscribe({
+    this.api.get('/approvals/queue', {
+      ...this.q, ...p,
+      location_id: this.locationFilter || undefined,
+      step: this.stepFilter || undefined,
+      role_id: this.roleFilter || undefined,
+    }).subscribe({
       next: r => {
         this.rows.set(r.data || []);
         this.pagination.set(r.meta || null);
