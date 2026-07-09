@@ -28,7 +28,7 @@ enum LoanStatus: string
             self::DRAFT => [self::CAPTURED, self::SUBMITTED, self::CANCELLED],
             self::CAPTURED => [self::SUBMITTED, self::CANCELLED],
             self::SUBMITTED => [self::UNDER_REVIEW, self::CANCELLED],
-            self::UNDER_REVIEW => [self::APPROVED, self::REJECTED],
+            self::UNDER_REVIEW => [self::APPROVED, self::REJECTED, self::CANCELLED],
             self::APPROVED => [self::DISBURSED, self::CANCELLED],
             self::REJECTED => [self::DRAFT],
             self::DISBURSED => [self::ACTIVE],

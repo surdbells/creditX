@@ -207,6 +207,17 @@ final class ApprovalEngineService
                 );
             }
 
+            // The underwriter step is restricted: only an underwriter (the step
+            // role), an admin, or a super admin may decide it — even a
+            // broad-access approver (loans.approve) on another role can't.
+            if ($approval->getStep()->getRole()->getSlug() === 'underwriter') {
+                $userRoleSlugs = $user->getRoles()->map(fn($r) => $r->getSlug())->toArray();
+                if (empty(array_intersect(['underwriter', 'admin', 'super_admin'], $userRoleSlugs))) {
+                    $this->em->rollback();
+                    throw new DomainException('Only an underwriter, admin, or super admin can decide the underwriter step.');
+                }
+            }
+
             // Process decision — these now throw if the row is not
             // PENDING (belt + suspenders vs the check above which can
             // race if we ever remove the lock).

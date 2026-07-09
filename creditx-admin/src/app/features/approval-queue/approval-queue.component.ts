@@ -413,8 +413,7 @@ import { SettingsService } from '../../core/services/settings.service';
                     }
                   </div>
 
-                  <!-- Recalculation preview — appears when a top-up is entered.
-                       Approval is blocked until the underwriter confirms it. -->
+                  <!-- Recalculation preview — appears when a top-up is entered. -->
                   @if (topUpNeedsConfirm()) {
                     @if (recalcBusy()) {
                       <div class="cx-aq-recalc cx-aq-recalc-busy">
@@ -440,13 +439,16 @@ import { SettingsService } from '../../core/services/settings.service';
                         <div class="cx-aq-recalc-row cx-aq-recalc-muted">
                           <span>Monthly repayment (unchanged)</span><span class="tabular-nums">{{ rc.monthly_repayment | money:2 }}</span>
                         </div>
-                        <label class="cx-aq-recalc-confirm">
-                          <input type="checkbox" [ngModel]="recalcConfirmed()" (ngModelChange)="recalcConfirmed.set($event)" [disabled]="deciding()" />
-                          <span>I have reviewed the recalculated net disbursement.</span>
-                        </label>
                       </div>
                     }
                   }
+
+                  <!-- Underwriter must tick this before Approve is enabled —
+                       for both top-up and fresh loans. -->
+                  <label class="cx-aq-recalc-confirm">
+                    <input type="checkbox" [ngModel]="recalcConfirmed()" (ngModelChange)="recalcConfirmed.set($event)" [disabled]="deciding()" />
+                    <span>{{ topUpNeedsConfirm() ? 'I have reviewed the recalculated net disbursement.' : 'I have reviewed this loan and confirm approval.' }}</span>
+                  </label>
                 </div>
               }
               <label class="cx-aq-label" for="aq-comment">Comment (optional for approve, required for reject)</label>
@@ -1187,10 +1189,17 @@ export class ApprovalQueueComponent implements OnInit {
     return this.isUnderwriterStep() && n > 0;
   }
 
-  /** Approve is blocked until the entered top-up's recalculation is confirmed. */
+  /**
+   * On an underwriter step, Approve stays disabled until the reviewer ticks the
+   * confirmation box — for both top-up and fresh loans. When a top-up is
+   * entered, the recalculation must also have loaded. Non-underwriter steps are
+   * unaffected.
+   */
   approveBlocked(): boolean {
-    if (!this.topUpNeedsConfirm()) return false;
-    return this.recalcBusy() || !this.recalc() || !this.recalcConfirmed();
+    if (!this.isUnderwriterStep()) return false;
+    if (!this.recalcConfirmed()) return true;
+    if (this.topUpNeedsConfirm()) return this.recalcBusy() || !this.recalc();
+    return false;
   }
 
   /** Fired when the top-up input changes (and on prefill). Debounced fetch of

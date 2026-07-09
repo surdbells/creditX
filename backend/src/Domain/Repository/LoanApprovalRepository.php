@@ -4,6 +4,7 @@ namespace App\Domain\Repository;
 
 use App\Domain\Entity\LoanApproval;
 use App\Domain\Enum\ApprovalStatus;
+use App\Domain\Enum\LoanStatus;
 
 class LoanApprovalRepository extends BaseRepository
 {
@@ -74,7 +75,12 @@ class LoanApprovalRepository extends BaseRepository
             // approvers also need this to avoid seeing future-step
             // approvals on their queue before earlier steps complete.
             ->andWhere('a.slaStartedAt IS NOT NULL')
-            ->setParameter('roleId', $roleId)->setParameter('status', ApprovalStatus::PENDING->value);
+            // Only surface approvals whose loan is still under review — once a
+            // mandatory step rejects (or the loan is otherwise decided), its
+            // remaining pending steps must drop out of every role's queue.
+            ->andWhere('l.status = :loanUnderReview')
+            ->setParameter('roleId', $roleId)->setParameter('status', ApprovalStatus::PENDING->value)
+            ->setParameter('loanUnderReview', LoanStatus::UNDER_REVIEW->value);
 
         if ($search && $search !== '') {
             $qb->andWhere($qb->expr()->orX(
@@ -139,7 +145,12 @@ class LoanApprovalRepository extends BaseRepository
             // actually ready for decision. The duplicate rows were the
             // bug the user reported in this session.
             ->andWhere('a.slaStartedAt IS NOT NULL')
-            ->setParameter('status', ApprovalStatus::PENDING->value);
+            // Only surface approvals whose loan is still under review — once a
+            // mandatory step rejects (or the loan is otherwise decided), its
+            // remaining pending steps must drop out of the queue.
+            ->andWhere('l.status = :loanUnderReview')
+            ->setParameter('status', ApprovalStatus::PENDING->value)
+            ->setParameter('loanUnderReview', LoanStatus::UNDER_REVIEW->value);
 
         if ($search && $search !== '') {
             $qb->andWhere($qb->expr()->orX(

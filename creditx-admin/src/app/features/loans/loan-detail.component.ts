@@ -1283,9 +1283,9 @@ export class LoanDetailComponent implements OnInit {
   cancelReason = '';
   cancelling = signal(false);
 
-  /** Cancellable before disbursement: draft/captured/submitted/approved. */
+  /** Cancellable before disbursement: draft/captured/submitted/under_review/approved. */
   isCancellable(): boolean {
-    return ['draft', 'captured', 'submitted', 'approved'].includes(this.loan()?.status);
+    return ['draft', 'captured', 'submitted', 'under_review', 'approved'].includes(this.loan()?.status);
   }
   openCancel(): void { this.cancelReason = ''; this.showCancel.set(true); }
   closeCancel(): void { this.showCancel.set(false); }
