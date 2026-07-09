@@ -692,6 +692,8 @@ import { SettingsService } from '../../core/services/settings.service';
       gap: 12px;
       padding: 20px 24px 16px;
       border-bottom: 1px solid var(--cx-border);
+      /* Never let the header shrink — only the body should give up space. */
+      flex-shrink: 0;
     }
     .cx-aq-modal-eyebrow {
       font-size: 11px;
@@ -1013,6 +1015,19 @@ import { SettingsService } from '../../core/services/settings.service';
       padding: 16px 24px 20px;
       border-top: 1px solid var(--cx-border);
       background: var(--cx-surface);
+      /*
+       * Keep the action footer (Approve/Reject buttons) always visible.
+       * Without flex-shrink:0 the footer was being compressed on shorter
+       * screens / browser zoom, and its buttons were clipped by the
+       * modal's overflow:hidden — the "Approve button doesn't show on
+       * some systems" report. The footer holds its full height; only the
+       * body scrolls. If the footer itself is taller than the viewport
+       * (long reject reason + top-up block on a very short screen) it
+       * scrolls internally rather than pushing the buttons out of view.
+       */
+      flex-shrink: 0;
+      max-height: 60vh;
+      overflow-y: auto;
     }
     .cx-aq-decision-area { display: flex; flex-direction: column; gap: 8px; }
     .cx-aq-label {
