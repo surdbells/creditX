@@ -40,6 +40,7 @@ final class MonthlyLoanSummaryService
                 c.full_name                                         AS full_name,
                 loc.name                                            AS location,
                 l.amount_requested                                  AS payment_amount,
+                appr.approval_date::date                            AS approval_date,
                 first_rs.due_date                                   AS payment_due_date,
                 c.bank_name                                         AS main_bank_name,
                 c.account_number                                    AS main_bank_num,
@@ -47,9 +48,15 @@ final class MonthlyLoanSummaryService
                 c.employer                                          AS employer,
                 c.phone                                             AS main_number,
                 l.tenure                                            AS tenure,
-                l.loan_type                                         AS loan_type,
+                -- A loan with any top-up balance is a top-up, even if it was
+                -- captured as a new loan (the underwriter added the balance).
+                CASE WHEN COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0) > 0
+                     THEN 'top_up' ELSE l.loan_type::text END       AS loan_type,
                 NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') AS dsa,
-                l.net_disbursed                                     AS net_disbursed,
+                -- Net disbursement = amount - top-up - 2% management fee.
+                (l.amount_requested
+                    - COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0)
+                    - l.amount_requested * 0.02)                    AS net_disbursed,
                 l.gross_loan                                        AS gl_amount,
                 COALESCE(l.top_up_balance_underwriter, l.top_up_balance) AS topup_bal,
                 l.bank_statement_mode                               AS as_source,
@@ -77,6 +84,11 @@ final class MonthlyLoanSummaryService
                 ORDER BY rs.installment_number ASC
                 LIMIT 1
             ) first_rs ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT MAX(la.decided_at) AS approval_date
+                FROM loan_approvals la
+                WHERE la.loan_id = l.id AND la.status IN ('approved', 'auto_approved')
+            ) appr ON TRUE
             WHERE {$where}
             ORDER BY COALESCE(l.disbursed_at, l.created_at) ASC, l.application_id ASC
         ";

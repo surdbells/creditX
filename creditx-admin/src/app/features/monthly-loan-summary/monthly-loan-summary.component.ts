@@ -46,6 +46,10 @@ interface Col { key: string; label: string; money?: boolean; }
           <button class="cx-btn cx-btn-primary" (click)="generate()" [disabled]="loading()">
             {{ loading() ? 'Generating…' : 'Generate' }}
           </button>
+          <button class="cx-btn cx-btn-secondary" (click)="exportExcel()" [disabled]="!rows().length">
+            <lucide-icon name="download" [size]="14"></lucide-icon>
+            <span>Export Excel</span>
+          </button>
           <button class="cx-btn cx-btn-secondary" (click)="exportCsv()" [disabled]="!rows().length">
             <lucide-icon name="download" [size]="14"></lucide-icon>
             <span>Export CSV</span>
@@ -106,6 +110,7 @@ export class MonthlyLoanSummaryComponent {
 
   columns: Col[] = [
     { key: 'date', label: 'Date' },
+    { key: 'approval_date', label: 'Approval Date' },
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'full_name', label: 'Full Name' },
     { key: 'location', label: 'Location' },
@@ -170,6 +175,22 @@ export class MonthlyLoanSummaryComponent {
     const a = document.createElement('a');
     a.href = url;
     a.download = `monthly-loan-summary-${this.filters.year}-${String(this.filters.month).padStart(2, '0')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** Export as .xls (HTML table — Excel opens it natively, no library). */
+  exportExcel(): void {
+    const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const head = '<tr>' + this.columns.map(c => `<th>${esc(c.label)}</th>`).join('') + '</tr>';
+    const body = this.rows().map(row => '<tr>' + this.columns.map(c => `<td>${esc(row[c.key])}</td>`).join('') + '</tr>').join('');
+    const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head>`
+      + `<body><table border="1">${head}${body}</table></body></html>`;
+    const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `monthly-loan-summary-${this.filters.year}-${String(this.filters.month).padStart(2, '0')}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   }
