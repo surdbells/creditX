@@ -167,6 +167,12 @@ import { SettingsService } from '../../core/services/settings.service';
                   <span class="cx-aq-field-label">Net Disbursed</span>
                   <span class="cx-aq-field-value tabular-nums">{{ l.net_disbursed | money:2 }}</span>
                 </div>
+                @if (+(l.top_up_balance_effective || 0) > 0) {
+                  <div class="cx-aq-field">
+                    <span class="cx-aq-field-label">Top-up / Outstanding Balance</span>
+                    <span class="cx-aq-field-value tabular-nums">{{ l.top_up_balance_effective | money:2 }}</span>
+                  </div>
+                }
                 <div class="cx-aq-field">
                   <span class="cx-aq-field-label">Branch</span>
                   <span class="cx-aq-field-value">{{ l.branch_name || '—' }}</span>
