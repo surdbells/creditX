@@ -114,10 +114,32 @@ final class CreateLoanAction
                         'customer.full_name' => 'Full name is required for new customers',
                     ]);
                 }
-                $customer = new Customer();
-                $customer->setFullName($customerPayload['full_name']);
-                $customer->fillFromArray($customerPayload);
-                $this->em->persist($customer);
+
+                // Dedup guard — DSAs (the same one or different ones) were
+                // creating duplicate customer rows for the same person because
+                // this path always minted a fresh Customer. If a customer with
+                // the same Staff ID (or, failing that, BVN) already exists,
+                // reuse that record and patch it instead of creating a
+                // duplicate. This mirrors the customer_id path: one person,
+                // one Customer row. The in-progress / owing guards below then
+                // apply correctly against the canonical customer.
+                $existing = null;
+                if (!empty($customerPayload['staff_id'])) {
+                    $existing = $this->customerRepo->findByStaffId($customerPayload['staff_id']);
+                }
+                if ($existing === null && !empty($customerPayload['bvn'])) {
+                    $existing = $this->customerRepo->findByBvn($customerPayload['bvn']);
+                }
+
+                if ($existing !== null) {
+                    $customer = $existing;
+                    $customer->fillFromArray($customerPayload);
+                } else {
+                    $customer = new Customer();
+                    $customer->setFullName($customerPayload['full_name']);
+                    $customer->fillFromArray($customerPayload);
+                    $this->em->persist($customer);
+                }
             }
 
             // ─── Next of kin (optional; attached to customer) ───────
