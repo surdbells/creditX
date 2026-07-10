@@ -190,15 +190,27 @@ class LoanApprovalRepository extends BaseRepository
         $countQb->select('COUNT(a.id)')->resetDQLPart('orderBy');
         $total = (int) $countQb->getQuery()->getSingleScalarResult();
 
-        // Sort — whitelist Step and Role (used by the admin queue); default
-        // createdAt. Unknown sort keys fall back to createdAt.
-        $orderCol = match ($sortBy) {
-            'current_step'                                       => 's.name',
-            'current_step_role_slug', 'current_step_role', 'role' => 'sr.name',
-            default                                              => 'a.createdAt',
-        };
+        // Sort — whitelist Step and Role (the only user-sortable queue
+        // columns), which honor the chosen direction. The DEFAULT order is
+        // FIFO: oldest submission first, so loans are worked first-come,
+        // first-served. createdAt on the approval row is the loan's
+        // submission time (all step rows are created together at initiate).
+        // The "Submitted" column is not user-sortable, so this default
+        // governs the natural queue order — previously it was DESC, which
+        // surfaced the newest loans at the top and broke FIFO. This matches
+        // the role-scoped queue (findPendingForRole), which is already ASC.
+        // NB: getPaginationParams() camelCases sort_by, so the frontend's
+        // 'current_step' / 'current_step_role' arrive here as 'currentStep' /
+        // 'currentStepRole'. Match both forms so the Step/Role column sorts
+        // actually take effect (they previously fell through to the default).
         $dir = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
-        $qb->orderBy($orderCol, $dir)->addOrderBy('a.createdAt', 'ASC')
+        [$orderCol, $orderDir] = match ($sortBy) {
+            'current_step', 'currentStep'                                    => ['s.name', $dir],
+            'current_step_role_slug', 'current_step_role', 'role',
+            'currentStepRoleSlug', 'currentStepRole'                         => ['sr.name', $dir],
+            default                                                          => ['a.createdAt', 'ASC'],
+        };
+        $qb->orderBy($orderCol, $orderDir)->addOrderBy('a.createdAt', 'ASC')
            ->setFirstResult($offset)->setMaxResults($limit);
         return ['items' => $qb->getQuery()->getResult(), 'total' => $total];
     }
