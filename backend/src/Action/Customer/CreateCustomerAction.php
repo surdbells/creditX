@@ -38,6 +38,7 @@ final class CreateCustomerAction
             'bvn'             => ['required' => false, 'type' => 'string', 'max' => 20],
             'number_of_children' => ['required' => false, 'type' => 'int', 'min' => 0],
             'bank_name'       => ['required' => false, 'type' => 'string', 'max' => 100],
+            'bank_code'       => ['required' => false, 'type' => 'string', 'max' => 20],
             'account_number'  => ['required' => false, 'type' => 'string', 'max' => 20],
             'alt_bank_name'   => ['required' => false, 'type' => 'string', 'max' => 100],
             'alt_account_number' => ['required' => false, 'type' => 'string', 'max' => 20],

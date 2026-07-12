@@ -139,9 +139,19 @@ import { NIGERIA_STATES } from '../../core/data/nigeria-states';
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">Bank Name</label>
             <cx-searchable-select [options]="bankOptions()" placeholder="Select bank..." [clearable]="true"
-              [(ngModel)]="form.bank_name" name="bank_name"></cx-searchable-select>
+              [(ngModel)]="form.bank_name" (ngModelChange)="onBankChange()" name="bank_name"></cx-searchable-select>
           </div>
-          <div><label class="cx-label">Account Number</label><input class="cx-input" [(ngModel)]="form.account_number" /></div>
+          <div>
+            <label class="cx-label">Account Number</label>
+            <input class="cx-input" [(ngModel)]="form.account_number" (blur)="resolveAccount()" maxlength="10" inputmode="numeric" />
+            @if (resolving()) {
+              <div class="text-xs mt-1 text-[var(--cx-text-muted)]">Verifying account…</div>
+            } @else if (resolvedName()) {
+              <div class="text-xs mt-1 font-medium text-[var(--cx-success)]">✓ {{ resolvedName() }}</div>
+            } @else if (resolveError()) {
+              <div class="text-xs mt-1 text-[var(--cx-danger)]">{{ resolveError() }}</div>
+            }
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div><label class="cx-label">Alt Bank Name</label>
@@ -171,8 +181,41 @@ export class CustomersComponent implements OnInit {
   states = NIGERIA_STATES;
   filteredLgas: string[] = [];
   bankOptions = signal<SelectOption[]>([]);
+  /** bank name → numeric code, for capturing bank_code alongside the name. */
+  private bankCodeByName: Record<string, string> = {};
+  resolving = signal(false);
+  resolvedName = signal<string | null>(null);
+  resolveError = signal<string | null>(null);
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService) {}
+
+  /** Keep bank_code in sync with the selected bank name. */
+  onBankChange(): void {
+    this.form.bank_code = this.bankCodeByName[this.form.bank_name] || '';
+    this.resolvedName.set(null);
+    this.resolveError.set(null);
+    this.resolveAccount();
+  }
+
+  /** Resolve the account name via the provider once bank + 10-digit number are set. */
+  resolveAccount(): void {
+    const acct = String(this.form.account_number || '').replace(/\D/g, '');
+    const code = this.form.bank_code;
+    if (!code || acct.length < 10) { this.resolvedName.set(null); this.resolveError.set(null); return; }
+    this.resolving.set(true);
+    this.resolvedName.set(null);
+    this.resolveError.set(null);
+    this.api.get('/banks/resolve', { account_number: acct, bank_code: code }).subscribe({
+      next: r => {
+        this.resolving.set(false);
+        this.resolvedName.set(r.data?.account_name || null);
+      },
+      error: e => {
+        this.resolving.set(false);
+        this.resolveError.set(e.error?.message || 'Could not verify this account.');
+      },
+    });
+  }
 
   onStateChange(): void {
     const state = this.states.find(s => s.name === this.form.state_of_origin);
@@ -189,7 +232,12 @@ export class CustomersComponent implements OnInit {
   ngOnInit() {
     this.load();
     this.api.get('/banks').subscribe({
-      next: r => this.bankOptions.set((r.data || []).map((b: any) => ({ value: b.name, label: b.name, sublabel: b.code }))),
+      next: r => {
+        const banks = r.data || [];
+        this.bankOptions.set(banks.map((b: any) => ({ value: b.name, label: b.name, sublabel: b.code })));
+        this.bankCodeByName = {};
+        for (const b of banks) { this.bankCodeByName[b.name] = b.code; }
+      },
       error: () => {},
     });
   }
@@ -214,10 +262,15 @@ export class CustomersComponent implements OnInit {
         religion: row.religion, home_address: row.home_address, permanent_address: row.permanent_address,
         state_of_origin: row.state_of_origin || '', lga: row.lga || '', hometown: row.hometown,
         mothers_maiden_name: row.mothers_maiden_name, number_of_children: row.number_of_children,
-        bank_name: row.bank_name, account_number: row.account_number,
+        bank_name: row.bank_name, bank_code: row.bank_code, account_number: row.account_number,
         alt_bank_name: row.alt_bank_name, alt_account_number: row.alt_account_number,
         next_of_kins: (row.next_of_kins || []).map((n: any) => ({ full_name: n.full_name, phone: n.phone, relationship: n.relationship, address: n.address })),
       };
+      // Derive the bank code for legacy records that only stored the name.
+      if (!this.form.bank_code && this.form.bank_name) {
+        this.form.bank_code = this.bankCodeByName[this.form.bank_name] || '';
+      }
+      this.resolvedName.set(null); this.resolveError.set(null);
       const state = this.states.find(s => s.name === row.state_of_origin);
       this.filteredLgas = state?.lgas || [];
     } else {
@@ -227,9 +280,10 @@ export class CustomersComponent implements OnInit {
         gender: '', marital_status: '', bvn: '', nin: '', is_insider: false, insider_relationship: '',
         religion: '', home_address: '', permanent_address: '',
         state_of_origin: '', lga: '', hometown: '', mothers_maiden_name: '', number_of_children: null,
-        bank_name: '', account_number: '', alt_bank_name: '', alt_account_number: '',
+        bank_name: '', bank_code: '', account_number: '', alt_bank_name: '', alt_account_number: '',
         next_of_kins: [],
       };
+      this.resolvedName.set(null); this.resolveError.set(null);
       this.filteredLgas = [];
     }
     this.showForm.set(true);

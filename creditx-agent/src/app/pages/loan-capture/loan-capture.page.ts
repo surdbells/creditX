@@ -1903,7 +1903,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     loan_amount_words: '', loan_purpose: '', repayment_method: '',
     bank_statement_mode: '', account_statement_id: '', account_statement_password: '',
     // Bank
-    bank_name: '', account_number: '', account_name: '',
+    bank_name: '', bank_code: '', account_number: '', account_name: '',
     alt_bank_name: '', alt_account_number: '', alt_account_name: '',
     // Next of Kin (single NOK captured here; server wraps it in an array)
     nok_full_name: '', nok_phone: '', nok_address: '', nok_relationship: '',
@@ -2066,6 +2066,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
 
     const digits = String(acct ?? '').replace(/\D/g, '');
     const code = this.bankCodeFor(bank);
+    // Capture the numeric bank code alongside the name — required for
+    // settlement (outbound transfer) later. Main account only.
+    if (which === 'main') this.form['bank_code'] = code || '';
     if (digits.length !== 10 || !code) return;
 
     clearTimeout(this.acctDebounce[which]);
@@ -2233,6 +2236,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
         this.form['work_id_expiry_date'] = c.work_id_expiry_date || '';
         // Customer bank
         this.form['bank_name'] = c.bank_name || '';
+        this.form['bank_code'] = c.bank_code || this.bankCodeFor(c.bank_name || '') || '';
         this.form['account_number'] = c.account_number || '';
         this.form['alt_bank_name'] = c.alt_bank_name || '';
         this.form['alt_account_number'] = c.alt_account_number || '';
@@ -2446,6 +2450,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
                   gross_pay: c.gross_pay,
                   // Bank
                   bank_name: c.bank_name,
+                  bank_code: c.bank_code,
                   account_number: c.account_number,
                   alt_bank_name: c.alt_bank_name,
                   alt_account_number: c.alt_account_number,
@@ -2805,7 +2810,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       work_id_expiry_date: this.form['work_id_expiry_date'],
       // Bank
       bank_name: this.form['bank_name'],
+      bank_code: this.form['bank_code'] || this.bankCodeFor(this.form['bank_name']) || '',
       account_number: this.form['account_number'],
+      account_name: this.form['account_name'],
       alt_bank_name: this.form['alt_bank_name'],
       alt_account_number: this.form['alt_account_number'],
       alt_account_name: this.form['alt_account_name'],
