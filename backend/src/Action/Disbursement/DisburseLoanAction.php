@@ -4,7 +4,7 @@ namespace App\Action\Disbursement;
 
 use App\Domain\Entity\MakerCheckerRequest;
 use App\Domain\Repository\{LoanRepository, UserRepository};
-use App\Infrastructure\Service\{ApiResponse, AuditService, DisbursementService, NotificationDispatchService, SettingsCacheService};
+use App\Infrastructure\Service\{ApiResponse, AuditService, DisbursementService, NotificationDispatchService, SettingsCacheService, SettlementService};
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -19,6 +19,7 @@ final class DisburseLoanAction
         private readonly SettingsCacheService $settings,
         private readonly AuditService $audit,
         private readonly EntityManagerInterface $em,
+        private readonly SettlementService $settlementService,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -41,6 +42,12 @@ final class DisburseLoanAction
 
         if ($settlementGlId === '') return $this->validationError(['settlement_gl_id' => 'Settlement GL account is required']);
 
+        // Optional settlement provider override ('paystack' | 'flutterwave').
+        // Null falls back to the settlement.provider setting.
+        $settlementProvider = isset($data['settlement_provider']) && $data['settlement_provider'] !== ''
+            ? (string) $data['settlement_provider']
+            : null;
+
         $userId = $request->getAttribute('user_id');
         $user = $this->userRepo->find($userId);
 
@@ -55,6 +62,7 @@ final class DisburseLoanAction
                 'loan_id' => $loan->getId(),
                 'settlement_gl_id' => $settlementGlId,
                 'effective_date' => $effectiveDate,
+                'settlement_provider' => $settlementProvider,
             ]);
             $mcRequest->setMaker($user);
             $mcRequest->setMakerComment($data['comment'] ?? null);
@@ -85,6 +93,15 @@ final class DisburseLoanAction
         );
 
         $this->audit->logCreate($userId, 'Disbursement', $loan->getId(), $result, $this->getClientIp($request), $this->getUserAgent($request));
+
+        // Hand off to settlement (outbound bank transfer) per configured mode.
+        // Returns null when settlement is disabled; never throws — a
+        // settlement problem must not fail the completed disbursement.
+        $settlement = $this->settlementService->handlePostDisbursement($loan, $user, $settlementProvider);
+        if ($settlement !== null) {
+            $result['settlement'] = $settlement;
+        }
+
         return $this->success($result, 'Loan disbursed successfully');
     }
 }

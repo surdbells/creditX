@@ -132,6 +132,10 @@ $settingsDef = [
     ['general.company_name', 'CreditX Financial Services', 'string', 'general', 'Company display name'],
     ['general.support_email', 'support@dostsuite.com', 'string', 'general', 'Support email address'],
     ['agent.monthly_target', '1000000', 'integer', 'general', 'Default monthly disbursement target (naira) for agents without an individual target set'],
+    // Settlement (outbound bank transfer after disbursement)
+    ['settlement.enabled', 'false', 'boolean', 'payment', 'Send disbursed funds to the customer bank account via a payment provider'],
+    ['settlement.provider', 'paystack', 'string', 'payment', 'Default settlement provider: paystack or flutterwave'],
+    ['settlement.mode', 'immediate', 'string', 'payment', 'Settlement trigger: immediate (send right after disbursement) or maker_checker (queue for approval)'],
 ];
 
 $settingsCount = 0;

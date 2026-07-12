@@ -39,6 +39,12 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
                 <span>Payoff</span>
               </button>
             }
+            @if (canSettle()) {
+              <button class="cx-btn cx-btn-secondary" (click)="settle()" [disabled]="settling()">
+                <lucide-icon name="send" [size]="14"></lucide-icon>
+                <span>{{ settlement()?.status === 'failed' || settlement()?.status === 'reversed' ? 'Retry Settlement' : 'Settle Now' }}</span>
+              </button>
+            }
             @if (isCancellable() && auth.hasPermission('loans.edit')) {
               <button class="cx-btn cx-btn-danger" (click)="openCancel()">
                 <lucide-icon name="x-circle" [size]="14"></lucide-icon>
@@ -136,6 +142,29 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
                   }
                 </tbody>
               </table>
+            </div>
+          }
+
+          @if (settlement(); as s) {
+            <div class="cx-card cx-loan-fees-card">
+              <div class="cx-loan-card-header">
+                <h3 class="cx-loan-card-title">Settlement</h3>
+                <span class="cx-settle-badge" [attr.data-status]="s.status">{{ s.status | titlecase }}</span>
+              </div>
+              <div class="cx-settle-grid">
+                <div><span class="cx-settle-label">Provider</span><span class="cx-settle-value">{{ s.provider | titlecase }}</span></div>
+                <div><span class="cx-settle-label">Amount</span><span class="cx-settle-value tabular-nums">{{ s.amount | money:2 }}</span></div>
+                <div><span class="cx-settle-label">Account</span><span class="cx-settle-value">{{ s.account_number }}{{ s.account_name ? ' · ' + s.account_name : '' }}</span></div>
+                @if (s.settled_at) {
+                  <div><span class="cx-settle-label">Settled</span><span class="cx-settle-value">{{ s.settled_at }}</span></div>
+                }
+                @if (s.initiated_by) {
+                  <div><span class="cx-settle-label">Initiated by</span><span class="cx-settle-value">{{ s.initiated_by }}</span></div>
+                }
+              </div>
+              @if (s.failure_reason && (s.status === 'failed' || s.status === 'reversed')) {
+                <div class="cx-settle-error">{{ s.failure_reason }}</div>
+              }
             </div>
           }
         }
@@ -593,6 +622,20 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           </div>
         </div>
 
+        <!-- Settlement provider (outbound transfer to the customer's bank) -->
+        <div class="cx-dis-section">
+          <label class="cx-label">Settlement Provider</label>
+          <select class="cx-input" [(ngModel)]="disburseProvider">
+            <option value="">Auto (system default)</option>
+            <option value="paystack">Paystack</option>
+            <option value="flutterwave">Flutterwave</option>
+          </select>
+          <div class="cx-dis-hint cx-dis-hint-muted">
+            <lucide-icon name="info" [size]="14"></lucide-icon>
+            <span>If settlement is enabled, funds are sent to the customer via this provider. Auto uses the configured default.</span>
+          </div>
+        </div>
+
         <!-- Effective date -->
         <div class="cx-dis-section">
           <label class="cx-label">Effective Date</label>
@@ -733,6 +776,18 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
     }
 
     .cx-loan-fees-card { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+    .cx-settle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 20px; }
+    .cx-settle-grid > div { display: flex; flex-direction: column; gap: 2px; }
+    .cx-settle-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--cx-text-muted); font-weight: 600; }
+    .cx-settle-value { font-size: 14px; color: var(--cx-text); }
+    .cx-settle-badge {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+      padding: 3px 10px; border-radius: 999px; background: var(--cx-stone-100, #f1f0ee); color: var(--cx-text-secondary);
+    }
+    .cx-settle-badge[data-status="success"] { background: var(--cx-success)/10; color: var(--cx-success); background: color-mix(in srgb, var(--cx-success) 12%, transparent); }
+    .cx-settle-badge[data-status="processing"], .cx-settle-badge[data-status="pending"] { background: color-mix(in srgb, var(--cx-warning) 14%, transparent); color: var(--cx-warning); }
+    .cx-settle-badge[data-status="failed"], .cx-settle-badge[data-status="reversed"] { background: color-mix(in srgb, var(--cx-danger) 12%, transparent); color: var(--cx-danger); }
+    .cx-settle-error { font-size: 13px; color: var(--cx-danger); padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--cx-danger) 8%, transparent); }
     .cx-loan-fees-table { width: 100%; border-collapse: collapse; }
     .cx-loan-fees-table thead th {
       font-size: var(--cx-text-xs); font-weight: 600;
@@ -1245,6 +1300,7 @@ export class LoanDetailComponent implements OnInit {
   disburseSettlementGlId = '';
   disburseTopUpBalance = '';  // editable; bound to the override input
   disburseEffectiveDate = '';  // defaults to today when dialog opens
+  disburseProvider = '';  // '' = system default, else 'paystack' | 'flutterwave'
 
   // Payoff modal state
   showPayoff = signal(false);
@@ -1304,7 +1360,47 @@ export class LoanDetailComponent implements OnInit {
     });
   }
 
+  // ── Settlement (outbound bank transfer) ──
+  settlement = signal<any | null>(null);
+  settling = signal(false);
+
+  private loadSettlement(): void {
+    const status = this.loan()?.status;
+    // Only disbursed-or-later loans can have a settlement.
+    if (!['disbursed', 'active', 'overdue', 'closed'].includes(status)) {
+      this.settlement.set(null);
+      return;
+    }
+    this.api.get(`/loans/${this.id}/settlement`).subscribe({
+      next: r => this.settlement.set(r.data ?? null),
+      error: () => this.settlement.set(null),
+    });
+  }
+
+  /** Whether a settle/retry action should be offered. */
+  canSettle(): boolean {
+    if (!this.auth.hasPermission('loans.disburse')) return false;
+    if (!['disbursed', 'active', 'overdue'].includes(this.loan()?.status)) return false;
+    const s = this.settlement();
+    // Offer when never settled, or the last attempt failed/reversed.
+    return !s || ['failed', 'reversed'].includes(s.status);
+  }
+
+  settle(): void {
+    if (this.settling()) return;
+    this.settling.set(true);
+    this.api.post(`/loans/${this.id}/settle`, {}).subscribe({
+      next: r => {
+        this.settling.set(false);
+        this.toast.success(r.message || 'Settlement initiated');
+        this.loadSettlement();
+      },
+      error: e => { this.settling.set(false); this.toast.error(e.error?.message || 'Settlement failed'); },
+    });
+  }
+
   loadRelated(): void {
+    this.loadSettlement();
     // Repayment schedule
     this.scheduleLoading.set(true);
     this.api.get(`/loans/${this.id}/repayment-schedule`).subscribe({
@@ -1538,6 +1634,7 @@ export class LoanDetailComponent implements OnInit {
       settlement_gl_id: this.disburseSettlementGlId,
       effective_date: this.disburseEffectiveDate,
       top_up_balance: this.disburseTopUpBalance || '0',
+      settlement_provider: this.disburseProvider || undefined,
       notes: this.disburseNotes,
     }).subscribe({
       next: r => {

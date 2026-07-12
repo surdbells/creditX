@@ -4,7 +4,7 @@ namespace App\Action\Payment;
 
 use App\Domain\Enum\{PaymentChannel, PaymentStatus};
 use App\Domain\Repository\{LoanRepository, PaymentRepository};
-use App\Infrastructure\Service\{ApiResponse, RepaymentService};
+use App\Infrastructure\Service\{ApiResponse, RepaymentService, SettlementService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class PaystackWebhookAction
@@ -14,6 +14,7 @@ final class PaystackWebhookAction
         private readonly PaymentRepository $paymentRepo,
         private readonly LoanRepository $loanRepo,
         private readonly RepaymentService $repaymentService,
+        private readonly SettlementService $settlementService,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -31,7 +32,20 @@ final class PaystackWebhookAction
         }
 
         $payload = json_decode($body, true);
-        if (!$payload || ($payload['event'] ?? '') !== 'charge.success') {
+        if (!is_array($payload)) {
+            return $this->success(null, 'Ignored');
+        }
+
+        // Paystack sends charge AND transfer events to the same webhook URL.
+        // Transfer (settlement) events are verified and reconciled by
+        // SettlementService independently of the charge flow above.
+        $event = (string) ($payload['event'] ?? '');
+        if (str_starts_with($event, 'transfer.')) {
+            $this->settlementService->handleWebhook('paystack', $body, $request->getHeaders(), $payload);
+            return $this->success(null, 'Transfer event processed');
+        }
+
+        if ($event !== 'charge.success') {
             return $this->success(null, 'Ignored');
         }
 

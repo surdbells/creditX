@@ -41,6 +41,7 @@ final class MakerCheckerExecutionService
         private readonly LoanRepository $loanRepo,
         private readonly EntityManagerInterface $em,
         private readonly ManualJournalService $manualJournalService,
+        private readonly SettlementService $settlementService,
     ) {}
 
     /**
@@ -58,6 +59,7 @@ final class MakerCheckerExecutionService
 
         return match ($opType) {
             'disbursement' => $this->executeDisbursement($payload, $checker),
+            'settlement'   => $this->executeSettlement($payload, $checker),
             'reversal'     => $this->executeReversal($payload, $checker),
             'write_off'    => $this->executeWriteOff($payload, $checker),
             'gl_entry'     => $this->executeManualJournal($payload, $checker),
@@ -137,13 +139,52 @@ final class MakerCheckerExecutionService
         // DisbursementService already guards loan.status === APPROVED
         // and opens its own transaction — safe to call here directly.
         // The checker becomes the attributed user for GL audit trails.
-        return $this->disbursementService->disburse(
+        $result = $this->disbursementService->disburse(
             $loan,
             $settlementGlId,
             $effectiveDate,
             $checker->getId(),
             $topUp === null || $topUp === '' ? null : (string) $topUp,
         );
+
+        // Hand off to settlement (outbound transfer) per configured mode.
+        // Never throws — a settlement hiccup must not fail the disbursement.
+        $settlement = $this->settlementService->handlePostDisbursement(
+            $loan,
+            $checker,
+            isset($payload['settlement_provider']) && $payload['settlement_provider'] !== '' ? (string) $payload['settlement_provider'] : null,
+        );
+        if ($settlement !== null) {
+            $result['settlement'] = $settlement;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Execute a pending settlement (outbound bank transfer) once the checker
+     * approves. Re-loads the loan at execution time; SettlementService
+     * re-validates that it is disbursed and not already settled, so a stale
+     * approval fails cleanly rather than double-paying.
+     *
+     * Expected payload keys (matches DisburseLoanAction's settlement capture):
+     *   - loan_id
+     *   - provider (optional — falls back to settlement.provider setting)
+     *
+     * @throws DomainException
+     */
+    private function executeSettlement(array $payload, User $checker): array
+    {
+        $loanId = $payload['loan_id'] ?? '';
+        if ($loanId === '') {
+            throw new DomainException('Maker-checker payload missing loan_id');
+        }
+        $loan = $this->loanRepo->find($loanId);
+        if ($loan === null) {
+            throw new DomainException('Loan not found (may have been deleted)');
+        }
+        $provider = isset($payload['provider']) && $payload['provider'] !== '' ? (string) $payload['provider'] : null;
+        return $this->settlementService->initiate($loan, $checker, $provider)->toArray();
     }
 
     /**

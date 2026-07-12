@@ -99,6 +99,10 @@ class Customer
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $bankName = null;
 
+    /** Numeric bank code (e.g. Paystack/NIP code) — required for settlements. */
+    #[ORM\Column(name: 'bank_code', type: 'string', length: 20, nullable: true)]
+    private ?string $bankCode = null;
+
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private ?string $accountNumber = null;
 
@@ -263,6 +267,7 @@ class Customer
     public function getInsiderRelationship(): ?string { return $this->insiderRelationship; }
     public function getNumberOfChildren(): ?int { return $this->numberOfChildren; }
     public function getBankName(): ?string { return $this->bankName; }
+    public function getBankCode(): ?string { return $this->bankCode; }
     public function getAccountNumber(): ?string { return $this->accountNumber; }
     public function getAltBankName(): ?string { return $this->altBankName; }
     public function getAltAccountNumber(): ?string { return $this->altAccountNumber; }
@@ -314,6 +319,7 @@ class Customer
     public function setInsiderRelationship(?string $v): void { $this->insiderRelationship = $v; }
     public function setNumberOfChildren(?int $v): void { $this->numberOfChildren = $v; }
     public function setBankName(?string $v): void { $this->bankName = $v; }
+    public function setBankCode(?string $v): void { $this->bankCode = $v; }
     public function setAccountNumber(?string $v): void { $this->accountNumber = $v; }
     public function setAltBankName(?string $v): void { $this->altBankName = $v; }
     public function setAltAccountNumber(?string $v): void { $this->altAccountNumber = $v; }
@@ -481,6 +487,7 @@ class Customer
         if (isset($data['insider_relationship'])) $this->setInsiderRelationship($data['insider_relationship']);
         if (isset($data['number_of_children'])) $this->setNumberOfChildren((int) $data['number_of_children']);
         if (isset($data['bank_name'])) $this->setBankName($data['bank_name']);
+        if (isset($data['bank_code'])) $this->setBankCode($data['bank_code']);
         if (isset($data['account_number'])) $this->setAccountNumber($data['account_number']);
         if (isset($data['alt_bank_name'])) $this->setAltBankName($data['alt_bank_name']);
         if (isset($data['alt_account_number'])) $this->setAltAccountNumber($data['alt_account_number']);
@@ -543,6 +550,7 @@ class Customer
             'insider_relationship' => $this->insiderRelationship,
             'number_of_children' => $this->numberOfChildren,
             'bank_name'          => $this->bankName,
+            'bank_code'          => $this->bankCode,
             'account_number'     => $this->accountNumber,
             'alt_bank_name'      => $this->altBankName,
             'alt_account_number' => $this->altAccountNumber,

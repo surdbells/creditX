@@ -481,6 +481,35 @@ return [
             $c->get(LoanRepository::class),
             $c->get(EntityManagerInterface::class),
             $c->get(\App\Infrastructure\Service\ManualJournalService::class),
+            $c->get(\App\Infrastructure\Service\SettlementService::class),
+        );
+    },
+
+    // ─── Settlement (outbound bank transfers via Paystack/Flutterwave) ───
+    \App\Domain\Repository\SettlementRepository::class => function (ContainerInterface $c): \App\Domain\Repository\SettlementRepository {
+        return new \App\Domain\Repository\SettlementRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Infrastructure\Service\Payment\PaystackTransferProvider::class => function (ContainerInterface $c): \App\Infrastructure\Service\Payment\PaystackTransferProvider {
+        return new \App\Infrastructure\Service\Payment\PaystackTransferProvider($c->get(\Psr\Log\LoggerInterface::class));
+    },
+    \App\Infrastructure\Service\Payment\FlutterwaveTransferProvider::class => function (ContainerInterface $c): \App\Infrastructure\Service\Payment\FlutterwaveTransferProvider {
+        return new \App\Infrastructure\Service\Payment\FlutterwaveTransferProvider($c->get(\Psr\Log\LoggerInterface::class));
+    },
+    \App\Infrastructure\Service\Payment\TransferProviderFactory::class => function (ContainerInterface $c): \App\Infrastructure\Service\Payment\TransferProviderFactory {
+        return new \App\Infrastructure\Service\Payment\TransferProviderFactory(
+            $c->get(\App\Infrastructure\Service\Payment\PaystackTransferProvider::class),
+            $c->get(\App\Infrastructure\Service\Payment\FlutterwaveTransferProvider::class),
+            $c->get(SettingsCacheService::class),
+        );
+    },
+    \App\Infrastructure\Service\SettlementService::class => function (ContainerInterface $c): \App\Infrastructure\Service\SettlementService {
+        return new \App\Infrastructure\Service\SettlementService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(\App\Domain\Repository\SettlementRepository::class),
+            $c->get(\App\Infrastructure\Service\Payment\TransferProviderFactory::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(NotificationDispatchService::class),
+            $c->get(\Psr\Log\LoggerInterface::class),
         );
     },
 ];

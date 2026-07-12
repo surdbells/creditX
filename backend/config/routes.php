@@ -25,6 +25,7 @@ use App\Action\Deposit;
 use App\Action\Disbursement;
 use App\Action\MakerChecker;
 use App\Action\Payment;
+use App\Action\Settlement;
 use App\Action\Penalty;
 use App\Action\Notification;
 use App\Action\Messaging;
@@ -69,6 +70,8 @@ return function (App $app): void {
 
     // ─── Paystack Webhook (public, signature-verified) ───
     $app->post('/api/payments/webhook/paystack', Payment\PaystackWebhookAction::class);
+    // Flutterwave webhook (settlement transfer events), verified by verif-hash.
+    $app->post('/api/payments/webhook/flutterwave', Payment\FlutterwaveWebhookAction::class);
 
     // ─── Public Storage (avatars, uploads) ───
     // Two paths serve the same action:
@@ -589,6 +592,17 @@ return function (App $app): void {
         // Same payload as batch, but commits nothing — returns per-loan
         // validation summary so operators can review before submitting.
         $api->post('/disbursement/batch/preview', Disbursement\BatchDisbursePreviewAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
+
+        // ─── Settlement (outbound bank transfer via Paystack/Flutterwave) ───
+        // Manually trigger / retry the payout for a disbursed loan.
+        $api->post('/loans/{id}/settle', Settlement\SettleLoanAction::class)
+            ->add(new RbacMiddleware('loans.disburse'));
+        // Latest settlement status for a loan (shown on the loan detail).
+        $api->get('/loans/{id}/settlement', Settlement\GetLoanSettlementAction::class)
+            ->add(new RbacMiddleware('loans.view'));
+        // Settlement queue.
+        $api->get('/settlements', Settlement\ListSettlementsAction::class)
             ->add(new RbacMiddleware('loans.disburse'));
 
         // ─── Maker-Checker ───
