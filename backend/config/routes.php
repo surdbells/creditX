@@ -849,6 +849,13 @@ return function (App $app): void {
     // AuthMiddleware. The /auth/* endpoints are public (registration/login);
     // everything else requires a valid customer token.
     $app->group('/api/portal', function (RouteCollectorProxy $portal) use ($app) {
+        // Public loan calculator — no auth. Lets prospective customers
+        // estimate repayments before registering. Reuses the same active
+        // product list and calculation service the authenticated flow uses,
+        // so figures match. Neither action reads the customer identity.
+        $portal->get('/calculator/products', Portal\ListProductsAction::class);
+        $portal->post('/calculator/calculate', LoanProduct\CalculateAction::class);
+
         // Public auth endpoints
         $portal->post('/auth/register', Portal\RegisterAction::class);
         $portal->post('/auth/verify-email', Portal\VerifyEmailAction::class);

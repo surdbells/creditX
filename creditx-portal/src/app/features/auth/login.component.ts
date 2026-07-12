@@ -90,6 +90,10 @@ type Mode = 'password' | 'otp';
         New to CreditX?
         <a routerLink="/auth/register" class="font-semibold" style="color: var(--cx-primary-600)">Create an account</a>
       </p>
+      <p class="text-center text-sm mt-2" style="color: var(--cx-text-secondary)">
+        Just exploring?
+        <a routerLink="/calculator" class="font-semibold" style="color: var(--cx-primary-600)">Try the loan calculator</a>
+      </p>
     </app-auth-shell>
   `,
 })

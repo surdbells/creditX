@@ -3,6 +3,12 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
+    // Public loan calculator — no auth guard so prospective customers can
+    // estimate repayments before registering or signing in.
+    path: 'calculator',
+    loadComponent: () => import('./features/calculator/loan-calculator.component').then(m => m.LoanCalculatorComponent),
+  },
+  {
     path: 'auth',
     canActivate: [guestGuard],
     children: [

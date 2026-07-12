@@ -19,6 +19,16 @@ export class PortalService {
     return this.api.get<LoanProduct[]>('/portal/products');
   }
 
+  /** Public (pre-auth) calculator — active products, no customer token needed. */
+  calculatorProducts(): Observable<ApiResponse<LoanProduct[]>> {
+    return this.api.get<LoanProduct[]>('/portal/calculator/products');
+  }
+
+  /** Public (pre-auth) repayment estimate for a product/amount/tenure. */
+  calculate(payload: { product_id: string; amount: number | string; tenure: number }): Observable<ApiResponse<any>> {
+    return this.api.post<any>('/portal/calculator/calculate', payload);
+  }
+
   applyLoan(payload: ApplyLoanRequest): Observable<ApiResponse<Loan>> {
     return this.api.post<Loan>('/portal/loans', payload);
   }
