@@ -319,7 +319,16 @@ class Customer
     public function setInsiderRelationship(?string $v): void { $this->insiderRelationship = $v; }
     public function setNumberOfChildren(?int $v): void { $this->numberOfChildren = $v; }
     public function setBankName(?string $v): void { $this->bankName = $v; }
-    public function setBankCode(?string $v): void { $this->bankCode = $v; }
+    /**
+     * Accepts int as well as string: bank codes are numeric-looking, so a JSON
+     * payload can legitimately carry `40195` as a number (older agent builds do
+     * — the /banks list used to emit int codes). Coerce rather than 500.
+     * Mirrors GovernmentRecord::setNetPay/setGrossPay.
+     */
+    public function setBankCode(int|string|null $v): void
+    {
+        $this->bankCode = $v === null || $v === '' ? null : trim((string) $v);
+    }
     public function setAccountNumber(?string $v): void { $this->accountNumber = $v; }
     public function setAltBankName(?string $v): void { $this->altBankName = $v; }
     public function setAltAccountNumber(?string $v): void { $this->altAccountNumber = $v; }

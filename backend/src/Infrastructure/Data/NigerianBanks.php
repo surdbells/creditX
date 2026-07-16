@@ -280,6 +280,19 @@ final class NigerianBanks
         return self::$banks[trim($code)] ?? null;
     }
 
+    /**
+     * @return array<int|string, string> code => name
+     *
+     * WARNING — keys are MIXED int/string and cannot be made otherwise. PHP
+     * converts canonical numeric array keys to int, so '40195' is held as int
+     * 40195, while '011' stays a string (a leading zero is not a canonical
+     * int). Casting on the way in does not help: the cast key is re-converted
+     * on assignment.
+     *
+     * Callers MUST cast the key to string before using it as a bank code —
+     * letting an int escape into the API is what broke Customer::setBankCode.
+     * Prefer forSelect(), which does the cast for you.
+     */
     public static function all(): array
     {
         return self::$banks;
@@ -287,12 +300,16 @@ final class NigerianBanks
 
     /**
      * Returns sorted list for dropdowns: [['code' => '011', 'name' => 'First Bank'], ...]
+     *
+     * `code` is always a string — see all() for why the cast is required.
+     * Clients persist this value as the customer's bank_code, so emitting a
+     * JSON number here made them send a number back.
      */
     public static function forSelect(): array
     {
         $result = [];
         foreach (self::$banks as $code => $name) {
-            $result[] = ['code' => $code, 'name' => $name];
+            $result[] = ['code' => (string) $code, 'name' => $name];
         }
         usort($result, fn($a, $b) => strcmp($a['name'], $b['name']));
         return $result;
