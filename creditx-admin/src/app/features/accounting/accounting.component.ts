@@ -56,7 +56,25 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
 
         <div class="cx-acc-table-wrap">
           @if (coaLoading()) {
-            <div class="cx-acc-state"><cx-loading message="Loading chart of accounts..."></cx-loading></div>
+            <div class="cx-coa-tree cx-coa-skeleton" aria-busy="true" aria-label="Loading chart of accounts">
+              @for (cat of [1,2,3]; track cat) {
+                <div class="cx-coa-sk-cat">
+                  <span class="cx-sk cx-sk-chev"></span>
+                  <span class="cx-sk cx-sk-icon"></span>
+                  <span class="cx-sk cx-sk-catlabel"></span>
+                  <span class="cx-sk cx-sk-count"></span>
+                  <span class="cx-sk cx-sk-catbal"></span>
+                </div>
+                @for (r of [1,2,3]; track r) {
+                  <div class="cx-coa-sk-node">
+                    <span class="cx-sk cx-sk-dot"></span>
+                    <span class="cx-sk cx-sk-code"></span>
+                    <span class="cx-sk cx-sk-name"></span>
+                    <span class="cx-sk cx-sk-bal"></span>
+                  </div>
+                }
+              }
+            </div>
           } @else if (coaRows().length === 0) {
             <div class="cx-acc-state"><cx-empty-state title="No GL accounts" description="Start by adding your first general ledger account." icon="landmark"></cx-empty-state></div>
           } @else {
@@ -341,6 +359,30 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
 
     /* ═══ Chart of Accounts — collapsible hierarchical tree ═══ */
     .cx-coa-toolbar-actions { display: flex; gap: 6px; margin-left: auto; }
+
+    /* Loading skeleton — mirrors the tree shape (categories + nested rows). */
+    .cx-coa-skeleton { overflow: hidden; }
+    .cx-coa-sk-cat { display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+      background: var(--cx-surface-2, var(--cx-stone-50)); border-top: 1px solid var(--cx-border); }
+    .cx-coa-sk-cat:first-child { border-top: none; }
+    .cx-coa-sk-node { display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 38px;
+      border-top: 1px solid var(--cx-border-subtle, var(--cx-border)); }
+    .cx-sk { display: inline-block; height: 12px; border-radius: 6px;
+      background: linear-gradient(90deg, var(--cx-stone-100, #eee) 25%, var(--cx-stone-200, #e2e2e2) 37%, var(--cx-stone-100, #eee) 63%);
+      background-size: 400% 100%; animation: cx-sk-shimmer 1.4s ease infinite; }
+    .cx-sk-chev { width: 14px; height: 14px; border-radius: 4px; }
+    .cx-sk-icon { width: 16px; height: 16px; border-radius: 4px; }
+    .cx-sk-catlabel { width: 120px; height: 14px; }
+    .cx-sk-count { width: 26px; height: 14px; border-radius: 999px; }
+    .cx-sk-catbal { width: 90px; height: 14px; margin-left: auto; }
+    .cx-sk-dot { width: 5px; height: 5px; border-radius: 50%; margin: 0 7px; }
+    .cx-sk-code { width: 54px; }
+    .cx-sk-name { width: 40%; max-width: 260px; }
+    .cx-sk-bal { width: 96px; margin-left: auto; }
+    @keyframes cx-sk-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+    @media (prefers-color-scheme: dark) {
+      .cx-sk { background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%); background-size: 400% 100%; }
+    }
     .cx-coa-tree {
       border: 1px solid var(--cx-border);
       border-radius: var(--cx-radius-lg, 12px);
