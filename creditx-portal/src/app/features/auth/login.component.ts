@@ -125,6 +125,16 @@ export class LoginComponent {
     this.auth.login({ email: this.email, password: this.password }).subscribe({
       next: res => {
         this.loading.set(false);
+        // 2FA enforced for the portal — the password was correct but no tokens
+        // were issued. Drop into the same OTP verify step the passwordless
+        // flow uses; the emailed code completes the login.
+        if ((res.data as any)?.requires_2fa) {
+          this.mode.set('otp');
+          this.otpStep.set('verify');
+          this.code = '';
+          this.toast.info(res.message || 'Enter the verification code sent to your email.');
+          return;
+        }
         if (res.status === 'success') {
           this.router.navigate(['/dashboard']);
         } else {

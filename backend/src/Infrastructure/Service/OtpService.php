@@ -77,9 +77,35 @@ final class OtpService
         return true;
     }
 
-    public function isEnforced(): bool
+    /**
+     * Is email-OTP 2FA enforced for the given app?
+     *
+     * Enforcement is configured per app so operations can require it for, say,
+     * the admin panel without forcing it on field agents:
+     *   - admin  → 2fa.admin_enabled
+     *   - agent  → 2fa.agent_enabled
+     *   - portal → 2fa.portal_enabled
+     *
+     * The per-app setting wins. If it has never been configured we fall back to
+     * the legacy global `2fa.enabled` so existing deployments keep their
+     * current behaviour until the new keys are seeded.
+     *
+     * NB: callers must derive $app from trusted server-side state (e.g. the
+     * user's is_agent flag), never from a client-supplied value — otherwise a
+     * client could claim the app whose policy is laxest and skip 2FA.
+     */
+    public function isEnforced(string $app = 'admin'): bool
     {
-        return $this->settings->getBool('2fa.enabled', false);
+        $key = match ($app) {
+            'agent'  => '2fa.agent_enabled',
+            'portal' => '2fa.portal_enabled',
+            default  => '2fa.admin_enabled',
+        };
+
+        if ($this->settings->get($key) === null) {
+            return $this->settings->getBool('2fa.enabled', false);
+        }
+        return $this->settings->getBool($key, false);
     }
 
     private function sendOtpEmail(User $user, string $code, int $ttlMinutes): void

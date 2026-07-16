@@ -39,8 +39,13 @@ final class LoginAction
             return $this->error('Your account is ' . $user->getStatus()->value . '. Contact administrator.', 403);
         }
 
-        // Check if 2FA is enforced
-        if ($this->otpService->isEnforced()) {
+        // 2FA enforcement is configured per app. Admin and agent share this
+        // endpoint, so derive the app from the user's is_agent flag — trusted
+        // server-side state, unlike a client-supplied app name which could be
+        // forged to pick whichever policy is laxest.
+        $app = $user->isAgent() ? 'agent' : 'admin';
+
+        if ($this->otpService->isEnforced($app)) {
             // Generate and send OTP
             $this->otpService->generateAndSend($user, 'login');
 

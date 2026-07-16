@@ -6,13 +6,18 @@ namespace App\Action\Portal;
 
 use App\Domain\Enum\CustomerPortalStatus;
 use App\Domain\Repository\CustomerRepository;
-use App\Infrastructure\Service\{ApiResponse, InputValidator, JwtService, PasswordService};
+use App\Infrastructure\Service\{ApiResponse, CustomerOtpService, InputValidator, JwtService, OtpService, PasswordService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 /**
  * Password login for the customer portal. Passwordless email-OTP login is
  * handled separately (RequestOtp + VerifyOtpLogin); this is the classic
  * email + password path.
+ *
+ * When 2FA is enforced for the portal (2fa.portal_enabled) a correct password
+ * does NOT issue tokens — it emails a code and returns requires_2fa. The client
+ * then completes login through the existing /portal/auth/verify-otp endpoint,
+ * which is the same verification the passwordless flow uses.
  */
 final class LoginAction
 {
@@ -22,6 +27,10 @@ final class LoginAction
     public function __construct(
         private readonly CustomerRepository $customerRepo,
         private readonly JwtService $jwtService,
+        private readonly CustomerOtpService $customerOtp,
+        // Injected for its per-app 2FA policy only (isEnforced); the staff OTP
+        // send/verify methods are not used here.
+        private readonly OtpService $otpPolicy,
     ) {
     }
 
@@ -62,6 +71,17 @@ final class LoginAction
 
         if ($customer->getPortalStatus() === CustomerPortalStatus::SUSPENDED || !$customer->isPortalEnabled()) {
             return $this->error('Your account access has been suspended. Please contact support.', 403);
+        }
+
+        // 2FA — password verified, but the portal requires a second factor.
+        // Issue no tokens; the client finishes at /portal/auth/verify-otp.
+        if ($this->otpPolicy->isEnforced('portal')) {
+            $this->customerOtp->generateAndSend($customer->getEmail(), $customer->getFullName(), 'login');
+
+            return $this->success([
+                'requires_2fa' => true,
+                'email'        => $customer->getEmail(),
+            ], 'Verification code sent to your email.');
         }
 
         $customer->recordPortalLogin($this->clientIp($request));

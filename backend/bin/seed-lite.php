@@ -118,6 +118,11 @@ $settingsDef = [
     ['security.maker_checker_write_off', 'true', 'boolean', 'security', 'Require maker-checker for write-off'],
     ['security.maker_checker_reversal', 'true', 'boolean', 'security', 'Require maker-checker for journal reversals'],
     ['security.password_min_length', '8', 'integer', 'security', 'Minimum password length'],
+    // Two-factor auth (email OTP) — enforced per app, independently.
+    ['2fa.admin_enabled', 'false', 'boolean', 'security', 'Require email OTP at login for admin/back-office users'],
+    ['2fa.agent_enabled', 'false', 'boolean', 'security', 'Require email OTP at login for field agents (DSAs)'],
+    ['2fa.portal_enabled', 'false', 'boolean', 'security', 'Require email OTP at login for customer portal accounts'],
+    ['2fa.otp_ttl_minutes', '10', 'integer', 'security', 'How long an emailed OTP code stays valid (minutes)'],
     ['notification.email_enabled', 'true', 'boolean', 'notification', 'Enable email notifications'],
     ['notification.sms_enabled', 'true', 'boolean', 'notification', 'Enable SMS notifications'],
     ['notification.whatsapp_enabled', 'false', 'boolean', 'notification', 'Enable WhatsApp notifications'],
