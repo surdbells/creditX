@@ -89,7 +89,10 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
                 $qb->expr()->like('LOWER(c.staffId)', ':search'),
                 $qb->expr()->like('LOWER(b.name)', ':search'),
-                $qb->expr()->like('LOWER(ag.fullName)', ':search'),
+                // DSA / agent name. User has no fullName field (it's a computed
+                // PHP getter) — only firstName + lastName are mapped, so build
+                // the searchable name in DQL. Matches "john", "doe" or "john doe".
+                $qb->expr()->like("LOWER(CONCAT(ag.firstName, ' ', ag.lastName))", ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
@@ -170,7 +173,10 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->expr()->like('LOWER(c.staffId)', ':search'),
                 $qb->expr()->like('LOWER(b.name)', ':search'),
                 // DSA / agent name — lets reviewers find a loan by who captured it.
-                $qb->expr()->like('LOWER(ag.fullName)', ':search'),
+                // DSA / agent name. User has no fullName field (it's a computed
+                // PHP getter) — only firstName + lastName are mapped, so build
+                // the searchable name in DQL. Matches "john", "doe" or "john doe".
+                $qb->expr()->like("LOWER(CONCAT(ag.firstName, ' ', ag.lastName))", ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
