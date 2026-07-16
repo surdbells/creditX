@@ -13,6 +13,10 @@ creditx-agent/package-lock.json
 # machine-specific files, and signing secrets are excluded.
 /android/build/
 /android/app/build/
+# Gradle writes app/release/output-metadata.json (+ the APK) on every
+# assembleRelease. It is build output, not source — tracking it made every
+# build dirty the tree and invited stale version metadata into commits.
+/android/app/release/
 /android/.gradle/
 /android/gradle/wrapper/gradle-wrapper.properties.lock
 /android/captures/
