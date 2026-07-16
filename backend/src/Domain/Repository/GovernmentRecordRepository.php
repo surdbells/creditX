@@ -8,9 +8,23 @@ class GovernmentRecordRepository extends BaseRepository
 {
     protected function getEntityClass(): string { return GovernmentRecord::class; }
 
+    /**
+     * Exact Staff ID lookup, insensitive to case and surrounding whitespace.
+     *
+     * Agents type the prefix inconsistently (pf0044542 / Pf0044542 / PF0044542),
+     * and a plain equality match is case-sensitive, so a correct ID would miss.
+     * This normalizes both sides while staying an EXACT match — 'PF004454'
+     * still does not match 'PF0044542'; it never degrades to a partial search.
+     *
+     * @return GovernmentRecord[]
+     */
     public function findByStaffId(string $staffId): array
     {
-        return $this->findBy(['staffId' => $staffId], ['createdAt' => 'DESC']);
+        return $this->em->createQueryBuilder()->select('g')->from(GovernmentRecord::class, 'g')
+            ->where('UPPER(TRIM(g.staffId)) = :sid')
+            ->setParameter('sid', strtoupper(trim($staffId)))
+            ->orderBy('g.createdAt', 'DESC')
+            ->getQuery()->getResult();
     }
 
     public function findOneByTypeAndStaffId(string $recordTypeId, string $staffId): ?GovernmentRecord

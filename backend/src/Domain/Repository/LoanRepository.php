@@ -72,8 +72,8 @@ class LoanRepository extends BaseRepository
     {
         return $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c')
-            ->where('c.staffId = :sid')->andWhere('l.status = :status')
-            ->setParameter('sid', $staffId)->setParameter('status', LoanStatus::DISBURSED->value)
+            ->where('UPPER(TRIM(c.staffId)) = :sid')->andWhere('l.status = :status')
+            ->setParameter('sid', strtoupper(trim($staffId)))->setParameter('status', LoanStatus::DISBURSED->value)
             ->getQuery()->getResult();
     }
 
@@ -85,8 +85,8 @@ class LoanRepository extends BaseRepository
         $inProgress = [LoanStatus::DRAFT->value, LoanStatus::CAPTURED->value, LoanStatus::SUBMITTED->value, LoanStatus::UNDER_REVIEW->value, LoanStatus::APPROVED->value];
         $qb = $this->em->createQueryBuilder()->select('COUNT(l.id)')->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c')
-            ->where('c.staffId = :sid')->andWhere('l.status IN (:statuses)')
-            ->setParameter('sid', $staffId)->setParameter('statuses', $inProgress);
+            ->where('UPPER(TRIM(c.staffId)) = :sid')->andWhere('l.status IN (:statuses)')
+            ->setParameter('sid', strtoupper(trim($staffId)))->setParameter('statuses', $inProgress);
         if ($excludeLoanId) $qb->andWhere('l.id != :ex')->setParameter('ex', $excludeLoanId);
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }

@@ -8,9 +8,20 @@ class CustomerRepository extends BaseRepository
 {
     protected function getEntityClass(): string { return Customer::class; }
 
+    /**
+     * Exact Staff ID lookup, insensitive to case and surrounding whitespace —
+     * matching GovernmentRecordRepository::findByStaffId. Both must normalise
+     * the same way: this method backs the duplicate-customer guard, so if it
+     * were case-sensitive a 'pf0044542' capture would miss an existing
+     * 'PF0044542' customer and create a duplicate.
+     */
     public function findByStaffId(string $staffId): ?Customer
     {
-        return $this->findOneBy(['staffId' => $staffId]);
+        return $this->em->createQueryBuilder()->select('c')->from(Customer::class, 'c')
+            ->where('UPPER(TRIM(c.staffId)) = :sid')
+            ->setParameter('sid', strtoupper(trim($staffId)))
+            ->setMaxResults(1)
+            ->getQuery()->getOneOrNullResult();
     }
 
     public function findByBvn(string $bvn): ?Customer
@@ -28,10 +39,12 @@ class CustomerRepository extends BaseRepository
         return $this->findOneBy(['email' => strtolower(trim($email))]);
     }
 
+    /** Normalised the same way as findByStaffId so the create-time guard agrees with it. */
     public function staffIdExists(string $staffId, ?string $excludeId = null): bool
     {
         $qb = $this->em->createQueryBuilder()->select('COUNT(c.id)')->from(Customer::class, 'c')
-            ->where('c.staffId = :sid')->setParameter('sid', $staffId);
+            ->where('UPPER(TRIM(c.staffId)) = :sid')
+            ->setParameter('sid', strtoupper(trim($staffId)));
         if ($excludeId) $qb->andWhere('c.id != :ex')->setParameter('ex', $excludeId);
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
