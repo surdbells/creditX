@@ -1914,12 +1914,38 @@ export class LoanCapturePage implements OnInit, OnDestroy {
 
   uploadedDocs: Map<string, {name: string; file?: File; existing?: boolean; documentId?: string}> = new Map();
   uploadError = signal<string|null>(null);
-  docTypes = [
+  /**
+   * Document types offered at capture. Loaded from /document-types?active=true
+   * so admins can add/retire documents and change which are required without an
+   * app release. The list below is only a fallback for when that call fails
+   * (e.g. offline) so the step still renders something usable.
+   *
+   * `required` mirrors the server's document_types.is_required — the server is
+   * the authority (SubmitLoanAction re-checks it); this is display only.
+   */
+  docTypes: { key: string; label: string; accept: string; required?: boolean }[] = [
     { key: 'passport', label: 'Passport Photograph', accept: 'image/*' },
     { key: 'id_card', label: 'ID Card (NIN/Voter/Driver)', accept: 'image/*,.pdf' },
     { key: 'payslip', label: 'Recent Payslip', accept: 'image/*,.pdf' },
     { key: 'bank_statement', label: 'Bank Statement', accept: '.pdf,image/*' },
   ];
+
+  /** Fetch the live document-type config; keep the fallback list on failure. */
+  private loadDocTypes(): void {
+    this.api.get('/document-types', { active: true }).subscribe({
+      next: (r: any) => {
+        const list = (r?.data || [])
+          .map((d: any) => ({
+            key: d.code,
+            label: d.label,
+            accept: d.accept || '*/*',
+            required: !!d.is_required,
+          }));
+        if (list.length) this.docTypes = list;
+      },
+      error: () => { /* keep the fallback list */ },
+    });
+  }
 
   agentBlocked = signal(false);
   banks = signal<{code: string; name: string}[]>([]);
@@ -2150,6 +2176,8 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       next: res => this.banks.set(res.data || []),
       error: () => {},
     });
+
+    this.loadDocTypes();
 
     // Edit-mode hydration. Fetch the loan and populate everything.
     if (this.isEditMode()) {
@@ -2951,15 +2979,29 @@ export class LoanCapturePage implements OnInit, OnDestroy {
         this.submitting.set(false);
         this.toast.success('Loan updated successfully');
 
-        // Upload only the newly-staged docs (ones without the
-        // 'existing' marker). If all 4 are existing, nothing to do.
+        // Upload only the newly-staged docs (ones without the 'existing'
+        // marker). If they're all existing, there's nothing to do.
         if (this.newlyStagedDocCount() > 0) {
-          const customerId = (this.existingCustomer() as any)?.id || '';
+          // Resolve the customer id from the loaded loan as well as the
+          // existingCustomer signal. Previously this read only the signal and,
+          // when it was empty, silently fell through to the navigate below —
+          // the agent saw "Loan updated successfully" while the document never
+          // uploaded, so submit-for-approval kept reporting it missing.
+          const customerId = (this.existingCustomer() as any)?.id
+            || (this.editLoan() as any)?.customer_id
+            || (this.editLoan() as any)?.customer?.id
+            || '';
+
           if (customerId) {
             this.uploadDocuments(this.id, customerId, /* editMode */ true);
             this.pollUploadsComplete(this.id);
             return;
           }
+
+          // Still no customer — fail loudly rather than pretending the
+          // documents were saved.
+          this.toast.error('Loan saved, but the documents could not be uploaded (customer not resolved). Please reopen the loan and try again.');
+          return;
         }
 
         // No new docs to upload — navigate straight back to detail.
