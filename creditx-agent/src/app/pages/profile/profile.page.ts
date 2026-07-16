@@ -102,7 +102,7 @@ import { TenantConfigService } from '../../core/services/tenant-config.service';
           </button>
         </div>
 
-        <p class="cx-profile-version">CreditX Agent v2.0 &bull; DOST HQ LIMITED</p>
+        <p class="cx-profile-version">CreditX Agent {{ tenant.appVersionLabel() }} &bull; DOST HQ LIMITED</p>
       </div>
     </ion-content>
   `,

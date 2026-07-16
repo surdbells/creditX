@@ -87,6 +87,10 @@ export class TenantPage {
       }));
       const data = res?.data || {};
       const min = data['mobile.min_agent_version'];
+      // Make sure the real build version is resolved before comparing —
+      // otherwise this would fall back to the environment constant and gate
+      // on the wrong version.
+      await this.tenant.ensureAppInfo();
       if (this.tenant.isOutdated(this.tenant.appVersion(), min)) {
         this.error.set(`This app is out of date for ${data['general.company_name'] || 'this organization'}. Please update to continue.`);
         this.loading.set(false);

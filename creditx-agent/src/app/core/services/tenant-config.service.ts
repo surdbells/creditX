@@ -1,4 +1,6 @@
 import { Injectable, signal } from '@angular/core';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { environment } from '../../../environments/environment';
 
 /**
@@ -77,9 +79,51 @@ export class TenantConfigService {
     this.tenantName.set(null);
   }
 
-  /** This build's version, for min-version comparison. */
+  /**
+   * Real build identity, read from the installed package via Capacitor's App
+   * plugin — `version` is the APK's versionName, `build` its versionCode.
+   * Resolved once and cached; null until ensureAppInfo() has run.
+   *
+   * Deliberately NOT environment.appVersion: that's a hand-maintained constant
+   * that drifts from the actual build (it still said 1.0.0 while the APK was
+   * 1.7), which silently broke the mobile.min_agent_version gate below.
+   */
+  private readonly appInfo = signal<{ version: string; build: string } | null>(null);
+
+  /**
+   * Load the native build info once. Safe to call repeatedly. On web (dev/PWA)
+   * there is no package to read, so it falls back to the environment constant.
+   */
+  async ensureAppInfo(): Promise<void> {
+    if (this.appInfo() !== null) return;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const info = await App.getInfo();
+        this.appInfo.set({ version: info.version, build: info.build });
+        return;
+      } catch {
+        // Plugin unavailable — fall through to the environment fallback.
+      }
+    }
+    this.appInfo.set({ version: environment.appVersion, build: '' });
+  }
+
+  /** This build's versionName, for min-version comparison. */
   appVersion(): string {
-    return environment.appVersion;
+    return this.appInfo()?.version || environment.appVersion;
+  }
+
+  /** This build's versionCode (empty on web). */
+  appBuild(): string {
+    return this.appInfo()?.build || '';
+  }
+
+  /** Display label, e.g. "v1.7 (2)" — or "v1.7" where there's no build number. */
+  appVersionLabel(): string {
+    const v = this.appVersion();
+    const b = this.appBuild();
+    return b ? `v${v} (${b})` : `v${v}`;
   }
 
   /**
