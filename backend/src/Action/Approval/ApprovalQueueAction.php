@@ -32,6 +32,8 @@ final class ApprovalQueueAction
             $p['sort_dir'],
             $params['role_id'] ?? null,
             $params['step'] ?? null,
+            $params['product_id'] ?? null,
+            $params['agent_id'] ?? null,
         );
 
         return $this->paginated($result['items'], $result['total'], $p['page'], $p['per_page']);

@@ -440,7 +440,7 @@ final class ApprovalEngineService
      *
      * @return array{items: array, total: int}
      */
-    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null, string $sortBy = 'created_at', string $sortDir = 'DESC', ?string $roleId = null, ?string $stepName = null): array
+    public function getQueue(User $user, int $offset, int $limit, ?string $search = null, ?string $filterBranchId = null, string $sortBy = 'created_at', string $sortDir = 'DESC', ?string $roleId = null, ?string $stepName = null, ?string $productId = null, ?string $agentId = null): array
     {
         /*
          * Two visibility modes:
@@ -489,7 +489,7 @@ final class ApprovalEngineService
         }
 
         if ($user->hasPermission('loans.approve')) {
-            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds, $sortBy, $sortDir, $roleId, $stepName);
+            $result = $this->approvalRepo->findAllPendingQueue($offset, $limit, $search, $branchIds, $sortBy, $sortDir, $roleId, $stepName, $productId, $agentId);
             $items = $result['items'];
             $total = $result['total'];
         } else {
@@ -541,6 +541,9 @@ final class ApprovalEngineService
                 'customer_staff_id' => $loanData['customer_staff_id'] ?? null,
                 'branch_name'      => $loanData['branch_name'] ?? null,
                 'product_name'     => $loanData['product_name'] ?? null,
+                'product_id'       => $loanData['product_id'] ?? null,
+                'agent_name'       => $loanData['agent_name'] ?? null,
+                'agent_id'         => $loanData['agent_id'] ?? null,
                 'amount_requested' => $loanData['amount_requested'] ?? null,
                 'loan_status'      => $loanData['status'] ?? null,
                 'loan_type'        => $loanData['loan_type'] ?? null,

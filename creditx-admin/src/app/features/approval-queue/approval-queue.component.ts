@@ -47,6 +47,18 @@ import { SettingsService } from '../../core/services/settings.service';
           @for (l of locations(); track l.id) { <option [value]="l.id">{{ l.name }}</option> }
         </select>
 
+        <label class="cx-aq-toolbar-label">Product</label>
+        <select class="cx-select" [(ngModel)]="productFilter" (change)="onFilterChange()">
+          <option value="">All products</option>
+          @for (p of productOptions(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+        </select>
+
+        <label class="cx-aq-toolbar-label">Agent</label>
+        <select class="cx-select" [(ngModel)]="agentFilter" (change)="onFilterChange()">
+          <option value="">All agents</option>
+          @for (a of agentOptions(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+        </select>
+
         <!-- Step + Role filters — admin/super_admin only. Populated from the
              approval workflows so the options match the live step/role set. -->
         @if (canFilter) {
@@ -1288,6 +1300,7 @@ export class ApprovalQueueComponent implements OnInit {
       { key: 'branch_name', label: 'Branch', sortable: false },
       { key: 'amount_requested', label: 'Amount', type: 'currency', align: 'right', sortable: false },
       { key: 'product_name', label: 'Product', sortable: false },
+      { key: 'agent_name', label: 'Agent', sortable: false },
       { key: 'current_step', label: 'Step', sortable: canSort },
       { key: 'current_step_role', label: 'Role', sortable: canSort },
       { key: 'status', label: 'Status', sortable: false },
@@ -1307,9 +1320,23 @@ export class ApprovalQueueComponent implements OnInit {
   stepFilter = '';
   roleFilter = '';
 
+  // Product + Agent (DSA) filters — available to all queue users.
+  productOptions = signal<{ id: string; name: string }[]>([]);
+  agentOptions = signal<{ id: string; name: string }[]>([]);
+  productFilter = '';
+  agentFilter = '';
+
   ngOnInit() {
     this.load();
     this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.locations.set(r.data || []), error: () => {} });
+    this.api.get('/loan-products', { per_page: 200 }).subscribe({
+      next: r => this.productOptions.set((r.data || []).map((p: any) => ({ id: p.id, name: p.name }))),
+      error: () => {},
+    });
+    this.api.get('/users', { per_page: 500, is_agent: true }).subscribe({
+      next: r => this.agentOptions.set((r.data || []).map((u: any) => ({ id: u.id, name: u.full_name || u.name }))),
+      error: () => {},
+    });
 
     this.canFilter = this.auth.hasAnyRole(['admin', 'super_admin']);
     if (this.canFilter) this.loadStepRoleOptions();
@@ -1357,6 +1384,8 @@ export class ApprovalQueueComponent implements OnInit {
       location_id: this.locationFilter || undefined,
       step: this.stepFilter || undefined,
       role_id: this.roleFilter || undefined,
+      product_id: this.productFilter || undefined,
+      agent_id: this.agentFilter || undefined,
     }).subscribe({
       next: r => {
         this.rows.set(r.data || []);

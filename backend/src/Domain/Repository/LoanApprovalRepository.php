@@ -69,6 +69,7 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
             ->leftJoin('l.branch', 'b')
+            ->leftJoin('l.agent', 'ag')
             ->where('s.role = :roleId')->andWhere('a.status = :status')
             // See findAllPendingQueue for the rationale — only active
             // pending steps should surface in the queue. Role-scoped
@@ -88,6 +89,7 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
                 $qb->expr()->like('LOWER(c.staffId)', ':search'),
                 $qb->expr()->like('LOWER(b.name)', ':search'),
+                $qb->expr()->like('LOWER(ag.fullName)', ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
@@ -128,7 +130,9 @@ class LoanApprovalRepository extends BaseRepository
         string $sortBy = 'created_at',
         string $sortDir = 'DESC',
         ?string $roleId = null,
-        ?string $stepName = null
+        ?string $stepName = null,
+        ?string $productId = null,
+        ?string $agentId = null
     ): array {
         $qb = $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
             ->innerJoin('a.step', 's')
@@ -136,6 +140,8 @@ class LoanApprovalRepository extends BaseRepository
             ->innerJoin('a.loan', 'l')
             ->innerJoin('l.customer', 'c')
             ->leftJoin('l.branch', 'b')
+            ->leftJoin('l.product', 'p')
+            ->leftJoin('l.agent', 'ag')
             ->where('a.status = :status')
             // Only include 'active' pending approvals — ones where the SLA
             // clock has started. For sequential workflows this is the
@@ -163,6 +169,8 @@ class LoanApprovalRepository extends BaseRepository
                 $qb->expr()->like('LOWER(c.fullName)', ':search'),
                 $qb->expr()->like('LOWER(c.staffId)', ':search'),
                 $qb->expr()->like('LOWER(b.name)', ':search'),
+                // DSA / agent name — lets reviewers find a loan by who captured it.
+                $qb->expr()->like('LOWER(ag.fullName)', ':search'),
             ))->setParameter('search', '%' . strtolower($search) . '%');
         }
 
@@ -184,6 +192,13 @@ class LoanApprovalRepository extends BaseRepository
         }
         if ($stepName !== null && $stepName !== '') {
             $qb->andWhere('s.name = :fStepName')->setParameter('fStepName', $stepName);
+        }
+        // Product and agent (DSA) filters.
+        if ($productId !== null && $productId !== '') {
+            $qb->andWhere('l.product = :fProductId')->setParameter('fProductId', $productId);
+        }
+        if ($agentId !== null && $agentId !== '') {
+            $qb->andWhere('l.agent = :fAgentId')->setParameter('fAgentId', $agentId);
         }
 
         $countQb = clone $qb;
