@@ -9,10 +9,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SettingsService } from '../../core/services/settings.service';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 @Component({
   selector: 'app-audit-logs', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

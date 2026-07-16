@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * GL Reconciliation Report — double-entry integrity check.
@@ -34,7 +35,7 @@ import { SettingsService } from '../../core/services/settings.service';
 @Component({
   selector: 'app-gl-reconciliation',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

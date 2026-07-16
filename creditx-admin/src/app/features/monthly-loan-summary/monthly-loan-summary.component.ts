@@ -6,6 +6,7 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 interface Col { key: string; label: string; money?: boolean; }
 
@@ -17,7 +18,7 @@ interface Col { key: string; label: string; money?: boolean; }
 @Component({
   selector: 'app-monthly-loan-summary',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Monthly Loan Summary" subtitle="Loans captured/disbursed in a month" eyebrow="Reports"></cx-page-header>

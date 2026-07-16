@@ -10,6 +10,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * General Loan Report — the legacy-compatible monthly export migrated
@@ -35,7 +36,7 @@ type BranchPerformanceRow = { label: string; value: number; count: number };
 @Component({
   selector: 'app-general-loan-report',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

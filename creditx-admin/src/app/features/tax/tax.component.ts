@@ -7,6 +7,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Tax (VAT/WHT) — rates config, raise a tax liability/reclaim, remit, and a
@@ -15,7 +16,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 @Component({
   selector: 'app-tax',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Tax (VAT / WHT)" subtitle="Configure rates, record tax, remit, and report" eyebrow="Accounting"></cx-page-header>

@@ -10,10 +10,11 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 @Component({
   selector: 'app-government-records', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

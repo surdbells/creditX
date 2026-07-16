@@ -15,10 +15,11 @@ import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.compon
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 @Component({
   selector: 'app-loan-detail', standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       @if (!embedded) {

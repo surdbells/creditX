@@ -9,6 +9,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Journal Entries — header-rooted view (Phase-2.5 sub-phase F).
@@ -48,7 +49,7 @@ import { SettingsService } from '../../core/services/settings.service';
 @Component({
   selector: 'app-journal-entries',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

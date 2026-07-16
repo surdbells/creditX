@@ -9,6 +9,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { environment } from '../../../environments/environment';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Bank Reconciliation — list + detail workflow.
@@ -26,7 +27,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 @Component({
   selector: 'app-reconciliation',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

@@ -11,6 +11,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Deposit Accounts — the subsidiary ledger behind the CUSTDEP control GL.
@@ -22,7 +23,7 @@ import { SettingsService } from '../../core/services/settings.service';
 @Component({
   selector: 'app-deposit-accounts',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, MoneyPipe],
   template: `
     <div class="cx-animate-in">
       <cx-page-header

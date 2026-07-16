@@ -8,6 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Settlements queue — outbound bank transfers that pay disbursed loans to
@@ -18,7 +19,7 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 @Component({
   selector: 'app-settlements',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, DataTableComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Settlements" subtitle="Outbound transfers paying disbursed loans to customers" eyebrow="Finance"></cx-page-header>

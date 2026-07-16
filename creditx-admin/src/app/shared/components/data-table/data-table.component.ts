@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Search, ChevronLeft, ChevronRight, Columns3, SlidersHorizontal, Download, ChevronUp, ChevronDown } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { SearchableSelectDirective } from '../../directives/searchable-select.directive';
 
 export interface TableColumn {
   key: string;
@@ -39,7 +40,7 @@ export interface TableQueryEvent {
 @Component({
   selector: 'cx-data-table',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, MoneyPipe],
   template: `
     <div class="cx-dtable">
       <!-- Toolbar -->

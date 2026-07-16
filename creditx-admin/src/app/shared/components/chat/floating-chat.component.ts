@@ -5,11 +5,12 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { SearchableSelectDirective } from '../../directives/searchable-select.directive';
 
 @Component({
   selector: 'cx-floating-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule],
   template: `
     <!-- Floating Button -->
     @if (!isOpen()) {

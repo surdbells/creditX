@@ -5,6 +5,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 /**
  * Bulk Disburse — three-step flow:
@@ -59,7 +60,7 @@ type ResultRow = {
 @Component({
   selector: 'app-bulk-disburse',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
