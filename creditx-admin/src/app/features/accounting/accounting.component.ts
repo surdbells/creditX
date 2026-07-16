@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -43,6 +43,14 @@ import { SettingsService } from '../../core/services/settings.service';
             <input type="text" class="cx-acc-filter-search-input"
               placeholder="Search accounts by code or name..." [(ngModel)]="coaSearch" (input)="loadCoa()" />
           </div>
+          <div class="cx-coa-toolbar-actions">
+            <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="coaExpandAll()">
+              <lucide-icon name="chevrons-down" [size]="14"></lucide-icon><span>Expand all</span>
+            </button>
+            <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="coaCollapseAll()">
+              <lucide-icon name="chevrons-up" [size]="14"></lucide-icon><span>Collapse all</span>
+            </button>
+          </div>
         </div>
 
         <div class="cx-acc-table-wrap">
@@ -51,35 +59,36 @@ import { SettingsService } from '../../core/services/settings.service';
           } @else if (coaRows().length === 0) {
             <div class="cx-acc-state"><cx-empty-state title="No GL accounts" description="Start by adding your first general ledger account." icon="landmark"></cx-empty-state></div>
           } @else {
-            <div class="cx-acc-scroll">
-              <table class="cx-acc-table">
-                <thead>
-                  <tr>
-                    <th>Code</th>
-                    <th>Account Name</th>
-                    <th>Type</th>
-                    <th>Ledger</th>
-                    <th class="cx-acc-right">Balance</th>
-                    <th class="cx-acc-actions-col"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (a of coaRows(); track a.id) {
-                    <tr>
-                      <td><span class="cx-acc-code">{{ a.account_code }}</span></td>
-                      <td class="cx-acc-name">{{ a.account_name }}</td>
-                      <td><span class="cx-acc-type-chip" [attr.data-type]="a.account_type?.toLowerCase()">{{ a.account_type }}</span></td>
-                      <td class="cx-acc-ledger">{{ a.ledger_type }}</td>
-                      <td class="cx-acc-right cx-acc-balance tabular-nums">{{ (a.balance || 0) | money:2 }}</td>
-                      <td class="cx-acc-actions-col">
-                        <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openCoaForm(a)" title="Edit">
-                          <lucide-icon name="pencil" [size]="14"></lucide-icon>
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+            <div class="cx-coa-tree">
+              @for (row of coaVisible(); track row.node.id) {
+                @if (row.node.isCategory) {
+                  <div class="cx-coa-cat" (click)="toggleCoaNode(row.node.id)">
+                    <lucide-icon [name]="row.collapsed ? 'chevron-right' : 'chevron-down'" [size]="16" class="cx-coa-chevron"></lucide-icon>
+                    <lucide-icon [name]="row.node.icon" [size]="16" class="cx-coa-cat-icon" [attr.data-type]="row.node.key"></lucide-icon>
+                    <span class="cx-coa-cat-label">{{ row.node.label }}</span>
+                    <span class="cx-coa-cat-count">{{ row.node.count }}</span>
+                    <span class="cx-coa-cat-balance tabular-nums">{{ row.node.balance | money:2 }}</span>
+                  </div>
+                } @else {
+                  <div class="cx-coa-node" [style.paddingLeft.px]="16 + row.depth * 22">
+                    @if (row.hasChildren) {
+                      <button type="button" class="cx-coa-node-toggle" (click)="toggleCoaNode(row.node.id)">
+                        <lucide-icon [name]="row.collapsed ? 'chevron-right' : 'chevron-down'" [size]="15"></lucide-icon>
+                      </button>
+                    } @else {
+                      <span class="cx-coa-node-dot"></span>
+                    }
+                    <span class="cx-acc-code">{{ row.node.account_code }}</span>
+                    <span class="cx-coa-node-name">{{ row.node.account_name }}</span>
+                    <span class="cx-acc-type-chip" [attr.data-type]="row.node.account_type?.toLowerCase()">{{ row.node.account_type }}</span>
+                    <span class="cx-coa-node-ledger">{{ row.node.ledger_type }}</span>
+                    <span class="cx-coa-node-balance tabular-nums">{{ (row.node.balance || 0) | money:2 }}</span>
+                    <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon cx-coa-node-edit" (click)="openCoaForm(row.node)" title="Edit">
+                      <lucide-icon name="pencil" [size]="14"></lucide-icon>
+                    </button>
+                  </div>
+                }
+              }
             </div>
           }
         </div>
@@ -326,8 +335,68 @@ import { SettingsService } from '../../core/services/settings.service';
     .cx-acc-type-chip[data-type="asset"] { background: rgba(30, 92, 168, 0.1); color: var(--cx-info); }
     .cx-acc-type-chip[data-type="liability"] { background: var(--cx-danger-50); color: var(--cx-danger); }
     .cx-acc-type-chip[data-type="equity"] { background: rgba(124, 58, 237, 0.1); color: #6d28d9; }
-    .cx-acc-type-chip[data-type="revenue"] { background: var(--cx-success-50); color: var(--cx-primary-700); }
+    .cx-acc-type-chip[data-type="revenue"], .cx-acc-type-chip[data-type="income"] { background: var(--cx-success-50); color: var(--cx-primary-700); }
     .cx-acc-type-chip[data-type="expense"] { background: var(--cx-accent-50); color: var(--cx-accent-700); }
+
+    /* ═══ Chart of Accounts — collapsible hierarchical tree ═══ */
+    .cx-coa-toolbar-actions { display: flex; gap: 6px; margin-left: auto; }
+    .cx-coa-tree {
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-lg, 12px);
+      background: var(--cx-surface);
+      overflow: hidden;
+    }
+    .cx-coa-cat {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      cursor: pointer;
+      background: var(--cx-surface-2, var(--cx-stone-50));
+      border-top: 1px solid var(--cx-border);
+      user-select: none;
+      transition: background 120ms;
+    }
+    .cx-coa-cat:first-child { border-top: none; }
+    .cx-coa-cat:hover { background: var(--cx-hover, var(--cx-stone-100)); }
+    .cx-coa-chevron { color: var(--cx-text-muted); flex-shrink: 0; }
+    .cx-coa-cat-icon { flex-shrink: 0; }
+    .cx-coa-cat-icon[data-type="asset"] { color: var(--cx-info); }
+    .cx-coa-cat-icon[data-type="liability"] { color: var(--cx-danger); }
+    .cx-coa-cat-icon[data-type="equity"] { color: #6d28d9; }
+    .cx-coa-cat-icon[data-type="income"] { color: var(--cx-primary-700); }
+    .cx-coa-cat-icon[data-type="expense"] { color: var(--cx-accent-700); }
+    .cx-coa-cat-label { font-weight: 600; font-size: 14px; color: var(--cx-text); }
+    .cx-coa-cat-count {
+      font-size: 11px; font-weight: 600; color: var(--cx-text-secondary);
+      background: var(--cx-surface); border: 1px solid var(--cx-border);
+      border-radius: 999px; padding: 1px 8px;
+    }
+    .cx-coa-cat-balance { margin-left: auto; font-weight: 600; font-size: 13px; color: var(--cx-text); }
+    .cx-coa-node {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px;
+      border-top: 1px solid var(--cx-border-subtle, var(--cx-border));
+      transition: background 120ms;
+    }
+    .cx-coa-node:hover { background: var(--cx-hover, rgba(0,0,0,0.02)); }
+    .cx-coa-node-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; padding: 0; border: none; background: none;
+      color: var(--cx-text-muted); cursor: pointer; flex-shrink: 0;
+    }
+    .cx-coa-node-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--cx-border-strong, var(--cx-text-muted));
+      flex-shrink: 0; margin: 0 7px;
+    }
+    .cx-coa-node-name { font-size: 13px; color: var(--cx-text); flex: 1; min-width: 0; }
+    .cx-coa-node-ledger { font-size: 12px; color: var(--cx-text-muted); white-space: nowrap; }
+    .cx-coa-node-balance { font-size: 13px; color: var(--cx-text); min-width: 110px; text-align: right; }
+    .cx-coa-node-edit { opacity: 0; transition: opacity 120ms; }
+    .cx-coa-node:hover .cx-coa-node-edit { opacity: 1; }
+    @media (max-width: 720px) {
+      .cx-coa-node-ledger { display: none; }
+      .cx-coa-node-edit { opacity: 1; }
+    }
 
     /* Trial balance total row */
     .cx-acc-total-row {
@@ -374,15 +443,100 @@ export class AccountingComponent implements OnInit {
     else if (key === 'txns') this.loadTxns();
   }
 
-  // ── Chart of Accounts ──
+  // ── Chart of Accounts (collapsible hierarchical tree) ──
+  // Top-level categories are the five account types. Under each, accounts nest
+  // by their self-referential parent_id; accounts with no (in-set) parent sit
+  // directly under their category.
+  private readonly coaCategoryMeta: { key: string; label: string; icon: string }[] = [
+    { key: 'asset',     label: 'Assets',      icon: 'wallet' },
+    { key: 'liability', label: 'Liabilities', icon: 'credit-card' },
+    { key: 'equity',    label: 'Equity',      icon: 'landmark' },
+    { key: 'income',    label: 'Income',      icon: 'trending-up' },
+    { key: 'expense',   label: 'Expenses',    icon: 'trending-down' },
+  ];
+  coaCollapsed = signal<Set<string>>(new Set());
+
   loadCoa() {
     this.coaLoading.set(true);
-    const params: any = { per_page: 200 };
+    const params: any = { per_page: 500 };
     if (this.coaSearch) params.search = this.coaSearch;
     this.api.get('/gl-accounts', params).subscribe({
       next: r => { this.coaRows.set(r.data || []); this.coaLoading.set(false); },
       error: () => this.coaLoading.set(false),
     });
+  }
+
+  /** Nested tree: category → (parent account → children). */
+  coaTree = computed(() => {
+    const rows = this.coaRows();
+    const nodeById = new Map<string, any>();
+    for (const a of rows) nodeById.set(a.id, { ...a, children: [] });
+
+    const rootsByType: Record<string, any[]> = {};
+    for (const a of rows) {
+      const node = nodeById.get(a.id);
+      const parent = a.parent_id ? nodeById.get(a.parent_id) : null;
+      if (parent) {
+        parent.children.push(node);
+      } else {
+        const type = (a.account_type || 'other').toLowerCase();
+        (rootsByType[type] ||= []).push(node);
+      }
+    }
+
+    const sortRec = (ns: any[]) => {
+      ns.sort((x, y) => String(x.account_code || '').localeCompare(String(y.account_code || '')));
+      for (const n of ns) if (n.children.length) sortRec(n.children);
+    };
+
+    const cats = [];
+    for (const meta of this.coaCategoryMeta) {
+      const roots = rootsByType[meta.key] || [];
+      if (!roots.length) continue;
+      sortRec(roots);
+      const total = this.sumBalances(roots);
+      cats.push({ ...meta, id: 'cat:' + meta.key, isCategory: true, children: roots, count: this.countNodes(roots), balance: total });
+    }
+    return cats;
+  });
+
+  private sumBalances(ns: any[]): number {
+    let t = 0;
+    for (const n of ns) { t += Number(n.balance || 0); if (n.children?.length) t += this.sumBalances(n.children); }
+    return t;
+  }
+  private countNodes(ns: any[]): number {
+    let c = 0;
+    for (const n of ns) { c += 1; if (n.children?.length) c += this.countNodes(n.children); }
+    return c;
+  }
+
+  /** Flattened visible rows honoring collapse state, for @for rendering. */
+  coaVisible = computed(() => {
+    const collapsed = this.coaCollapsed();
+    const out: any[] = [];
+    const walk = (nodes: any[], depth: number) => {
+      for (const n of nodes) {
+        const hasChildren = !!n.children?.length;
+        out.push({ node: n, depth, hasChildren, collapsed: collapsed.has(n.id) });
+        if (hasChildren && !collapsed.has(n.id)) walk(n.children, depth + 1);
+      }
+    };
+    walk(this.coaTree(), 0);
+    return out;
+  });
+
+  toggleCoaNode(id: string): void {
+    const next = new Set(this.coaCollapsed());
+    next.has(id) ? next.delete(id) : next.add(id);
+    this.coaCollapsed.set(next);
+  }
+  coaExpandAll(): void { this.coaCollapsed.set(new Set()); }
+  coaCollapseAll(): void {
+    const ids = new Set<string>();
+    const collect = (ns: any[]) => { for (const n of ns) { if (n.children?.length || n.isCategory) ids.add(n.id); if (n.children?.length) collect(n.children); } };
+    collect(this.coaTree());
+    this.coaCollapsed.set(ids);
   }
 
   acctTypeClass(t: string): string {
