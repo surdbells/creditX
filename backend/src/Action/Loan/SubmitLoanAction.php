@@ -4,18 +4,35 @@ namespace App\Action\Loan;
 
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Enum\LoanStatus;
-use App\Domain\Repository\LoanRepository;
+use App\Domain\Repository\{DocumentRepository, LoanRepository};
 use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService, NotificationDispatchService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class SubmitLoanAction
 {
     use ApiResponse;
+
+    /**
+     * Documents that must be present before a loan can be submitted for
+     * approval. Agents may skip the upload step during capture (some documents
+     * aren't available immediately), but must provide these before submitting.
+     * Mirrors the agent app's docTypes list.
+     *
+     * @var array<string,string> type value => human label
+     */
+    private const REQUIRED_DOCS = [
+        'passport'       => 'Passport Photograph',
+        'id_card'        => 'ID Card',
+        'payslip'        => 'Payslip',
+        'bank_statement' => 'Bank Statement',
+    ];
+
     public function __construct(
         private readonly LoanRepository $repo,
         private readonly ApprovalEngineService $approvalEngine,
         private readonly AuditService $audit,
         private readonly NotificationDispatchService $notifService,
+        private readonly DocumentRepository $documentRepo,
         private readonly \Doctrine\ORM\EntityManagerInterface $em,
     ) {}
 
@@ -31,6 +48,26 @@ final class SubmitLoanAction
         if ($caller instanceof \App\Domain\Entity\User && $caller->isLoanScopedToSelf()
             && $loan->getAgent()?->getId() !== $callerId) {
             return $this->notFound('Loan not found');
+        }
+
+        // Enforce required documents at submit-for-approval (they can be
+        // skipped during capture, but not at this gate).
+        $present = array_map(
+            fn($d) => $d->getType()->value,
+            $this->documentRepo->findByLoan($loan->getId()),
+        );
+        $missing = [];
+        foreach (self::REQUIRED_DOCS as $type => $label) {
+            if (!in_array($type, $present, true)) {
+                $missing[] = $label;
+            }
+        }
+        if (!empty($missing)) {
+            return $this->error(
+                'Cannot submit for approval — these required documents are missing: '
+                . implode(', ', $missing) . '. Please upload them first.',
+                422,
+            );
         }
 
         try {

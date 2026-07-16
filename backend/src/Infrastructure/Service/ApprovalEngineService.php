@@ -14,6 +14,7 @@ use App\Domain\Entity\User;
 use App\Domain\Enum\ApprovalMode;
 use App\Domain\Enum\ApprovalStatus;
 use App\Domain\Enum\LoanStatus;
+use App\Domain\Enum\LoanType;
 use App\Domain\Exception\DomainException;
 use App\Domain\Repository\ApprovalWorkflowRepository;
 use App\Domain\Repository\LoanApprovalRepository;
@@ -262,6 +263,21 @@ final class ApprovalEngineService
                 $trail->setUserId($user->getId());
                 $trail->setAction('Underwriter set top-up balance to ₦' . $normalised);
                 $loan->addTrail($trail);
+            }
+
+            // Top-up loans must carry a positive top-up balance. Enforce at the
+            // underwriter approve step (where the balance is set), so a top-up
+            // can't be approved with a zero/blank balance.
+            if (
+                $action === 'approve'
+                && $approval->getStep()->getRole()->getSlug() === 'underwriter'
+                && $loan->getLoanType() === LoanType::TOP_UP
+            ) {
+                $effective = $loan->getEffectiveTopUpBalance();
+                if ($effective === null || bccomp(number_format((float) $effective, 2, '.', ''), '0.00', 2) <= 0) {
+                    $this->em->rollback();
+                    throw new DomainException('This is a top-up loan — enter a top-up balance greater than zero before approving.');
+                }
             }
 
             // Trail

@@ -1879,6 +1879,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   staffRecord = signal<any>(null);
   staffLoading = signal(false);
   staffError = signal<string | null>(null);
+  // True when the looked-up staff is ineligible or already has a blocking loan
+  // — prevents proceeding past the Staff ID step.
+  staffBlocked = signal(false);
   existingCustomer = signal<any>(null);
   calcResult = signal<any>(null);
   calcLoading = signal(false);
@@ -2380,16 +2383,39 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     if (this.staffRecord() !== null) this.staffRecord.set(null);
     if (this.existingCustomer() !== null) this.existingCustomer.set(null);
     if (this.staffError() !== null) this.staffError.set(null);
+    if (this.staffBlocked()) this.staffBlocked.set(false);
   }
 
   lookupStaff(): void {
-    this.staffLoading.set(true); this.staffError.set(null); this.staffRecord.set(null);
-    this.api.get('/government-records', { search: this.form['staff_id'], per_page: 1 }).subscribe({
+    this.staffLoading.set(true); this.staffError.set(null); this.staffRecord.set(null); this.staffBlocked.set(false);
+    // EXACT Staff ID match (not a fuzzy search) — the dedicated lookup endpoint
+    // returns only records whose staff_id equals the value entered, each with
+    // eligibility + the same duplicate-loan rules enforced at submit.
+    this.api.get('/government-records/lookup/' + encodeURIComponent((this.form['staff_id'] || '').trim())).subscribe({
       next: res => {
         const records = res.data || [];
         if (records.length > 0) {
           const rec = records[0];
           this.staffRecord.set(rec);
+
+          // Block BEFORE the agent fills the whole form: eligibility (age /
+          // service / retirement) and duplicate-loan rules (in-progress /
+          // pending decision). A running loan is not a block — it becomes a
+          // top-up at submit — so it does not stop the agent here.
+          const elig = rec.eligibility;
+          const block = rec.loan_block;
+          if (elig && elig.eligible === false) {
+            this.staffError.set('Not eligible: ' + (elig.reasons || []).join(' '));
+            this.staffBlocked.set(true);
+            this.staffLoading.set(false);
+            return;
+          }
+          if (block && block.blocked) {
+            this.staffError.set(block.reason || 'This customer cannot take a new loan right now.');
+            this.staffBlocked.set(true);
+            this.staffLoading.set(false);
+            return;
+          }
           // Auto-fill from government record (still editable). Only populates
           // empty fields so repeated lookups don't clobber agent edits.
           this.applyPrefill({
@@ -2473,11 +2499,15 @@ export class LoanCapturePage implements OnInit, OnDestroy {
             error: () => this.staffLoading.set(false),
           });
         } else {
-          this.staffError.set('No government record found for this Staff ID');
+          this.staffError.set('No government record found for this exact Staff ID');
           this.staffLoading.set(false);
         }
       },
-      error: () => { this.staffError.set('Lookup failed'); this.staffLoading.set(false); },
+      error: (e: any) => {
+        // 404 from the exact-lookup endpoint = no record with this Staff ID.
+        this.staffError.set(e?.error?.message || 'No government record found for this exact Staff ID');
+        this.staffLoading.set(false);
+      },
     });
   }
 
@@ -2527,7 +2557,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   canProceed(): boolean {
     switch (this.step()) {
       case 0: return !!this.form['product_id'];
-      case 1: return !!this.staffRecord();
+      case 1: return !!this.staffRecord() && !this.staffBlocked();
       case 2: return !!this.form['amount'] && !!this.form['tenure'];
       // Step 3: must have full_name, phone, and a VALID BVN. BVN is
       // required per user decision — wizard can't submit without it.
@@ -2535,12 +2565,12 @@ export class LoanCapturePage implements OnInit, OnDestroy {
                   && !!this.form['phone']
                   && !!this.form['bvn']
                   && this.bvnError() === null;
-      // Step 4: ALL document types must be staged. Previously this was
-      // optional (return true); user testing revealed loans were being
-      // submitted without required docs, blocking downstream approval.
-      // Now the Next button stays disabled until every docTypes entry
-      // has a file in uploadedDocs.
-      case 4: return this.allDocsStaged();
+      // Step 4: documents are OPTIONAL at capture. Some documents aren't
+      // available immediately, so agents may skip this step and capture the
+      // loan now. The required documents are enforced later, at
+      // submit-for-approval (backend SubmitLoanAction), so a loan cannot be
+      // sent for approval without them.
+      case 4: return true;
       default: return true;
     }
   }
