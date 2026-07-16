@@ -73,6 +73,16 @@ import { SettingsService } from '../../core/services/settings.service';
           <option value="">All Products</option>
           @for (p of products(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
         </select>
+        <select class="cx-select" [(ngModel)]="filters.branch_id" (change)="onFilterChange()">
+          <option value="">All Branches</option>
+          @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select>
+        @if (hasActiveFilters()) {
+          <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="clearFilters()">
+            <lucide-icon name="x" [size]="14"></lucide-icon>
+            <span>Clear</span>
+          </button>
+        }
       </div>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
@@ -171,13 +181,48 @@ export class LoansComponent implements OnInit {
   ];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   products = signal<any[]>([]);
-  filters: any = { search: '', status: '', product_id: '' };
+  branches = signal<any[]>([]);
+  filters: any = { search: '', status: '', product_id: '', branch_id: '' };
   totalRecords = 0; exportOpen = false; private q: any = {}; private filterTimeout: any;
+
+  // Filters persist across navigation (list → detail → back) until the user
+  // clears them. sessionStorage survives an in-app navigation and a refresh,
+  // and is scoped to the tab. Cleared explicitly via clearFilters().
+  private static readonly STATE_KEY = 'cx_loans_filter_state';
 
   constructor(public auth: AuthService, private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
   ngOnInit() {
+    this.restoreState();
     this.load();
     this.api.get('/loan-products', { per_page: 50 }).subscribe({ next: r => this.products.set(r.data || []) });
+    this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.branches.set(r.data || []) });
+  }
+
+  hasActiveFilters(): boolean {
+    return !!(this.filters.search || this.filters.status || this.filters.product_id || this.filters.branch_id);
+  }
+
+  private saveState(): void {
+    try {
+      sessionStorage.setItem(LoansComponent.STATE_KEY, JSON.stringify({ filters: this.filters, q: this.q }));
+    } catch { /* storage may be unavailable; degrade silently */ }
+  }
+
+  private restoreState(): void {
+    try {
+      const raw = sessionStorage.getItem(LoansComponent.STATE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.filters) this.filters = { search: '', status: '', product_id: '', branch_id: '', ...s.filters };
+      if (s.q) this.q = s.q;
+    } catch { /* ignore corrupt state */ }
+  }
+
+  clearFilters(): void {
+    this.filters = { search: '', status: '', product_id: '', branch_id: '' };
+    this.q = {};
+    try { sessionStorage.removeItem(LoansComponent.STATE_KEY); } catch { /* noop */ }
+    this.load();
   }
 
   load(p?: any) {
@@ -186,6 +231,8 @@ export class LoansComponent implements OnInit {
     if (this.filters.search) params.search = this.filters.search;
     if (this.filters.status) params.status = this.filters.status;
     if (this.filters.product_id) params.product_id = this.filters.product_id;
+    if (this.filters.branch_id) params.branch_id = this.filters.branch_id;
+    this.saveState();
     this.api.get('/loans', params).subscribe({
       next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.totalRecords = r.meta?.total || 0; this.loading.set(false); },
       error: () => this.loading.set(false),
@@ -199,6 +246,8 @@ export class LoansComponent implements OnInit {
     const params: any = { per_page: 10000 };
     if (this.filters.search) params.search = this.filters.search;
     if (this.filters.status) params.status = this.filters.status;
+    if (this.filters.product_id) params.product_id = this.filters.product_id;
+    if (this.filters.branch_id) params.branch_id = this.filters.branch_id;
     this.api.get('/loans', params).subscribe({
       next: res => {
         const data = res.data || [];
