@@ -15,6 +15,7 @@ use App\Action\RecordType;
 use App\Action\GovRecord;
 use App\Action\Customer;
 use App\Action\Document;
+use App\Action\DocumentType;
 use App\Action\FeeType;
 use App\Action\LoanProduct;
 use App\Action\Loan;
@@ -273,6 +274,21 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('products.create'));
             $group->put('/{id}', FeeType\UpdateFeeTypeAction::class)
                 ->add(new RbacMiddleware('products.edit'));
+        });
+
+        // ─── Document Types (configurable; drives agent capture + the
+        //     required-documents gate at submit-for-approval) ───
+        // GET is products.view so field agents (who hold it) can build their
+        // upload list from the live config.
+        $api->group('/document-types', function (RouteCollectorProxy $group) {
+            $group->get('', DocumentType\ListDocumentTypesAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->post('', DocumentType\CreateDocumentTypeAction::class)
+                ->add(new RbacMiddleware('products.create'));
+            $group->put('/{id}', DocumentType\UpdateDocumentTypeAction::class)
+                ->add(new RbacMiddleware('products.edit'));
+            $group->delete('/{id}', DocumentType\DeleteDocumentTypeAction::class)
+                ->add(new RbacMiddleware('products.delete'));
         });
 
         // ─── Loan Products ───

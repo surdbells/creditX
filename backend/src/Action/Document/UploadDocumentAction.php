@@ -2,8 +2,7 @@
 declare(strict_types=1);
 namespace App\Action\Document;
 
-use App\Domain\Enum\DocumentType;
-use App\Domain\Repository\CustomerRepository;
+use App\Domain\Repository\{CustomerRepository, DocumentTypeConfigRepository};
 use App\Infrastructure\Service\{ApiResponse, AuditService, DocumentService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
@@ -14,6 +13,7 @@ final class UploadDocumentAction
         private readonly CustomerRepository $customerRepo,
         private readonly DocumentService $docService,
         private readonly AuditService $audit,
+        private readonly DocumentTypeConfigRepository $docTypeRepo,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -31,11 +31,18 @@ final class UploadDocumentAction
         $customer = $this->customerRepo->find($customerId);
         if ($customer === null) return $this->notFound('Customer not found');
 
-        $typeValue = $params['type'] ?? DocumentType::OTHER->value;
-        $docType = DocumentType::tryFrom($typeValue);
-        if ($docType === null) {
-            return $this->validationError(['type' => 'Invalid document type. Allowed: ' . implode(', ', array_column(DocumentType::cases(), 'value'))]);
+        // Validate the type against the configurable document_types table
+        // (admins can add types, so a hardcoded enum can't be the gate).
+        // Inactive types are rejected — they're retired and must not be uploaded.
+        $typeValue = strtolower(trim((string) ($params['type'] ?? 'other')));
+        $config = $this->docTypeRepo->findByCode($typeValue);
+        if ($config === null || !$config->isActive()) {
+            $allowed = array_map(fn($d) => $d->getCode(), $this->docTypeRepo->findActive());
+            return $this->validationError([
+                'type' => 'Invalid document type. Allowed: ' . implode(', ', $allowed),
+            ]);
         }
+        $docType = $config->getCode();
 
         $loanId = $params['loan_id'] ?? null;
         $uploadedBy = $request->getAttribute('user_id');

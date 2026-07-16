@@ -155,6 +155,32 @@ echo "  Created {$settingsCount} settings\n";
 // ─── 5. Fee Types ───
 echo "[5/8] Seeding fee types...\n";
 
+// ─── Document types (configurable; is_required drives the submit gate) ───
+// code, label, is_required, is_active, is_system, accept, sort_order
+$docTypesDef = [
+    ['passport',       'Passport Photograph',        false, 'image/*',      10],
+    ['id_card',        'ID Card (NIN/Voter/Driver)', true,  'image/*,.pdf', 20],
+    ['payslip',        'Recent Payslip',             true,  'image/*,.pdf', 30],
+    ['bank_statement', 'Bank Statement',             true,  '.pdf,image/*', 40],
+    ['utility_bill',   'Utility Bill',               false, 'image/*,.pdf', 50],
+    ['work_id',        'Work ID',                    false, 'image/*,.pdf', 60],
+    ['other',          'Other',                      false, '',             99],
+];
+$docTypeCount = 0;
+foreach ($docTypesDef as [$code, $label, $required, $accept, $order]) {
+    $existing = $conn->fetchOne('SELECT id FROM document_types WHERE code = ?', [$code]);
+    if ($existing) continue;
+    $conn->insert('document_types', [
+        'id' => uuid(), 'code' => $code, 'label' => $label,
+        'is_required' => $required ? 'true' : 'false',
+        'is_active' => 'true', 'is_system' => 'true',
+        'accept' => $accept, 'sort_order' => $order,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $docTypeCount++;
+}
+echo "  Created {$docTypeCount} document types\n";
+
 $feeTypesDef = [
     ['Admin Fee', 'AA', 'Administrative fee charged on loan origination', true],
     ['Insurance Fee', 'IA', 'Insurance premium deducted at source', true],

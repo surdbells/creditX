@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domain\Entity;
 
 use App\Domain\Enum\DocumentStatus;
-use App\Domain\Enum\DocumentType;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -29,8 +28,17 @@ class Document
     #[ORM\Column(type: 'string', length: 36, nullable: true)]
     private ?string $loanId = null;
 
-    #[ORM\Column(type: 'string', length: 30, enumType: DocumentType::class)]
-    private DocumentType $type;
+    /**
+     * Document type code — matches DocumentTypeConfig.code.
+     *
+     * Deliberately a plain string, not the old DocumentType enum: types are now
+     * configurable (admins can add new ones), and an enum would reject any code
+     * outside its hardcoded cases. Validated against the document_types table
+     * at upload time. The column is unchanged (varchar 30), so existing rows
+     * keep working.
+     */
+    #[ORM\Column(type: 'string', length: 30)]
+    private string $type;
 
     #[ORM\Column(type: 'string', length: 500)]
     private string $filePath;
@@ -70,7 +78,7 @@ class Document
     public function getId(): string { return $this->id; }
     public function getCustomer(): Customer { return $this->customer; }
     public function getLoanId(): ?string { return $this->loanId; }
-    public function getType(): DocumentType { return $this->type; }
+    public function getType(): string { return $this->type; }
     public function getFilePath(): string { return $this->filePath; }
     public function getFileName(): string { return $this->fileName; }
     public function getFileSize(): int { return $this->fileSize; }
@@ -85,7 +93,7 @@ class Document
 
     public function setCustomer(Customer $v): void { $this->customer = $v; }
     public function setLoanId(?string $v): void { $this->loanId = $v; }
-    public function setType(DocumentType $v): void { $this->type = $v; }
+    public function setType(string $v): void { $this->type = strtolower(trim($v)); }
     public function setFilePath(string $v): void { $this->filePath = $v; }
     public function setFileName(string $v): void { $this->fileName = $v; }
     public function setFileSize(int $v): void { $this->fileSize = $v; }
@@ -114,7 +122,7 @@ class Document
             'id'               => $this->id,
             'customer_id'      => $this->customer->getId(),
             'loan_id'          => $this->loanId,
-            'type'             => $this->type->value,
+            'type'             => $this->type,
             'file_path'        => $this->filePath,
             'file_name'        => $this->fileName,
             'file_size'        => $this->fileSize,

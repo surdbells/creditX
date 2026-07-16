@@ -4,28 +4,13 @@ namespace App\Action\Loan;
 
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Enum\LoanStatus;
-use App\Domain\Repository\{DocumentRepository, LoanRepository};
+use App\Domain\Repository\{DocumentRepository, DocumentTypeConfigRepository, LoanRepository};
 use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService, NotificationDispatchService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class SubmitLoanAction
 {
     use ApiResponse;
-
-    /**
-     * Documents that must be present before a loan can be submitted for
-     * approval. Agents may skip the upload step during capture (some documents
-     * aren't available immediately), but must provide these before submitting.
-     * Mirrors the agent app's docTypes list.
-     *
-     * @var array<string,string> type value => human label
-     */
-    private const REQUIRED_DOCS = [
-        'passport'       => 'Passport Photograph',
-        'id_card'        => 'ID Card',
-        'payslip'        => 'Payslip',
-        'bank_statement' => 'Bank Statement',
-    ];
 
     public function __construct(
         private readonly LoanRepository $repo,
@@ -34,6 +19,7 @@ final class SubmitLoanAction
         private readonly NotificationDispatchService $notifService,
         private readonly DocumentRepository $documentRepo,
         private readonly \Doctrine\ORM\EntityManagerInterface $em,
+        private readonly DocumentTypeConfigRepository $docTypeRepo,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -51,15 +37,18 @@ final class SubmitLoanAction
         }
 
         // Enforce required documents at submit-for-approval (they can be
-        // skipped during capture, but not at this gate).
+        // skipped during capture, but not at this gate). Which documents are
+        // mandatory is configured per document type (document_types.is_required)
+        // and applies globally — no hardcoded list, so operations can change
+        // what blocks submission without a deploy.
         $present = array_map(
-            fn($d) => $d->getType()->value,
+            fn($d) => $d->getType(),
             $this->documentRepo->findByLoan($loan->getId()),
         );
         $missing = [];
-        foreach (self::REQUIRED_DOCS as $type => $label) {
-            if (!in_array($type, $present, true)) {
-                $missing[] = $label;
+        foreach ($this->docTypeRepo->findRequiredActive() as $required) {
+            if (!in_array($required->getCode(), $present, true)) {
+                $missing[] = $required->getLabel();
             }
         }
         if (!empty($missing)) {

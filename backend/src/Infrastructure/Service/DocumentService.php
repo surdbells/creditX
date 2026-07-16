@@ -6,7 +6,6 @@ namespace App\Infrastructure\Service;
 
 use App\Domain\Entity\Customer;
 use App\Domain\Entity\Document;
-use App\Domain\Enum\DocumentType;
 use App\Domain\Repository\DocumentRepository;
 use Psr\Http\Message\UploadedFileInterface;
 
@@ -55,10 +54,14 @@ final class DocumentService
      *
      * @throws \RuntimeException on validation failure
      */
+    /**
+     * @param string $type Document type code (DocumentTypeConfig.code). Callers
+     *                     validate it against the document_types table.
+     */
     public function upload(
         UploadedFileInterface $file,
         Customer $customer,
-        DocumentType $type,
+        string $type,
         ?string $loanId,
         ?string $uploadedBy,
     ): Document {
