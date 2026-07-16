@@ -763,7 +763,7 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
     .cx-je-modal {
       position: fixed; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: min(860px, calc(100vw - 32px));
+      width: min(1060px, calc(100vw - 32px));
       max-height: calc(100vh - 48px);
       background: var(--cx-surface);
       border-radius: var(--cx-radius-xl, 12px);
