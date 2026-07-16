@@ -1010,7 +1010,7 @@ export class JournalEntriesComponent implements OnInit {
     // Lazy-load active GL accounts for the line dropdowns. Pull a high
     // per_page so the full chart of accounts is selectable in one shot.
     if (this.glAccounts().length === 0) {
-      this.api.get('/accounting/gl-accounts', { per_page: 200 }).subscribe({
+      this.api.get('/gl-accounts', { per_page: 200 }).subscribe({
         next: r => this.glAccounts.set((r.data || []).filter((g: any) => g.is_active !== false)),
         error: () => this.toast.error('Failed to load chart of accounts'),
       });
