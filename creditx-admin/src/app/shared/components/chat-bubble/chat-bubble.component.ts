@@ -9,38 +9,25 @@ import { ApiService } from '../../../core/services/api.service';
   standalone: true,
   imports: [CommonModule, RouterLink, LucideAngularModule],
   template: `
-    <a routerLink="/messaging" class="chat-bubble" [class.has-unread]="unreadCount() > 0">
-      <lucide-icon name="message-square" [size]="22"></lucide-icon>
+    <a routerLink="/messaging" class="cx-btn cx-btn-ghost cx-btn-icon chat-bubble"
+       [class.has-unread]="unreadCount() > 0" title="Messages" aria-label="Messages">
+      <lucide-icon name="message-square" [size]="18"></lucide-icon>
       @if (unreadCount() > 0) {
         <span class="badge">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
       }
     </a>
   `,
   styles: [`
-    .chat-bubble {
-      position: fixed; bottom: 80px; right: 20px; z-index: 40;
-      width: 52px; height: 52px; border-radius: 50%;
-      background: var(--cx-primary); color: white;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 16px rgba(10,79,42,0.35);
-      cursor: pointer; transition: all 0.2s ease; text-decoration: none;
-    }
-    .chat-bubble:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(10,79,42,0.45); }
-    .chat-bubble.has-unread { animation: pulse-ring 2s ease-out infinite; }
+    /* Inline header button (sits next to the font-size control), no longer floating. */
+    .chat-bubble { position: relative; text-decoration: none; }
     .badge {
-      position: absolute; top: -4px; right: -4px;
-      min-width: 20px; height: 20px; padding: 0 6px;
+      position: absolute; top: -3px; right: -3px;
+      min-width: 16px; height: 16px; padding: 0 4px;
       background: var(--cx-danger); color: white;
-      border-radius: 10px; font-size: 10px; font-weight: 700;
+      border-radius: 8px; font-size: 9px; font-weight: 700; line-height: 1;
       display: flex; align-items: center; justify-content: center;
-      border: 2px solid var(--cx-bg);
+      border: 2px solid var(--cx-surface, var(--cx-bg));
     }
-    @keyframes pulse-ring {
-      0% { box-shadow: 0 0 0 0 rgba(10,79,42,0.4); }
-      70% { box-shadow: 0 0 0 10px rgba(10,79,42,0); }
-      100% { box-shadow: 0 0 0 0 rgba(10,79,42,0); }
-    }
-    @media (min-width: 768px) { .chat-bubble { bottom: 24px; right: 24px; } }
   `],
 })
 export class ChatBubbleComponent implements OnInit, OnDestroy {
