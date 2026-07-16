@@ -20,17 +20,54 @@ final class MonthlyLoanSummaryService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function rows(int $year, int $month, ?string $status = null): array
+    /**
+     * @param array<string,mixed> $filters Optional: date_from, date_to,
+     *        branch_id, product_id, agent_id, loan_type ('top_up'|'new').
+     *        When date_from + date_to are both present they define the period
+     *        (overriding year/month); otherwise year + month are used.
+     * @return array<int, array<string, mixed>>
+     */
+    public function rows(int $year, int $month, ?string $status = null, array $filters = []): array
     {
         $conn = $this->em->getConnection();
 
-        $where = 'EXTRACT(YEAR FROM COALESCE(l.disbursed_at, l.created_at)) = :year'
-            . ' AND EXTRACT(MONTH FROM COALESCE(l.disbursed_at, l.created_at)) = :month';
-        $params = ['year' => $year, 'month' => $month];
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo   = $filters['date_to'] ?? null;
+        $params = [];
+
+        if ($dateFrom && $dateTo) {
+            $where = 'COALESCE(l.disbursed_at, l.created_at)::date BETWEEN :date_from AND :date_to';
+            $params['date_from'] = $dateFrom;
+            $params['date_to']   = $dateTo;
+        } else {
+            $where = 'EXTRACT(YEAR FROM COALESCE(l.disbursed_at, l.created_at)) = :year'
+                . ' AND EXTRACT(MONTH FROM COALESCE(l.disbursed_at, l.created_at)) = :month';
+            $params['year']  = $year;
+            $params['month'] = $month;
+        }
 
         if ($status !== null && $status !== '' && strtolower($status) !== 'all') {
             $where .= ' AND l.status = :status';
             $params['status'] = $status;
+        }
+        if (!empty($filters['branch_id'])) {
+            $where .= ' AND l.branch_id = :branch_id';
+            $params['branch_id'] = $filters['branch_id'];
+        }
+        if (!empty($filters['product_id'])) {
+            $where .= ' AND l.product_id = :product_id';
+            $params['product_id'] = $filters['product_id'];
+        }
+        if (!empty($filters['agent_id'])) {
+            $where .= ' AND l.agent_id = :agent_id';
+            $params['agent_id'] = $filters['agent_id'];
+        }
+        // Loan type is derived: a loan with any top-up balance is a top-up.
+        $loanType = $filters['loan_type'] ?? null;
+        if ($loanType === 'top_up') {
+            $where .= ' AND COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0) > 0';
+        } elseif ($loanType === 'new') {
+            $where .= ' AND COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0) = 0';
         }
 
         $sql = "
@@ -41,6 +78,7 @@ final class MonthlyLoanSummaryService
                 loc.name                                            AS location,
                 l.amount_requested                                  AS payment_amount,
                 appr.approval_date::date                            AS approval_date,
+                uw.underwriter                                      AS underwriter,
                 first_rs.due_date                                   AS payment_due_date,
                 c.bank_name                                         AS main_bank_name,
                 c.account_number                                    AS main_bank_num,
@@ -98,6 +136,19 @@ final class MonthlyLoanSummaryService
                 FROM loan_fee_breakdowns fb
                 WHERE fb.loan_id = l.id AND fb.is_deducted = true
             ) df ON TRUE
+            -- The underwriter who approved this loan (most recent approved
+            -- decision on a step whose role is 'underwriter').
+            LEFT JOIN LATERAL (
+                SELECT NULLIF(TRIM(COALESCE(au.first_name, '') || ' ' || COALESCE(au.last_name, '')), '') AS underwriter
+                FROM loan_approvals la2
+                INNER JOIN approval_steps aps ON la2.step_id = aps.id
+                INNER JOIN roles r ON aps.role_id = r.id
+                INNER JOIN users au ON la2.approver_id = au.id
+                WHERE la2.loan_id = l.id AND r.slug = 'underwriter'
+                  AND la2.status IN ('approved', 'auto_approved')
+                ORDER BY la2.decided_at DESC
+                LIMIT 1
+            ) uw ON TRUE
             WHERE {$where}
             ORDER BY COALESCE(l.disbursed_at, l.created_at) ASC, l.application_id ASC
         ";

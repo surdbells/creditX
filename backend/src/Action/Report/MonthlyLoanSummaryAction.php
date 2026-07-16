@@ -23,14 +23,30 @@ final class MonthlyLoanSummaryAction
         $year  = (int) ($q['year'] ?? 0);
         $month = (int) ($q['month'] ?? 0);
 
-        if ($year < 2000 || $year > 2100) {
-            return $this->validationError(['year' => 'A valid year is required.']);
-        }
-        if ($month < 1 || $month > 12) {
-            return $this->validationError(['month' => 'A month (1-12) is required.']);
+        $dateFrom = $q['date_from'] ?? null;
+        $dateTo   = $q['date_to'] ?? null;
+        $hasRange = $dateFrom && $dateTo;
+
+        // Year + month are only required when a date range isn't supplied.
+        if (!$hasRange) {
+            if ($year < 2000 || $year > 2100) {
+                return $this->validationError(['year' => 'A valid year is required.']);
+            }
+            if ($month < 1 || $month > 12) {
+                return $this->validationError(['month' => 'A month (1-12) is required.']);
+            }
         }
 
-        $rows = $this->service->rows($year, $month, $q['status'] ?? null);
+        $filters = [
+            'date_from'  => $dateFrom ?: null,
+            'date_to'    => $dateTo ?: null,
+            'branch_id'  => $q['branch_id'] ?? null,
+            'product_id' => $q['product_id'] ?? null,
+            'agent_id'   => $q['agent_id'] ?? null,
+            'loan_type'  => $q['loan_type'] ?? null,
+        ];
+
+        $rows = $this->service->rows($year, $month, $q['status'] ?? null, $filters);
 
         return $this->success([
             'rows'  => $rows,

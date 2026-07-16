@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
@@ -40,6 +40,43 @@ interface Col { key: string; label: string; money?: boolean; }
           <select class="cx-select" [(ngModel)]="filters.status">
             <option value="all">All statuses</option>
             @for (s of statuses; track s) { <option [value]="s">{{ s | titlecase }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="cx-label">From (optional)</label>
+          <input type="date" class="cx-select" [(ngModel)]="filters.date_from" />
+        </div>
+        <div>
+          <label class="cx-label">To (optional)</label>
+          <input type="date" class="cx-select" [(ngModel)]="filters.date_to" />
+        </div>
+        <div>
+          <label class="cx-label">Branch</label>
+          <select class="cx-select" [(ngModel)]="filters.branch_id">
+            <option value="">All branches</option>
+            @for (b of branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="cx-label">Product</label>
+          <select class="cx-select" [(ngModel)]="filters.product_id">
+            <option value="">All products</option>
+            @for (p of products(); track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="cx-label">Agent</label>
+          <select class="cx-select" [(ngModel)]="filters.agent_id">
+            <option value="">All agents</option>
+            @for (a of agents(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
+          </select>
+        </div>
+        <div>
+          <label class="cx-label">Loan Type</label>
+          <select class="cx-select" [(ngModel)]="filters.loan_type">
+            <option value="">All types</option>
+            <option value="new">New</option>
+            <option value="top_up">Top-up</option>
           </select>
         </div>
         <div class="cx-mls-actions">
@@ -98,7 +135,7 @@ interface Col { key: string; label: string; money?: boolean; }
     .cx-mls-empty { margin-top: 16px; padding: 32px; text-align: center; color: var(--cx-text-muted); border: 1px dashed var(--cx-border); border-radius: var(--cx-radius-md); }
   `],
 })
-export class MonthlyLoanSummaryComponent {
+export class MonthlyLoanSummaryComponent implements OnInit {
   private readonly nowYear = new Date().getFullYear();
   years = Array.from({ length: 6 }, (_, i) => this.nowYear - i);
   months = [
@@ -111,6 +148,7 @@ export class MonthlyLoanSummaryComponent {
   columns: Col[] = [
     { key: 'date', label: 'Date' },
     { key: 'approval_date', label: 'Approval Date' },
+    { key: 'underwriter', label: 'Underwriter' },
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'full_name', label: 'Full Name' },
     { key: 'location', label: 'Location' },
@@ -136,12 +174,26 @@ export class MonthlyLoanSummaryComponent {
     { key: 'status', label: 'Status' },
   ];
 
-  filters: any = { year: this.nowYear, month: new Date().getMonth() + 1, status: 'all' };
+  filters: any = { year: this.nowYear, month: new Date().getMonth() + 1, status: 'all',
+    date_from: '', date_to: '', branch_id: '', product_id: '', agent_id: '', loan_type: '' };
   rows = signal<any[]>([]);
   loading = signal(false);
   generated = signal(false);
 
+  branches = signal<any[]>([]);
+  products = signal<any[]>([]);
+  agents = signal<{ id: string; name: string }[]>([]);
+
   constructor(private api: ApiService, private toast: ToastService, public settings: SettingsService) {}
+
+  ngOnInit(): void {
+    this.api.get('/locations', { per_page: 200 }).subscribe({ next: r => this.branches.set(r.data || []), error: () => {} });
+    this.api.get('/loan-products', { per_page: 200 }).subscribe({ next: r => this.products.set(r.data || []), error: () => {} });
+    this.api.get('/users', { per_page: 500, is_agent: true }).subscribe({
+      next: r => this.agents.set((r.data || []).map((u: any) => ({ id: u.id, name: u.full_name || u.name }))),
+      error: () => {},
+    });
+  }
 
   monthName(): string { return this.months.find(m => m.v === +this.filters.month)?.n || ''; }
 
@@ -156,6 +208,12 @@ export class MonthlyLoanSummaryComponent {
     this.loading.set(true);
     this.api.get('/reports/monthly-loan-summary', {
       year: this.filters.year, month: this.filters.month, status: this.filters.status,
+      date_from: this.filters.date_from || undefined,
+      date_to: this.filters.date_to || undefined,
+      branch_id: this.filters.branch_id || undefined,
+      product_id: this.filters.product_id || undefined,
+      agent_id: this.filters.agent_id || undefined,
+      loan_type: this.filters.loan_type || undefined,
     }).subscribe({
       next: r => { this.loading.set(false); this.rows.set(r.data?.rows || []); this.generated.set(true); },
       error: e => { this.loading.set(false); this.toast.error(e.error?.message || 'Failed to generate report'); },
