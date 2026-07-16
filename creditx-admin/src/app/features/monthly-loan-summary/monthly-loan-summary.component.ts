@@ -121,10 +121,10 @@ interface Col { key: string; label: string; money?: boolean; }
     </div>
   `,
   styles: [`
-    .cx-mls-filters { display: grid; grid-template-columns: repeat(3, minmax(140px, 220px)) 1fr; gap: 14px; align-items: end;
+    .cx-mls-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; align-items: end;
       background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-xl, 12px); padding: 16px; }
-    @media (max-width: 800px) { .cx-mls-filters { grid-template-columns: 1fr 1fr; } }
-    .cx-mls-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: end; }
+    /* Actions span their own full-width row so they never overlap the filter fields. */
+    .cx-mls-actions { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: flex-end; align-items: end; flex-wrap: wrap; }
     .cx-mls-meta { margin: 16px 0 8px; font-size: 13px; color: var(--cx-text-secondary); }
     .cx-mls-table-scroll { overflow-x: auto; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface); }
     .cx-mls-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; min-width: 100%; }
@@ -198,11 +198,20 @@ export class MonthlyLoanSummaryComponent implements OnInit {
 
   monthName(): string { return this.months.find(m => m.v === +this.filters.month)?.n || ''; }
 
+  /**
+   * Monetary display. Zero or null renders as 0.00 (never a dash) so the
+   * column stays numeric and Excel can total it after export.
+   */
   fmtMoney(v: any): string {
-    if (v === null || v === undefined || v === '') return '—';
-    const n = typeof v === 'number' ? v : parseFloat(v);
-    if (isNaN(n)) return '—';
-    return n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const n = v === null || v === undefined || v === '' ? 0 : (typeof v === 'number' ? v : parseFloat(v));
+    const safe = isNaN(n) ? 0 : n;
+    return safe.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /** Numeric value for exports — money columns become a real number (0 if blank). */
+  private moneyNum(v: any): number {
+    const n = v === null || v === undefined || v === '' ? 0 : (typeof v === 'number' ? v : parseFloat(v));
+    return isNaN(n) ? 0 : n;
   }
 
   generate(): void {
@@ -227,7 +236,7 @@ export class MonthlyLoanSummaryComponent implements OnInit {
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const header = this.columns.map(c => esc(c.label)).join(',');
-    const lines = this.rows().map(row => this.columns.map(c => esc(row[c.key])).join(','));
+    const lines = this.rows().map(row => this.columns.map(c => c.money ? String(this.moneyNum(row[c.key])) : esc(row[c.key])).join(','));
     const csv = [header, ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -242,7 +251,9 @@ export class MonthlyLoanSummaryComponent implements OnInit {
   exportExcel(): void {
     const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const head = '<tr>' + this.columns.map(c => `<th>${esc(c.label)}</th>`).join('') + '</tr>';
-    const body = this.rows().map(row => '<tr>' + this.columns.map(c => `<td>${esc(row[c.key])}</td>`).join('') + '</tr>').join('');
+    const body = this.rows().map(row => '<tr>' + this.columns.map(c => c.money
+      ? `<td style="mso-number-format:'0.00'">${this.moneyNum(row[c.key])}</td>`
+      : `<td>${esc(row[c.key])}</td>`).join('') + '</tr>').join('');
     const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head>`
       + `<body><table border="1">${head}${body}</table></body></html>`;
     const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });

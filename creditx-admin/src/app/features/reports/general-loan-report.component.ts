@@ -756,10 +756,11 @@ export class GeneralLoanReportComponent implements OnInit {
 
   // ─── Number formatting ───
   formatMoney(v: any): string {
-    if (v === null || v === undefined || v === '') return '—';
-    const n = typeof v === 'number' ? v : parseFloat(v);
-    if (isNaN(n)) return '—';
-    return n.toLocaleString('en-NG', { maximumFractionDigits: 2 });
+    // Zero or null shows 0 (never a dash) so money columns stay numeric and
+    // Excel can total them after export.
+    const n = v === null || v === undefined || v === '' ? 0 : (typeof v === 'number' ? v : parseFloat(v));
+    const safe = isNaN(n) ? 0 : n;
+    return safe.toLocaleString('en-NG', { maximumFractionDigits: 2 });
   }
 
   // ─── Chart SVG renderers ───

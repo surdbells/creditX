@@ -205,7 +205,7 @@ final class GeneralLoanReportService
                 -- Employment columns 19-23
                 c.employer AS group_name_employer,
                 loc.name AS branch,
-                c.gross_pay AS salary,
+                COALESCE(c.gross_pay, 0) AS salary,
                 c.employment_date,
                 -- Computed retirement date: DOB + 60 years (Nigerian civil
                 -- service convention). Returns NULL when DOB is unknown.
@@ -227,9 +227,9 @@ final class GeneralLoanReportService
                 -- Loan-specific columns 31-41
                 l.loan_type,
                 l.disbursed_at AS date_issued,
-                l.amount_requested AS approved_amount,
-                bsa_fee.amount AS bank_statement_fee,
-                l.gross_loan AS gross_loan_amount,
+                COALESCE(l.amount_requested, 0) AS approved_amount,
+                COALESCE(bsa_fee.amount, 0) AS bank_statement_fee,
+                COALESCE(l.gross_loan, 0) AS gross_loan_amount,
                 -- Net disbursement = amount - top-up - all fees deducted from
                 -- disbursement (management + bank statement + any other
                 -- deducted fee). Previously this used the stored
@@ -238,9 +238,9 @@ final class GeneralLoanReportService
                 (l.amount_requested
                     - COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0)
                     - COALESCE(df.deducted_fees, 0)) AS net_disbursement,
-                COALESCE(l.top_up_balance_underwriter, l.top_up_balance) AS top_up_balance,
+                COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0) AS top_up_balance,
                 l.interest_rate,
-                first_rs.total_amount AS repayment_amount,
+                COALESCE(first_rs.total_amount, 0) AS repayment_amount,
                 first_rs.due_date AS first_repayment_date,
                 l.tenure AS tenor,
 
