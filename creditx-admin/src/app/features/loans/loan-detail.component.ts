@@ -1687,13 +1687,31 @@ export class LoanDetailComponent implements OnInit {
     });
   }
 
+  /**
+   * Net disbursed = amount − effective top-up − fees deducted from
+   * disbursement (management, bank statement, etc.). The stored
+   * loan.net_disbursed is computed at CAPTURE time and does not reflect the
+   * underwriter's later top-up balance, so recompute it here from the actual
+   * fee breakdowns + effective top-up.
+   */
+  netDisbursedValue(): number {
+    const l = this.loan();
+    if (!l) return 0;
+    const amount = Number(l.amount_requested || 0);
+    const topUp = Number(l.top_up_balance_effective ?? l.top_up_balance_underwriter ?? l.top_up_balance ?? 0);
+    const deducted = (l.fee_breakdowns || [])
+      .filter((f: any) => f.is_deducted)
+      .reduce((s: number, f: any) => s + Number(f.amount || 0), 0);
+    return Math.max(0, amount - topUp - deducted);
+  }
+
   get kpis() {
     const l = this.loan();
     if (!l) return [];
     return [
       { label: 'Amount', value: this.settings.formatMoney(l.amount_requested) },
       { label: 'Gross Loan', value: this.settings.formatMoney(l.gross_loan || l.amount_requested) },
-      { label: 'Net Disbursed', value: this.settings.formatMoney(l.net_disbursed || l.amount_requested) },
+      { label: 'Net Disbursed', value: this.settings.formatMoney(this.netDisbursedValue()) },
       { label: 'Status', value: (l.status || '').replace(/_/g, ' ').toUpperCase(), color: l.status === 'active' || l.status === 'disbursed' ? 'text-[var(--cx-success)]' : l.status === 'overdue' ? 'text-[var(--cx-danger)]' : '' },
       { label: 'Tenure', value: l.tenure + ' months' },
     ];

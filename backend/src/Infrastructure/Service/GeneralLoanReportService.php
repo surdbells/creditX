@@ -230,7 +230,14 @@ final class GeneralLoanReportService
                 l.amount_requested AS approved_amount,
                 bsa_fee.amount AS bank_statement_fee,
                 l.gross_loan AS gross_loan_amount,
-                l.net_disbursed AS net_disbursement,
+                -- Net disbursement = amount - top-up - all fees deducted from
+                -- disbursement (management + bank statement + any other
+                -- deducted fee). Previously this used the stored
+                -- l.net_disbursed, which is computed at capture time and does
+                -- not reflect the underwriter's top-up or the bank statement fee.
+                (l.amount_requested
+                    - COALESCE(l.top_up_balance_underwriter, l.top_up_balance, 0)
+                    - COALESCE(df.deducted_fees, 0)) AS net_disbursement,
                 COALESCE(l.top_up_balance_underwriter, l.top_up_balance) AS top_up_balance,
                 l.interest_rate,
                 first_rs.total_amount AS repayment_amount,
@@ -279,6 +286,13 @@ final class GeneralLoanReportService
                 WHERE fb.loan_id = l.id AND ft.code = 'BSA'
                 LIMIT 1
             ) bsa_fee ON TRUE
+
+            -- Sum of all fees deducted from disbursement (for net disbursement).
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(SUM(fb.amount), 0) AS deducted_fees
+                FROM loan_fee_breakdowns fb
+                WHERE fb.loan_id = l.id AND fb.is_deducted = true
+            ) df ON TRUE
 
             WHERE {$where}
             ORDER BY COALESCE(l.disbursed_at, l.created_at) DESC, l.id DESC
