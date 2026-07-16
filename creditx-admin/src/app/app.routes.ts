@@ -31,6 +31,7 @@ export const routes: Routes = [
       { path: 'registration-approvals', loadComponent: () => import('./features/registration-approvals/registration-approvals.component').then(m => m.RegistrationApprovalsComponent) },
       { path: 'loan-products', loadComponent: () => import('./features/loan-products/loan-products.component').then(m => m.LoanProductsComponent) },
       { path: 'fee-types', loadComponent: () => import('./features/fee-types/fee-types.component').then(m => m.FeeTypesComponent) },
+      { path: 'document-types', loadComponent: () => import('./features/document-types/document-types.component').then(m => m.DocumentTypesComponent) },
       { path: 'penalty-rules', loadComponent: () => import('./features/penalty-rules/penalty-rules.component').then(m => m.PenaltyRulesComponent) },
       { path: 'approval-workflows', loadComponent: () => import('./features/approval-workflows/approval-workflows.component').then(m => m.ApprovalWorkflowsComponent) },
       { path: 'loans', loadComponent: () => import('./features/loans/loans.component').then(m => m.LoansComponent) },
