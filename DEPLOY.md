@@ -5,8 +5,20 @@ done manually — run each step in order. Do not skip steps unless you
 understand what they do and why.
 
 Server path: `/www/wwwroot/creditx`
-PHP-FPM service: typically `php-fpm` or `php8.2-fpm` (check with
-`systemctl list-units --state=active | grep fpm`)
+(live tenants live under their own vhost, e.g. `/www/wwwroot/fti.api.creditx.cloud`)
+
+**PHP-FPM — resolve this before touching `var/`.** On **aaPanel** (fti and
+karicash) the PHP 8.4 service is **`php-fpm-84`**, reloaded with
+`/etc/init.d/php-fpm-84 reload` — *not* `php-fpm` or `php8.4-fpm`, which do
+not exist there. It runs as user **`www`**. Elsewhere it may be
+`php-fpm`/`php8.2-fpm` as `www-data` or `nginx`. See **Step 4**.
+
+> **The two mistakes that break deploys, every time:**
+> 1. `rm -rf var/cache var/proxies` as root **without `chown`-ing them back**
+>    to the FPM user → `"Your proxy directory ... must be writable"` at
+>    request time. See Step 5.
+> 2. Running `bin/cache-warmup.php` **as root** → root-owned files in `var/`
+>    that PHP-FPM can't rewrite. Run it as the FPM user. See Step 7.
 
 ---
 
@@ -81,12 +93,62 @@ php bin/doctrine orm:schema-tool:update --force --complete
 
 ---
 
-## Step 4 — Clear caches thoroughly
+## Step 4 — Identify the PHP-FPM user and service (do this FIRST)
 
-**This step is where most deploys go wrong if done sloppily.** Doctrine
-ORM metadata is cached to disk, and PHP opcache keeps the bytecode of
-those cache files in memory. Both need to be cleared in the correct
-order.
+Steps 5–8 all depend on these two values. Resolve them once, export them,
+and reuse them — most broken deploys trace back to guessing here.
+
+```bash
+# The user PHP-FPM runs as. Everything under var/ must be owned by it.
+FPMUSER=$(ps -o user= -C php-fpm | grep -v '^root$' | sort -u | head -1)
+echo "PHP-FPM user: ${FPMUSER:-<NOT FOUND — do not continue>}"
+
+# The service name.
+systemctl list-units --state=active --type=service | grep -i fpm
+ls /etc/init.d/ | grep -i fpm
+```
+
+**On aaPanel** (which is what fti + karicash run on) PHP is installed per
+version under `/www/server/php/<ver>/` and the service is **not** named
+`php-fpm` or `php8.4-fpm`. For PHP 8.4 it is **`php-fpm-84`**, reloaded via
+its init script:
+
+```bash
+/etc/init.d/php-fpm-84 reload        # aaPanel, PHP 8.4  ← use this on fti
+systemctl reload php-fpm-84          # only if the unit is registered
+```
+
+Notes:
+- aaPanel runs **one FPM master per PHP version**, shared by every site on
+  that version — so reloading `php-fpm-84` also flushes opcache for the
+  other sites on 8.4 (e.g. karicash). Reload is graceful; this is safe, but
+  be aware it isn't scoped to one site.
+- The FPM user on aaPanel is normally **`www`**. Other stacks use
+  `www-data` (Debian/Ubuntu default) or `nginx`.
+
+Common service names on non-aaPanel hosts: `php-fpm.service`,
+`php8.2-fpm.service`, `php8.3-fpm.service`.
+
+---
+
+## Step 5 — Clear caches, then FIX OWNERSHIP
+
+**This step is where most deploys go wrong.** Doctrine ORM metadata is
+cached to disk, and PHP opcache keeps the bytecode of those cache files in
+memory. Both need clearing, in order.
+
+> ### ⚠️ Never `rm -rf var/` without chown-ing it back
+> Deleting and recreating the directories **as root** leaves them owned by
+> root. PHP-FPM (running as `www`) then cannot write proxy classes, and the
+> site fails at request time with:
+>
+> ```
+> Your proxy directory ".../var/proxies" must be writable
+> ```
+>
+> Doctrine generates proxies **lazily, at request time**, whenever it
+> hydrates a lazy relation — so a freshly emptied `var/proxies` guarantees a
+> write attempt. The `chown` below is **not optional**.
 
 ```bash
 cd /www/wwwroot/creditx/backend
@@ -96,16 +158,18 @@ cd /www/wwwroot/creditx/backend
 rm -rf var/cache var/proxies
 mkdir -p var/cache/doctrine var/proxies
 
-# Fix ownership — the web server user needs to read these later.
-# Try each common owner; one of them matches your setup.
-chown -R www:www var/cache var/proxies 2>/dev/null || \
-chown -R www-data:www-data var/cache var/proxies 2>/dev/null || \
-chown -R nginx:nginx var/cache var/proxies
+# ── MANDATORY: hand them back to the PHP-FPM user (from Step 4) ──
+chown -R "$FPMUSER:$FPMUSER" var/cache var/proxies
+chmod -R 775 var/cache var/proxies
+
+# Verify before moving on — this must print OK.
+sudo -u "$FPMUSER" test -w var/proxies && echo "OK: var/proxies writable by $FPMUSER" \
+  || echo "FAIL: $FPMUSER cannot write var/proxies — fix before continuing"
 ```
 
 ---
 
-## Step 5 — First opcache reload (before warmup)
+## Step 6 — First opcache reload (before warmup)
 
 Resets PHP opcache BEFORE the warmup script runs. This ensures the
 warmup CLI process reads fresh entity source code from disk rather
@@ -113,34 +177,37 @@ than stale bytecode that might have been loaded by a previous CLI
 invocation (which is common on managed hosts with `opcache.enable_cli=1`).
 
 ```bash
-# Find the actual service name
-systemctl list-units --state=active --type=service | grep fpm
-
-# Reload it (substitute the actual name)
-sudo systemctl reload php-fpm
+/etc/init.d/php-fpm-84 reload        # aaPanel / PHP 8.4 — substitute yours
 ```
-
-Common service names:
-- `php-fpm.service`
-- `php8.2-fpm.service`
-- `php8.3-fpm.service`
 
 ---
 
-## Step 6 — Warm the Doctrine cache
+## Step 7 — Warm the Doctrine cache — RUN AS THE FPM USER
 
 ```bash
 cd /www/wwwroot/creditx/backend
-php -d memory_limit=512M bin/cache-warmup.php
+
+# ── Run as the PHP-FPM user, NOT root ──
+# Running this as root writes root-owned metadata + proxy files into var/,
+# which PHP-FPM then cannot rewrite — the same failure as skipping the
+# chown in Step 5, just harder to spot because warmup "succeeds".
+sudo -u "$FPMUSER" php -d memory_limit=512M bin/cache-warmup.php
 ```
 
 This pre-generates Doctrine ORM metadata and proxy classes so the first
 HTTP request doesn't consume excessive memory. Output should say:
 `Loaded N entity metadata` and `Proxy classes generated in var/proxies/`.
 
+Re-verify ownership afterwards (cheap, catches a root-run warmup):
+
+```bash
+ls -ld var/cache var/proxies         # owner must be the FPM user, not root
+find var -user root -print -quit     # must print NOTHING
+```
+
 ---
 
-## Step 7 — Second opcache reload (after warmup)
+## Step 8 — Second opcache reload (after warmup)
 
 Ensures HTTP workers pick up the freshly written Doctrine metadata cache
 files. Without this second reload, Semantical errors like "Class User
@@ -149,12 +216,12 @@ because the HTTP workers still hold the OLD metadata cache file bytecode
 in opcache memory.
 
 ```bash
-sudo systemctl reload php-fpm   # or whichever service name
+/etc/init.d/php-fpm-84 reload        # aaPanel / PHP 8.4 — substitute yours
 ```
 
 ---
 
-## Step 8 — Build frontend apps
+## Step 9 — Build frontend apps
 
 ### Admin app
 
@@ -181,7 +248,7 @@ Skip these if the deploy only touched backend code.
 
 ---
 
-## Step 9 — Smoke test
+## Step 10 — Smoke test
 
 ```bash
 # Verify HEAD is what you expect
@@ -212,8 +279,8 @@ cd /www/wwwroot/creditx
 git log --oneline -5        # find the last good commit
 git reset --hard <commit>
 
-# Then re-run steps 4–7 (cache clear + opcache reload) so PHP uses
-# the rolled-back code
+# Then re-run steps 4–8 (cache clear + chown + warmup-as-www + reloads)
+# so PHP uses the rolled-back code. Do NOT skip the chown.
 ```
 
 If a schema update is in the bad commit, you may need to manually
@@ -379,7 +446,7 @@ an OAuth2 service account. The legacy server-key HTTP API is NOT used
 7. **Reload php-fpm** so workers pick up the env change:
 
    ```bash
-   sudo systemctl reload php-fpm
+   /etc/init.d/php-fpm-84 reload    # aaPanel / PHP 8.4 — see Step 4
    ```
 
 ### What the 8 seeded templates cover
