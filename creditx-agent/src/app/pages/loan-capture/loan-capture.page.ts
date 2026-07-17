@@ -1105,7 +1105,7 @@ import { BankSelectComponent } from '../../shared/bank-select.component';
                       [disabled]="submitting() || !canSubmit()" (click)="submit()">
                 @if (submitting()) {
                   <ion-spinner name="crescent" style="width: 16px; height: 16px"></ion-spinner>
-                  <span>{{ isEditMode() ? 'Saving...' : 'Submitting...' }}</span>
+                  <span>{{ uploadInFlight() ? 'Uploading documents…' : (isEditMode() ? 'Saving...' : 'Submitting...') }}</span>
                 } @else {
                   <ion-icon name="checkmark-circle-outline" style="font-size: 16px"></ion-icon>
                   <span>{{ isEditMode() ? 'Save Changes' : 'Submit Application' }}</span>
@@ -2682,6 +2682,15 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   }
 
   /**
+   * True while document uploads are actually in flight (after the loan itself
+   * has been saved/created). Drives the button label so it says "Uploading
+   * documents…" instead of the misleading "Saving…" during the upload phase.
+   */
+  uploadInFlight(): boolean {
+    return !!this.submittedLoanId() && this.uploadedDocs.size > 0 && !this.uploadsComplete();
+  }
+
+  /**
    * Labels of the REQUIRED documents that aren't staged yet. Documents can be
    * skipped at capture, but the backend blocks submit-for-approval until these
    * exist — so the review step warns up front rather than letting the agent
@@ -2890,6 +2899,9 @@ export class LoanCapturePage implements OnInit, OnDestroy {
     // but if an agent somehow invokes submit() via another path (stale
     // ref, keyboard enter on a hidden button) we still refuse.
     if (!this.canSubmit()) return;
+    // Re-entrancy guard: a second tap while the first request (or its
+    // document uploads) is still running must not fire another PUT/POST.
+    if (this.submitting()) return;
     // Guarantee the read-only amount-in-words matches the final amount.
     this.onAmountChange();
     this.submitting.set(true);
@@ -3037,8 +3049,11 @@ export class LoanCapturePage implements OnInit, OnDestroy {
   private submitEdit(payload: any): void {
     this.api.put(`/loans/${this.id}`, payload).subscribe({
       next: () => {
-        this.submitting.set(false);
-        this.toast.success('Loan updated successfully');
+        // NB: `submitting` is deliberately NOT cleared here. It used to be, the
+        // instant the PUT returned — which re-enabled Save Changes while the
+        // document uploads were still running, so agents tapped it repeatedly
+        // waiting for something to happen. It stays true until the uploads
+        // finish (pollUploadsComplete) or we bail out below.
 
         // Upload only the newly-staged docs (ones without the 'existing'
         // marker). If they're all existing, there's nothing to do.
@@ -3054,6 +3069,13 @@ export class LoanCapturePage implements OnInit, OnDestroy {
             || '';
 
           if (customerId) {
+            this.toast.success('Loan updated — uploading documents…');
+            // The upload progress panel is keyed off submittedLoanId, which was
+            // only ever set on create — so edit-mode uploads ran invisibly.
+            // Setting it here renders the same per-document progress rows,
+            // spinner, retry buttons and completion tick that create mode gets.
+            this.uploadsComplete.set(false);
+            this.submittedLoanId.set(this.id);
             this.uploadDocuments(this.id, customerId, /* editMode */ true);
             this.pollUploadsComplete(this.id);
             return;
@@ -3061,9 +3083,13 @@ export class LoanCapturePage implements OnInit, OnDestroy {
 
           // Still no customer — fail loudly rather than pretending the
           // documents were saved.
+          this.submitting.set(false);
           this.toast.error('Loan saved, but the documents could not be uploaded (customer not resolved). Please reopen the loan and try again.');
           return;
         }
+
+        this.submitting.set(false);
+        this.toast.success('Loan updated successfully');
 
         // No new docs to upload — navigate straight back to detail.
         // Use queryParams cache-bust so the loan-detail page re-fetches
@@ -3087,6 +3113,10 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       if (allDone) {
         clearInterval(iv);
         this.uploadsComplete.set(true);
+        // Release the submit/save button now the uploads have settled —
+        // without this it would stay disabled forever when an upload fails
+        // and the agent stays on the page to retry.
+        this.submitting.set(false);
         // If all succeeded, auto-navigate after a brief success pause
         const allSucceeded = states.every(s => s.status === 'done');
         if (allSucceeded) {
