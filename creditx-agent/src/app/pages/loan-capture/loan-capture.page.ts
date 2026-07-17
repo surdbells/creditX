@@ -584,7 +584,11 @@ import { BankSelectComponent } from '../../shared/bank-select.component';
           @if (step() === 4) {
             <div class="flex flex-col gap-3">
               <div class="cxm-lc-doc-head-row">
-                <p class="cxm-lc-doc-hint">All documents are required. Max 10MB each.</p>
+                <p class="cxm-lc-doc-hint">
+                  You can skip and add these later — but the ones marked
+                  <strong>Required</strong> must be uploaded before you can send
+                  the loan for approval. Max 10MB each.
+                </p>
                 <span class="cxm-lc-doc-counter tabular-nums"
                       [class.is-complete]="allDocsStaged()">
                   {{ stagedDocCount() }} of {{ docTypes.length }}
@@ -659,6 +663,24 @@ import { BankSelectComponent } from '../../shared/bank-select.component';
           <!-- Step 6: Review & Submit -->
           @if (step() === 5) {
             <div class="flex flex-col gap-3">
+
+              <!-- Missing required documents — capture can still be saved, but
+                   the loan can't be sent for approval until these exist. Warn
+                   here rather than letting the agent hit the block later. -->
+              @if (!submittedLoanId() && missingRequiredDocs().length) {
+                <div class="cxm-lc-doc-warn">
+                  <ion-icon name="alert-circle-outline" class="cxm-lc-doc-warn-icon"></ion-icon>
+                  <div>
+                    <div class="cxm-lc-doc-warn-title">Still needed before approval</div>
+                    <div class="cxm-lc-doc-warn-text">
+                      You can submit this application now, but
+                      <strong>{{ missingRequiredDocs().join(', ') }}</strong>
+                      must be uploaded before it can be sent for approval. Add them
+                      on the Documents step, or later by editing this loan.
+                    </div>
+                  </div>
+                </div>
+              }
 
               <!-- Loan summary (product, staff, amounts) -->
               <div class="cxm-lc-card">
@@ -1512,6 +1534,21 @@ import { BankSelectComponent } from '../../shared/bank-select.component';
       gap: 12px;
       padding: 0 2px;
     }
+    /* Review-step notice: required documents still outstanding. */
+    .cxm-lc-doc-warn {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 12px 14px;
+      border-radius: var(--cx-radius-md, 10px);
+      background: color-mix(in srgb, var(--cx-warning) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--cx-warning) 45%, transparent);
+    }
+    .cxm-lc-doc-warn-icon { font-size: 20px; color: var(--cx-warning); flex-shrink: 0; }
+    .cxm-lc-doc-warn-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;
+      font-weight: 700; color: var(--cx-warning); margin-bottom: 3px;
+    }
+    .cxm-lc-doc-warn-text { font-size: 13px; color: var(--cx-text); line-height: 1.45; }
+
     .cxm-lc-doc-hint {
       font-size: var(--cx-text-xs);
       color: var(--cx-text-muted);
@@ -2611,25 +2648,49 @@ export class LoanCapturePage implements OnInit, OnDestroy {
    *     gate — if the user reached Step 5 without docs, we still
    *     refuse to submit)
    */
+  /**
+   * Gates the "Submit Application" button on step 6.
+   *
+   * Deliberately does NOT require documents. Agents may skip the upload step
+   * because some documents aren't available at capture time — gating submit on
+   * them would defeat that (the Next button would let you past step 5, then
+   * Submit would sit dead with no explanation).
+   *
+   * Required documents are enforced later, at submit-for-approval (backend
+   * SubmitLoanAction, against the configurable document_types table), so a loan
+   * still cannot reach an approver without them.
+   */
   canSubmit(): boolean {
     return !!this.form['product_id']
         && !!this.staffRecord()
+        && !this.staffBlocked()
         && !!this.form['amount']
         && !!this.form['tenure']
         && !!this.form['full_name']
         && !!this.form['phone']
         && !!this.form['bvn']
-        && this.bvnError() === null
-        && this.allDocsStaged();
+        && this.bvnError() === null;
   }
 
   /**
-   * True when every docType in the required list has a file staged
-   * in uploadedDocs. Used by both step-4's Next gate and the final
-   * submit gate.
+   * True when EVERY docType has a file staged. Only drives the "N of M"
+   * counter's complete styling — it is NOT a gate. Neither Next nor Submit
+   * depends on it, since documents are optional at capture.
    */
   allDocsStaged(): boolean {
     return this.docTypes.every(dt => this.uploadedDocs.has(dt.key));
+  }
+
+  /**
+   * Labels of the REQUIRED documents that aren't staged yet. Documents can be
+   * skipped at capture, but the backend blocks submit-for-approval until these
+   * exist — so the review step warns up front rather than letting the agent
+   * discover it later from a rejection toast.
+   */
+  missingRequiredDocs(): string[] {
+    return this.docTypes
+      .filter(dt => dt.required && !this.uploadedDocs.has(dt.key))
+      .map(dt => dt.label);
   }
 
   /**
