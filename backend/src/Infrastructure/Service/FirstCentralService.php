@@ -64,6 +64,10 @@ final class FirstCentralService
         if (!$this->isConfigured()) return $this->result('not_configured', null, null, [], null, [], 'FirstCentral is not configured on this server.');
 
         $productId = (string) $this->settings->get('credit_bureau.consumer_product_id', '70'); // iScore
+        // The dedicated named report endpoint — NOT the generic /consumerreports,
+        // which returns HTTP 500 for iScore on UAT. Configurable so a deployment
+        // can pull a different report without a code change.
+        $endpoint = (string) $this->settings->get('credit_bureau.consumer_endpoint', '/GetiScoreReport');
 
         try {
             $ticket = $this->ticket();
@@ -95,7 +99,7 @@ final class FirstCentralService
             }
             $mergeList = implode(',', array_unique($ids));
 
-            $report = $this->call('/consumerreports', [
+            $report = $this->call($endpoint, [
                 'DataTicket'                => $ticket,
                 'consumerID'                => $consumerId,
                 'EnquiryID'                 => (string) ($matched['EnquiryID'] ?? ''),
@@ -134,6 +138,7 @@ final class FirstCentralService
         if (!$this->isConfigured()) return $this->result('not_configured', null, null, [], null, [], 'FirstCentral is not configured on this server.');
 
         $productId = (string) $this->settings->get('credit_bureau.commercial_product_id', '47'); // Commercial Full Credit
+        $endpoint = (string) $this->settings->get('credit_bureau.commercial_endpoint', '/GetCommercialFullCreditReport');
 
         try {
             $ticket = $this->ticket();
@@ -160,7 +165,7 @@ final class FirstCentralService
                 if ($id !== '' && $id !== '0') $ids[] = $id;
             }
 
-            $report = $this->call('/commercialreports', [
+            $report = $this->call($endpoint, [
                 'DataTicket'                => $ticket,
                 'commercialID'              => $commercialId,
                 'EnquiryID'                 => (string) ($first['SubscriberEnquiryID'] ?? ''),

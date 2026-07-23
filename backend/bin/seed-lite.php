@@ -146,7 +146,9 @@ $settingsDef = [
     // which report to pull, and the auto-decision thresholds.
     ['credit_bureau.enabled', 'false', 'boolean', 'general', 'Enable FirstCentral credit bureau checks'],
     ['credit_bureau.consumer_product_id', '70', 'string', 'general', 'FirstCentral consumer report product id (70 = iScore, returns a numeric score)'],
+    ['credit_bureau.consumer_endpoint', '/GetiScoreReport', 'string', 'general', 'FirstCentral consumer report endpoint (named endpoint; /consumerreports 500s for iScore)'],
     ['credit_bureau.commercial_product_id', '47', 'string', 'general', 'FirstCentral commercial report product id (47 = Commercial Full Credit)'],
+    ['credit_bureau.commercial_endpoint', '/GetCommercialFullCreditReport', 'string', 'general', 'FirstCentral commercial report endpoint'],
     ['credit_bureau.pass_threshold', '600', 'integer', 'general', 'Credit-check workflow step auto-approves at or above this score'],
     ['credit_bureau.fail_threshold', '400', 'integer', 'general', 'Credit-check workflow step auto-rejects at or below this score; scores between fail and pass go to a human'],
 ];
