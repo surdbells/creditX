@@ -11,4 +11,6 @@ export const environment = {
   requireTenantSelection: false,
   // This build's version — compared against the tenant's mobile.min_agent_version.
   appVersion: '1.0.0',
+  // Sentry DSN (public, embedded in the bundle). Empty disables Sentry.
+  sentryDsn: '',
 };

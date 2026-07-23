@@ -5,4 +5,5 @@ export const environment = {
   // Auto-derived from the hostname on *.creditx.cloud (one build → all clients).
   // The fallback is used only off-platform (localhost / preview URLs).
   apiUrl: resolveApiUrl('http://localhost:8080/api'),
+  sentryDsn: '',
 };

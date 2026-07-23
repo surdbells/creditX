@@ -1,4 +1,5 @@
-import { ApplicationConfig, importProvidersFrom, provideAppInitializer, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, inject } from '@angular/core';
+import { ApplicationConfig, ErrorHandler, importProvidersFrom, provideAppInitializer, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, inject } from '@angular/core';
+import * as Sentry from '@sentry/angular';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
@@ -22,6 +23,8 @@ import { SettingsService } from './core/services/settings.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    // Route uncaught Angular errors to Sentry (no-op if Sentry wasn't init'd).
+    { provide: ErrorHandler, useValue: Sentry.createErrorHandler() },
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding()),

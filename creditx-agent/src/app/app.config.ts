@@ -1,13 +1,15 @@
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, ErrorHandler } from '@angular/core';
 import { provideRouter, RouteReuseStrategy, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideIonicAngular, IonicRouteStrategy } from '@ionic/angular/standalone';
+import * as Sentry from '@sentry/angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    { provide: ErrorHandler, useValue: Sentry.createErrorHandler() },
     // withComponentInputBinding() binds route params directly to
     // @Input() properties on the routed component. Without this, all
     // our thread / detail pages that read `@Input() id = ''` silently

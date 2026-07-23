@@ -36,3 +36,20 @@ export function resolveApiUrl(fallback: string): string {
   }
   return fallback;
 }
+
+/**
+ * Tenant slug from the hostname (fti, karicash, …), used to tag Sentry events
+ * per deployment from a single shared build. Falls back off-platform.
+ */
+export function resolveTenantSlug(fallback: string): string {
+  try {
+    const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+    if (host && host !== ROOT && host.endsWith('.' + ROOT)) {
+      const slug = host.split('.')[0].replace(/-(admin|portal)$/, '');
+      if (slug && RESERVED.indexOf(slug) === -1) return slug;
+    }
+  } catch {
+    // fall through
+  }
+  return fallback;
+}
