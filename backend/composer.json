@@ -32,7 +32,8 @@
         "symfony/console": "^7.0",
         "symfony/property-access": "^7.0",
         "ramsey/uuid-doctrine": "^2.0",
-        "kreait/firebase-php": "^8.2"
+        "kreait/firebase-php": "^8.2",
+        "sentry/sentry": "^4.0"
     },
     "config": {
         "audit": {

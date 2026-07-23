@@ -42,6 +42,12 @@ return function (App $app): void {
             $statusCode = $exception->getCode();
         }
 
+        // Report server-side failures to Sentry — not client 4xx (validation,
+        // not-found, unauthorized), which are expected and would be noise.
+        if ($statusCode >= 500 && function_exists('Sentry\\captureException')) {
+            \Sentry\captureException($exception);
+        }
+
         $payload = ['status' => 'error', 'message' => 'Internal server error'];
         if ($displayErrorDetails) {
             $payload['message'] = $exception->getMessage();

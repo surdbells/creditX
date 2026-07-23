@@ -11,6 +11,9 @@ require __DIR__ . '/../vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
 
+// Initialize Sentry (no-op if SENTRY_DSN is unset).
+(require __DIR__ . '/../config/sentry.php')();
+
 // Build DI container (no compilation — Doctrine handles its own caching)
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions(__DIR__ . '/../config/container.php');
