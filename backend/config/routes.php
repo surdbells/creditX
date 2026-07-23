@@ -620,6 +620,9 @@ return function (App $app): void {
             ->add(new RbacMiddleware('credit_bureau.check'));
         $api->get('/credit-bureau/checks/{id}', CreditBureau\GetCreditCheckAction::class)
             ->add(new RbacMiddleware('credit_bureau.check'));
+        // Latest credit check for a loan — visible to loan viewers/approvers.
+        $api->get('/loans/{id}/credit-check', CreditBureau\GetLoanCreditCheckAction::class)
+            ->add(new RbacMiddleware('loans.view'));
 
         // ─── Settlement (outbound bank transfer via Paystack/Flutterwave) ───
         // Manually trigger / retry the payout for a disbursed loan.

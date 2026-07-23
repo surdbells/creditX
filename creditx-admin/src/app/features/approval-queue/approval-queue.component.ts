@@ -220,6 +220,26 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
             </section>
 
             <!-- Affordability (portal-originated loans capture an income + DSR snapshot) -->
+            @if (creditCheck(); as cc) {
+              <section class="cx-aq-section">
+                <h3 class="cx-aq-section-title">Credit Bureau</h3>
+                <div class="cx-aq-credit">
+                  @if (cc.status === 'hit' && cc.score != null) {
+                    <div class="cx-aq-credit-score tabular-nums">{{ cc.score }}</div>
+                    <div class="cx-aq-credit-meta">
+                      <span class="cx-aq-credit-band">{{ cc.risk_band || '—' }}</span>
+                      <span class="cx-aq-credit-sub">FirstCentral · {{ cc.decision === 'auto_pass' ? 'passed threshold' : cc.decision === 'auto_fail' ? 'below threshold' : 'manual review' }}</span>
+                    </div>
+                  } @else {
+                    <div class="cx-aq-credit-meta">
+                      <span class="cx-aq-credit-band">{{ cc.status === 'no_hit' ? 'No bureau record' : cc.status === 'error' ? 'Check unavailable' : 'No score' }}</span>
+                      <span class="cx-aq-credit-sub">FirstCentral · manual review</span>
+                    </div>
+                  }
+                </div>
+              </section>
+            }
+
             @if (l.applicant_monthly_income != null || l.dsr != null) {
               <section class="cx-aq-section">
                 <h3 class="cx-aq-section-title">Affordability</h3>
@@ -793,6 +813,11 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
     }
     .cx-aq-secret-btn:hover { color: var(--cx-text); border-color: var(--cx-border-strong); }
     .cx-aq-section { margin-bottom: 24px; }
+    .cx-aq-credit { display: flex; align-items: center; gap: 16px; }
+    .cx-aq-credit-score { font-size: 34px; font-weight: 800; color: var(--cx-primary-600); line-height: 1; }
+    .cx-aq-credit-meta { display: flex; flex-direction: column; gap: 3px; }
+    .cx-aq-credit-band { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--cx-text); }
+    .cx-aq-credit-sub { font-size: 12px; color: var(--cx-text-muted); }
     .cx-aq-section:last-child { margin-bottom: 0; }
     .cx-aq-section-title {
       font-size: 11px;
@@ -1180,6 +1205,7 @@ export class ApprovalQueueComponent implements OnInit {
   mode = signal<'review' | 'reject' | 'quick-approve'>('review');
   activeRow = signal<any>(null);
   loanDetail = signal<any>(null);
+  creditCheck = signal<any | null>(null);
   approvals = signal<any[]>([]);
   detailLoading = signal(false);
   deciding = signal(false);
@@ -1431,6 +1457,11 @@ export class ApprovalQueueComponent implements OnInit {
         this.detailLoading.set(false);
       },
       error: () => this.detailLoading.set(false),
+    });
+    this.creditCheck.set(null);
+    this.api.get(`/loans/${loanId}/credit-check`).subscribe({
+      next: r => this.creditCheck.set(r.data ?? null),
+      error: () => this.creditCheck.set(null),
     });
     this.api.get(`/approvals/loan/${loanId}`).subscribe({
       next: r => this.approvals.set(r.data || []),
