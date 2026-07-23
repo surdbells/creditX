@@ -46,6 +46,7 @@ $permissionsDef = [
     'notifications' => [['notifications.view','View Notifications'],['notifications.manage','Manage Notification Templates']],
     'messaging' => [['messaging.view','View Messages'],['messaging.send','Send Messages']],
     'maker_checker' => [['maker_checker.make','Submit Maker-Checker Requests'],['maker_checker.check','Approve/Reject Maker-Checker Requests']],
+    'credit_bureau' => [['credit_bureau.check','Run Credit Bureau Checks']],
 ];
 
 $permIds = [];
@@ -141,6 +142,13 @@ $settingsDef = [
     ['settlement.enabled', 'false', 'boolean', 'payment', 'Send disbursed funds to the customer bank account via a payment provider'],
     ['settlement.provider', 'paystack', 'string', 'payment', 'Default settlement provider: paystack or flutterwave'],
     ['settlement.mode', 'immediate', 'string', 'payment', 'Settlement trigger: immediate (send right after disbursement) or maker_checker (queue for approval)'],
+    // Credit bureau (FirstCentral). Secrets live in env; these control on/off,
+    // which report to pull, and the auto-decision thresholds.
+    ['credit_bureau.enabled', 'false', 'boolean', 'general', 'Enable FirstCentral credit bureau checks'],
+    ['credit_bureau.consumer_product_id', '70', 'string', 'general', 'FirstCentral consumer report product id (70 = iScore, returns a numeric score)'],
+    ['credit_bureau.commercial_product_id', '47', 'string', 'general', 'FirstCentral commercial report product id (47 = Commercial Full Credit)'],
+    ['credit_bureau.pass_threshold', '600', 'integer', 'general', 'Credit-check workflow step auto-approves at or above this score'],
+    ['credit_bureau.fail_threshold', '400', 'integer', 'general', 'Credit-check workflow step auto-rejects at or below this score; scores between fail and pass go to a human'],
 ];
 
 $settingsCount = 0;

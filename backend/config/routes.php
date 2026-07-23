@@ -37,6 +37,7 @@ use App\Action\DsaTarget;
 use App\Action\Department;
 use App\Action\Team;
 use App\Action\Reconciliation;
+use App\Action\CreditBureau;
 use App\Action\Portal;
 use App\Action\ListBanksAction;
 use App\Action\ResolveBankAccountAction;
@@ -609,6 +610,16 @@ return function (App $app): void {
         // validation summary so operators can review before submitting.
         $api->post('/disbursement/batch/preview', Disbursement\BatchDisbursePreviewAction::class)
             ->add(new RbacMiddleware('loans.disburse'));
+
+        // ─── Credit Bureau (FirstCentral) ───
+        // Standalone credit checks, gated by its own permission so it can be
+        // granted independently of the loan flow.
+        $api->post('/credit-bureau/check', CreditBureau\CheckCreditAction::class)
+            ->add(new RbacMiddleware('credit_bureau.check'));
+        $api->get('/credit-bureau/checks', CreditBureau\ListCreditChecksAction::class)
+            ->add(new RbacMiddleware('credit_bureau.check'));
+        $api->get('/credit-bureau/checks/{id}', CreditBureau\GetCreditCheckAction::class)
+            ->add(new RbacMiddleware('credit_bureau.check'));
 
         // ─── Settlement (outbound bank transfer via Paystack/Flutterwave) ───
         // Manually trigger / retry the payout for a disbursed loan.

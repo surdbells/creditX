@@ -485,6 +485,18 @@ return [
         );
     },
 
+    // ─── Credit Bureau (FirstCentral) ───
+    \App\Domain\Repository\CreditCheckRepository::class => function (ContainerInterface $c): \App\Domain\Repository\CreditCheckRepository {
+        return new \App\Domain\Repository\CreditCheckRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Infrastructure\Service\FirstCentralService::class => function (ContainerInterface $c): \App\Infrastructure\Service\FirstCentralService {
+        return new \App\Infrastructure\Service\FirstCentralService(
+            $c->get(SettingsCacheService::class),
+            $c->get(RedisService::class),
+            $c->get(\Psr\Log\LoggerInterface::class),
+        );
+    },
+
     // ─── Settlement (outbound bank transfers via Paystack/Flutterwave) ───
     \App\Domain\Repository\SettlementRepository::class => function (ContainerInterface $c): \App\Domain\Repository\SettlementRepository {
         return new \App\Domain\Repository\SettlementRepository($c->get(EntityManagerInterface::class));
