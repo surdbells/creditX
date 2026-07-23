@@ -12,5 +12,5 @@ export const environment = {
   // This build's version — compared against the tenant's mobile.min_agent_version.
   appVersion: '1.0.0',
   // Sentry DSN (public, embedded in the bundle). Empty disables Sentry.
-  sentryDsn: '',
+  sentryDsn: 'https://3c8d3442acec6b609e3a9ee03e090159@o4511786578411521.ingest.us.sentry.io/4511786591977472',
 };
