@@ -70,6 +70,7 @@ final class CreateWorkflowAction
                 $step->setAutoApproveAfterHours(isset($stepData['auto_approve_after_hours']) ? (int) $stepData['auto_approve_after_hours'] : null);
                 $step->setSlaHours(isset($stepData['sla_hours']) ? (int) $stepData['sla_hours'] : null);
                 $step->setIsConditional(filter_var($stepData['is_conditional'] ?? false, FILTER_VALIDATE_BOOLEAN));
+                $step->setType($stepData['type'] ?? 'human');
                 $wf->addStep($step);
             }
         }

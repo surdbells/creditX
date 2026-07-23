@@ -89,9 +89,22 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
                       <input class="cx-input" placeholder="e.g. Credit Manager Review" [(ngModel)]="step.name" />
                     </div>
                     <div>
-                      <label class="cx-label">Approver Role</label>
+                      <label class="cx-label">Step Type</label>
+                      <select class="cx-select" [(ngModel)]="step.type">
+                        <option value="human">Human review</option>
+                        <option value="credit_check">Automated credit check (FirstCentral)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="cx-label">Approver Role{{ step.type === 'credit_check' ? ' (fallback reviewer)' : '' }}</label>
                       <cx-searchable-select [options]="roleOptions()" placeholder="Select role..." [(ngModel)]="step.role_id"></cx-searchable-select>
                     </div>
+                    @if (step.type === 'credit_check') {
+                      <p class="cx-wf-step-hint">
+                        Pulls a FirstCentral score when this step activates and auto-approves/rejects on the
+                        configured thresholds. A no-hit, error, or in-between score goes to the role above for manual review.
+                      </p>
+                    }
                     <label class="cx-wf-step-cond">
                       <input type="checkbox" [(ngModel)]="step.is_conditional" />
                       <span>Conditional step — skipped unless a routing condition below targets it</span>
@@ -208,6 +221,7 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
     }
     @media (max-width: 640px) { .cx-wf-step-fields { grid-template-columns: 1fr; } }
     .cx-wf-step-remove { color: var(--cx-danger); margin-top: 22px; }
+    .cx-wf-step-hint { font-size: 12px; color: var(--cx-text-muted); line-height: 1.45; margin: 2px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--cx-surface-2, var(--cx-stone-50)); }
     .cx-wf-step-remove:hover { background: var(--cx-danger-50); }
 
     /* Conditional-step toggle inside a step card */
@@ -293,7 +307,7 @@ export class ApprovalWorkflowsComponent implements OnInit {
   openForm(row?: any) {
     if (row) {
       this.editId = row.id;
-      const steps = (row.steps || []).map((s: any) => ({ name: s.name, role_id: s.role_id || s.approver_role_id, is_conditional: !!s.is_conditional }));
+      const steps = (row.steps || []).map((s: any) => ({ name: s.name, role_id: s.role_id || s.approver_role_id, is_conditional: !!s.is_conditional, type: s.type || 'human' }));
       // Conditions reference their target step by ID on the backend; map it
       // back to a position index so the form's step dropdown stays valid even
       // after steps are reordered/rebuilt.
@@ -313,7 +327,7 @@ export class ApprovalWorkflowsComponent implements OnInit {
     this.showForm.set(true);
   }
 
-  addStep() { this.form.steps = [...(this.form.steps || []), { name: '', role_id: '', is_conditional: false }]; }
+  addStep() { this.form.steps = [...(this.form.steps || []), { name: '', role_id: '', is_conditional: false, type: 'human' }]; }
   removeStep(i: number) {
     this.form.steps.splice(i, 1);
     this.form.steps = [...this.form.steps];

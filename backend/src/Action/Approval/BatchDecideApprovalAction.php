@@ -84,6 +84,7 @@ final class BatchDecideApprovalAction
 
             try {
                 $result = $this->engine->decide($loan, $user, $action, $comment);
+                try { $this->engine->processAutomatedSteps($loan, $user->getId()); } catch (\Throwable $e) {}
                 $success[] = [
                     'loan_id'        => $lid,
                     'application_id' => $loan->getApplicationId(),

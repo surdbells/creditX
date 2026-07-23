@@ -257,6 +257,7 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(NotificationDispatchService::class),
             $c->get(BranchScopeService::class),
+            $c->get(\App\Infrastructure\Service\FirstCentralService::class),
         );
     },
     BranchScopeService::class => function (ContainerInterface $c): BranchScopeService {

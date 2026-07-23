@@ -218,6 +218,7 @@ final class ApplyLoanAction
         try {
             $this->approvalEngine->initiate($loan);
             $this->em->flush();
+            try { $this->approvalEngine->processAutomatedSteps($loan); } catch (\Throwable $e) {}
         } catch (\App\Domain\Exception\DomainException) {
             // No workflow configured — leave SUBMITTED for staff to action.
         }

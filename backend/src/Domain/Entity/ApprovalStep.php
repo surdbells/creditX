@@ -51,6 +51,15 @@ class ApprovalStep
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isConditional = false;
 
+    /**
+     * Step type. 'human' (default) — a person in the role decides.
+     * 'credit_check' — automated: the engine pulls a FirstCentral report when
+     * the step activates and auto-approves/rejects on the configured score
+     * thresholds, else leaves it pending for the role to decide.
+     */
+    #[ORM\Column(type: 'string', length: 20, options: ['default' => 'human'])]
+    private string $type = 'human';
+
     public function __construct()
     {
         $this->id = Uuid::uuid4()->toString();
@@ -75,6 +84,9 @@ class ApprovalStep
     public function setSlaHours(?int $v): void { $this->slaHours = $v; }
     public function isConditional(): bool { return $this->isConditional; }
     public function setIsConditional(bool $v): void { $this->isConditional = $v; }
+    public function getType(): string { return $this->type; }
+    public function setType(string $v): void { $this->type = $v === 'credit_check' ? 'credit_check' : 'human'; }
+    public function isCreditCheck(): bool { return $this->type === 'credit_check'; }
 
     public function toArray(): array
     {
@@ -91,6 +103,7 @@ class ApprovalStep
             'auto_approve_after_hours' => $this->autoApproveAfterHours,
             'sla_hours'                => $this->slaHours,
             'is_conditional'           => $this->isConditional,
+            'type'                     => $this->type,
             'created_at'               => $this->createdAt->format('Y-m-d H:i:s'),
         ];
     }

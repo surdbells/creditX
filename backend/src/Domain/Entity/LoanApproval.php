@@ -130,6 +130,28 @@ class LoanApproval
     }
 
     /**
+     * System (non-human) approve — used by automated steps like the credit
+     * check. Records AUTO_APPROVED with the given reason and no approver, and
+     * (unlike autoApprove) does NOT flag an SLA breach.
+     */
+    public function systemApprove(?string $comment = null): void
+    {
+        $this->status = ApprovalStatus::AUTO_APPROVED;
+        $this->comment = $comment;
+        $this->approver = null;
+        $this->decidedAt = new \DateTimeImmutable('now', new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos'));
+    }
+
+    /** System (non-human) reject — records REJECTED with a reason and no approver. */
+    public function systemReject(?string $comment = null): void
+    {
+        $this->status = ApprovalStatus::REJECTED;
+        $this->comment = $comment;
+        $this->approver = null;
+        $this->decidedAt = new \DateTimeImmutable('now', new \DateTimeZone($_ENV['APP_TIMEZONE'] ?? 'Africa/Lagos'));
+    }
+
+    /**
      * Mark as escalated.
      */
     public function escalate(): void

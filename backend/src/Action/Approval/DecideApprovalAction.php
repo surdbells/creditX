@@ -38,6 +38,9 @@ final class DecideApprovalAction
 
         try {
             $result = $this->engine->decide($loan, $user, $action, $comment, $topUpBalance);
+            // A human approving step N may activate an automated credit-check
+            // step N+1 — process it now (outside decide's transaction).
+            try { $this->engine->processAutomatedSteps($loan, $user->getId()); } catch (\Throwable $e) {}
         } catch (\App\Domain\Exception\DomainException $e) {
             return $this->error($e->getMessage(), 400);
         }

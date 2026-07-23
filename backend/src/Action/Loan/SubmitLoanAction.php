@@ -77,6 +77,9 @@ final class SubmitLoanAction
         // Initiate approval workflow
         try {
             $this->approvalEngine->initiate($loan);
+            // Run any automated credit-check step now active (best-effort — a
+            // bureau problem must not fail submission; the step stays pending).
+            try { $this->approvalEngine->processAutomatedSteps($loan, $caller?->getId()); } catch (\Throwable $e) {}
         } catch (\App\Domain\Exception\DomainException $e) {
             // If no workflow configured, loan stays in submitted state
             // and must be manually moved to approved

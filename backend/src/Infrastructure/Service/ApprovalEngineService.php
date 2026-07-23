@@ -7,6 +7,7 @@ namespace App\Infrastructure\Service;
 use App\Domain\Entity\ApprovalCondition;
 use App\Domain\Entity\ApprovalStep;
 use App\Domain\Entity\ApprovalWorkflow;
+use App\Domain\Entity\CreditCheck;
 use App\Domain\Entity\Loan;
 use App\Domain\Entity\LoanApproval;
 use App\Domain\Entity\LoanTrail;
@@ -30,6 +31,9 @@ final class ApprovalEngineService
         private readonly SettingsCacheService $settings,
         private readonly ?NotificationDispatchService $notifService = null,
         private readonly ?BranchScopeService $branchScope = null,
+        // Optional so the engine still constructs if the bureau isn't wired;
+        // automated credit-check steps are simply skipped when it's absent.
+        private readonly ?FirstCentralService $firstCentral = null,
     ) {
     }
 
@@ -112,6 +116,128 @@ final class ApprovalEngineService
         $loan->addTrail($trail);
 
         $this->em->flush();
+    }
+
+    /**
+     * Run any ACTIVE automated (credit-check) steps for a loan and auto-decide
+     * them. Called AFTER initiate() and after each human decide() so a
+     * credit-check step that has just become active is processed immediately.
+     *
+     * Deliberately NOT called inside a DB transaction / lock: it makes an
+     * external FirstCentral HTTP call, which must not hold a row lock. Each
+     * decision is flushed and then re-evaluated, so a credit-check step
+     * followed by another credit-check step is handled in one pass; a human
+     * step in between stops the loop (left pending).
+     *
+     * On no-hit, error, no numeric score, or a score between the fail/pass
+     * thresholds, the step is left PENDING for the role to decide — a bureau
+     * outage never auto-approves or auto-rejects lending.
+     */
+    public function processAutomatedSteps(Loan $loan, ?string $actorId = null): void
+    {
+        if ($this->firstCentral === null || !$this->firstCentral->isEnabled()) {
+            return;
+        }
+
+        // Bounded loop — guards against a misconfigured workflow of all
+        // credit-check steps looping unexpectedly.
+        for ($i = 0; $i < 12; $i++) {
+            if ($loan->getStatus() !== LoanStatus::UNDER_REVIEW) return;
+
+            $approval = $this->findActiveCreditCheckApproval($loan->getId());
+            if ($approval === null) return;
+
+            $customer = $loan->getCustomer();
+            $bvn = $customer->getBvn();
+            $dob = $customer->getDateOfBirth()?->format('d/m/Y');
+            $result = $bvn
+                ? $this->firstCentral->checkConsumer($bvn)
+                : $this->firstCentral->checkConsumer(null, $customer->getFullName(), $dob);
+
+            $pass = $this->settings->getInt('credit_bureau.pass_threshold', 600);
+            $fail = $this->settings->getInt('credit_bureau.fail_threshold', 400);
+            $score = $result['score'];
+            $band = $result['risk_band'] ?? '';
+
+            $check = new CreditCheck();
+            $check->setLoan($loan);
+            $check->setCustomer($customer);
+            $check->setSubjectType('consumer');
+            $check->setIdentifier($bvn ?: $customer->getFullName());
+            $check->setStatus($result['status']);
+            $check->setScore($score);
+            $check->setRiskBand($result['risk_band']);
+            $check->setProviderRef($result['provider_ref']);
+            $check->setSummary($result['summary'] ?: null);
+            $check->setRawResponse($result['raw'] ?: null);
+            $check->setErrorMessage($result['error']);
+
+            $decisive = $result['status'] === 'hit' && $score !== null;
+
+            if ($decisive && $score >= $pass) {
+                $reason = "Credit check auto-approved — score {$score}" . ($band !== '' ? " ({$band})" : '');
+                $approval->systemApprove($reason);
+                $check->setDecision('auto_pass');
+                $this->addCreditTrail($loan, $reason, $result);
+            } elseif ($decisive && $score <= $fail) {
+                $reason = "Credit check auto-rejected — score {$score}" . ($band !== '' ? " ({$band})" : '');
+                $approval->systemReject($reason);
+                $check->setDecision('auto_fail');
+                $this->addCreditTrail($loan, $reason, $result, $reason);
+            } else {
+                // No auto-decision: score between thresholds, no-hit, error, or
+                // no numeric score → leave PENDING for the role to review.
+                $check->setDecision('manual');
+                $note = match ($result['status']) {
+                    'no_hit' => 'Credit check: no bureau record found — manual review.',
+                    'error'  => 'Credit check unavailable (' . ($result['error'] ?? 'error') . ') — manual review.',
+                    default  => $score !== null
+                        ? "Credit check: score {$score}" . ($band !== '' ? " ({$band})" : '') . ' is between thresholds — manual review.'
+                        : 'Credit report retrieved without a numeric score — manual review.',
+                };
+                $this->addCreditTrail($loan, $note, $result);
+                $this->em->persist($check);
+                $this->em->flush();
+                return; // stop — a human handles this step
+            }
+
+            $this->em->persist($check);
+            $this->evaluateOverallStatus($loan, $approval->getStep()->getWorkflow(), null);
+            $this->em->flush();
+            // loop: the next step may now be active (possibly another credit check)
+        }
+    }
+
+    /** The loan's currently-active (SLA started), pending, credit-check approval, if any. */
+    private function findActiveCreditCheckApproval(string $loanId): ?LoanApproval
+    {
+        return $this->em->createQueryBuilder()->select('a')->from(LoanApproval::class, 'a')
+            ->innerJoin('a.step', 's')
+            ->where('a.loan = :lid')
+            ->andWhere('a.status = :pending')
+            ->andWhere('a.slaStartedAt IS NOT NULL')
+            ->andWhere('s.type = :ctype')
+            ->setParameter('lid', $loanId)
+            ->setParameter('pending', ApprovalStatus::PENDING->value)
+            ->setParameter('ctype', 'credit_check')
+            ->orderBy('s.stepOrder', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()->getOneOrNullResult();
+    }
+
+    /** Record a credit-check outcome on the loan trail. `rejectReason` populates details.comment so the agent's rejection banner shows it. */
+    private function addCreditTrail(Loan $loan, string $action, array $result, ?string $rejectReason = null): void
+    {
+        $trail = new LoanTrail();
+        $trail->setAction($action);
+        $trail->setDetails(array_filter([
+            'source'    => 'firstcentral',
+            'status'    => $result['status'] ?? null,
+            'score'     => $result['score'] ?? null,
+            'risk_band' => $result['risk_band'] ?? null,
+            'comment'   => $rejectReason,
+        ], fn($v) => $v !== null));
+        $loan->addTrail($trail);
     }
 
     /**
