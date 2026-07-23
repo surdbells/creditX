@@ -10,8 +10,8 @@ android {
         // versionCode MUST increase on every released build — it is what
         // Android/Play use to decide what is newer. versionName is only the
         // human-facing label. Bump BOTH for a release.
-        versionCode 2
-        versionName "1.6"
+        versionCode 3
+        versionName "1.7"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
