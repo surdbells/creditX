@@ -39,6 +39,7 @@ export const routes: Routes = [
       { path: 'approval-queue', loadComponent: () => import('./features/approval-queue/approval-queue.component').then(m => m.ApprovalQueueComponent) },
       { path: 'disbursement-queue', loadComponent: () => import('./features/disbursement-queue/disbursement-queue.component').then(m => m.DisbursementQueueComponent) },
       { path: 'settlements', loadComponent: () => import('./features/settlements/settlements.component').then(m => m.SettlementsComponent) },
+      { path: 'credit-bureau', loadComponent: () => import('./features/credit-bureau/credit-bureau.component').then(m => m.CreditBureauComponent) },
       { path: 'maker-checker', loadComponent: () => import('./features/maker-checker/maker-checker.component').then(m => m.MakerCheckerComponent) },
       { path: 'journal-entries', loadComponent: () => import('./features/journal-entries/journal-entries.component').then(m => m.JournalEntriesComponent) },
       { path: 'gl-reconciliation', loadComponent: () => import('./features/gl-reconciliation/gl-reconciliation.component').then(m => m.GlReconciliationComponent) },

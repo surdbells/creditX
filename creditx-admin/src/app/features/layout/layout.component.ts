@@ -53,6 +53,7 @@ export class LayoutComponent {
       { label: 'Registration Approvals', icon: 'badge-check', route: '/registration-approvals', permission: 'customers.view' },
       { label: 'Loans', icon: 'file-text', route: '/loans', permission: 'loans.view' },
       { label: 'Approval Queue', icon: 'user-check', route: '/approval-queue', permission: 'loans.approve' },
+      { label: 'Credit Bureau', icon: 'shield-check', route: '/credit-bureau', permission: 'credit_bureau.check' },
       { label: 'Disbursement Queue', icon: 'banknote', route: '/disbursement-queue', permission: 'loans.disburse' },
       { label: 'Bulk Disburse', icon: 'upload', route: '/disbursement/bulk', permission: 'loans.disburse' },
       { label: 'Settlements', icon: 'send', route: '/settlements', permission: 'loans.disburse' },
