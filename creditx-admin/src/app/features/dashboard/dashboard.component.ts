@@ -64,6 +64,10 @@ type ProductChartItem = { label: string; value: number; amount: number };
           </h1>
           <p class="cx-dash-hero-subtitle">Here's your portfolio pulse for today.</p>
         </div>
+        <!-- Agent-intake toggle reads and writes system settings, so only show
+             it to users who can actually do that. Without this it rendered for
+             everyone and its /settings fetch 403'd (Sentry PHP-2). -->
+        @if (auth.hasPermission('settings.view')) {
         <div class="cx-dash-toggle-wrap">
           <div class="cx-dash-toggle">
             <div class="cx-dash-toggle-state">
@@ -79,6 +83,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
             </button>
           </div>
         </div>
+        }
       </div>
 
       <!-- ─── KPI tiles ─── -->
@@ -557,14 +562,21 @@ export class DashboardComponent implements OnInit {
       error: () => this.chartsLoading.set(false),
     });
 
-    // Agent-accepting toggle setting (preserved)
-    this.api.get('/settings', { per_page: 200 }).subscribe({
-      next: res => {
-        const settings = res.data || [];
-        const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
-        if (s) this.agentAccepting.set(s.value === 'true' || s.value === '1');
-      },
-    });
+    // Agent-accepting toggle setting. /settings requires settings.view, so
+    // only fetch when the user has it — otherwise this 403'd on every
+    // dashboard load and, with no error handler, escaped to Angular's global
+    // ErrorHandler (Sentry PHP-2, 20 events). The error callback is kept as a
+    // backstop so a blip can never surface as an uncaught error.
+    if (this.auth.hasPermission('settings.view')) {
+      this.api.get('/settings', { per_page: 200 }).subscribe({
+        next: res => {
+          const settings = res.data || [];
+          const s = settings.find((x: any) => x.key === 'agent.accepting_loans');
+          if (s) this.agentAccepting.set(s.value === 'true' || s.value === '1');
+        },
+        error: () => { /* non-fatal — toggle just keeps its default */ },
+      });
+    }
 
     // Recent applications (X3a: trimmed from 10 to 5)
     this.api.get('/loans', { per_page: 5, sort_by: 'createdAt', sort_dir: 'DESC' }).subscribe({
@@ -608,6 +620,8 @@ export class DashboardComponent implements OnInit {
           });
         }
       },
+      // Without this a 403 (user lacks settings.view) escaped uncaught.
+      error: () => this.toast.error('You do not have permission to change this setting'),
     });
   }
 

@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, throwError } from 'rxjs';
+import { Observable, of, tap, catchError, throwError } from 'rxjs';
 import { ApiResponse, LoginRequest, LoginResponse, User } from '../models';
 import { TenantConfigService } from './tenant-config.service';
 
@@ -39,8 +39,11 @@ export class AuthService {
 
   logout(): void {
     const rt = localStorage.getItem(this.REFRESH_KEY);
+    // Best-effort — tokens are cleared locally below regardless. Rethrowing
+    // into a handler-less subscribe would escape to the global ErrorHandler
+    // (same bug as admin, Sentry PHP-1).
     this.http.post(`${this.API}/auth/logout`, { refresh_token: rt }).pipe(
-      catchError(() => throwError(() => new Error()))
+      catchError(() => of(null))
     ).subscribe();
     localStorage.removeItem(this.ACCESS_KEY);
     localStorage.removeItem(this.REFRESH_KEY);

@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, throwError } from 'rxjs';
+import { Observable, of, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, LoginRequest, LoginResponse, User } from '../models';
 
@@ -42,9 +42,13 @@ export class AuthService {
 
   logout(): void {
     const refreshToken = this.getRefreshToken();
+    // Best-effort: the local session is cleared below regardless, so a failed
+    // server logout (commonly an expired/invalid refresh token → 401) is not an
+    // error worth surfacing. It previously rethrew into a handler-less
+    // subscribe, escaping to Angular's global ErrorHandler (Sentry PHP-1).
     this.http.post(`${this.API}/auth/logout`, { refresh_token: refreshToken }).pipe(
-      catchError(() => throwError(() => new Error('Logout failed')))
-    ).subscribe({ complete: () => {} });
+      catchError(() => of(null))
+    ).subscribe();
 
     this.clearSession();
     this.router.navigate(['/auth/login']);
