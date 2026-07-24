@@ -618,6 +618,9 @@ return function (App $app): void {
             ->add(new RbacMiddleware('credit_bureau.check'));
         $api->get('/credit-bureau/checks', CreditBureau\ListCreditChecksAction::class)
             ->add(new RbacMiddleware('credit_bureau.check'));
+        // Must precede /checks/{id} — otherwise "facets" matches as an id.
+        $api->get('/credit-bureau/checks/facets', CreditBureau\GetCreditCheckFacetsAction::class)
+            ->add(new RbacMiddleware('credit_bureau.check'));
         $api->get('/credit-bureau/checks/{id}', CreditBureau\GetCreditCheckAction::class)
             ->add(new RbacMiddleware('credit_bureau.check'));
         // Latest credit check for a loan — visible to loan viewers/approvers.

@@ -1,24 +1,32 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
+import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { CreditReportViewComponent } from './credit-report-view.component';
 
 /**
  * Credit Bureau (FirstCentral) — standalone check module, gated by
  * credit_bureau.check. Run a consumer (BVN / name+DOB) or commercial
- * (business name / RC) check without a loan, see the score + risk band, and
- * browse the enquiry history.
+ * (business name / RC) check without a loan, see the FULL bureau report, and
+ * browse/filter the enquiry history with a detail modal per enquiry.
+ *
+ * Both the live result and the history modal render through
+ * cx-credit-report-view, so there is exactly one place that decides how a
+ * bureau payload is displayed.
  */
 @Component({
   selector: 'app-credit-bureau',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, DataTableComponent, SearchableSelectDirective],
+  imports: [
+    CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent,
+    DataTableComponent, CxViewDialogComponent, SearchableSelectDirective, CreditReportViewComponent,
+  ],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Credit Bureau" subtitle="Run a FirstCentral credit check" eyebrow="Risk"></cx-page-header>
@@ -53,82 +61,115 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         </div>
 
-        <!-- Result -->
+        <!-- Result: the complete bureau response, every field labelled -->
         <div class="cx-card cx-cb-result">
           @if (result(); as r) {
-            <div class="cx-cb-result-head">
-              <div>
-                <div class="cx-eyebrow">Result</div>
-                <div class="cx-cb-subject">{{ r.identifier }}</div>
-              </div>
-              <span class="cx-cb-status" [attr.data-status]="r.status">{{ statusLabel(r.status) }}</span>
+            <div class="cx-cb-result-bar">
+              <span class="cx-eyebrow">Result</span>
+              <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="openDetail(r)">
+                <lucide-icon name="external-link" [size]="13"></lucide-icon><span>Expand</span>
+              </button>
             </div>
-
-            @if (r.status === 'hit') {
-              @if (r.score != null) {
-                <div class="cx-cb-score">
-                  <div class="cx-cb-score-num tabular-nums">{{ r.score }}</div>
-                  <div class="cx-cb-score-band" [attr.data-band]="bandTone(r.risk_band)">{{ r.risk_band || '—' }}</div>
-                </div>
-              } @else {
-                <p class="cx-cb-note">Report retrieved — no numeric score for this product (manual review).</p>
-              }
-              @if (r.summary) {
-                <div class="cx-cb-summary">
-                  @for (kv of summaryRows(r.summary); track kv[0]) {
-                    <div class="cx-cb-summary-row"><span>{{ prettyKey(kv[0]) }}</span><span class="tabular-nums">{{ kv[1] }}</span></div>
-                  }
-                </div>
-              }
-            } @else if (r.status === 'no_hit') {
-              <p class="cx-cb-note">No record found at the bureau for this subject.</p>
-            } @else {
-              <p class="cx-cb-note cx-cb-note-err">{{ r.error_message || 'The check could not be completed.' }}</p>
-            }
+            <cx-credit-report-view [data]="r"></cx-credit-report-view>
           } @else {
             <div class="cx-cb-empty">
               <lucide-icon name="shield-check" [size]="28"></lucide-icon>
-              <p>Run a check to see the credit score and risk band.</p>
+              <p>Run a check to see the full bureau report — score, risk band and every section the provider returns.</p>
             </div>
           }
         </div>
       </div>
 
       <!-- History -->
-      <h3 class="cx-cb-history-title">Recent checks</h3>
+      <div class="cx-cb-history-head">
+        <h3 class="cx-cb-history-title">Recent checks</h3>
+        @if (activeFilterCount()) {
+          <button class="cx-btn cx-btn-ghost cx-btn-sm" (click)="clearFilters()">
+            <lucide-icon name="x" [size]="13"></lucide-icon>
+            <span>Clear {{ activeFilterCount() }} filter{{ activeFilterCount() > 1 ? 's' : '' }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="cx-cb-filters">
+        <select class="cx-select" [(ngModel)]="filters.status" (change)="onFilterChange()" aria-label="Result">
+          <option value="">All results</option>
+          @for (s of facets().statuses; track s) { <option [value]="s">{{ statusLabel(s) }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.subject_type" (change)="onFilterChange()" aria-label="Subject type">
+          <option value="">All subjects</option>
+          @for (s of facets().subject_types; track s) { <option [value]="s">{{ titleCase(s) }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.risk_band" (change)="onFilterChange()" aria-label="Risk band">
+          <option value="">All risk bands</option>
+          @for (b of facets().risk_bands; track b) { <option [value]="b">{{ b }}</option> }
+        </select>
+        <select class="cx-select" [(ngModel)]="filters.linked" (change)="onFilterChange()" aria-label="Source">
+          <option value="">All sources</option>
+          <option value="standalone">Standalone check</option>
+          <option value="loan">Raised on a loan</option>
+        </select>
+        @if (facets().decisions.length) {
+          <select class="cx-select" [(ngModel)]="filters.decision" (change)="onFilterChange()" aria-label="Workflow decision">
+            <option value="">All decisions</option>
+            @for (d of facets().decisions; track d) { <option [value]="d">{{ decisionLabel(d) }}</option> }
+          </select>
+        }
+        <input type="date" class="cx-input" [(ngModel)]="filters.date_from" (change)="onFilterChange()" aria-label="From date" />
+        <input type="date" class="cx-input" [(ngModel)]="filters.date_to" (change)="onFilterChange()" aria-label="To date" />
+      </div>
+
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
-                     searchPlaceholder="Search by BVN, customer or app id…" [hasActions]="false"
-                     trackBy="id" (query)="onQuery($event)"></cx-data-table>
+                     searchPlaceholder="Search by BVN, customer, app id, reference or user…" [hasActions]="true"
+                     trackBy="id" (query)="onQuery($event)">
+        <ng-template #rowActions let-row>
+          <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openDetail(row)" title="View full report" aria-label="View full report">
+            <lucide-icon name="eye" [size]="15"></lucide-icon>
+          </button>
+        </ng-template>
+      </cx-data-table>
+
+      <!-- Detail modal -->
+      <cx-view-dialog [open]="detailOpen()" title="Credit check" [subtitle]="detailSubtitle()" maxWidth="1060px" (close)="closeDetail()">
+        @if (detailLoading()) {
+          <div class="cx-cb-detail-loading">
+            <lucide-icon name="loader-2" [size]="15" class="cx-spin"></lucide-icon>
+            <span>Loading the full bureau report…</span>
+          </div>
+        }
+        @if (detail(); as d) {
+          <cx-credit-report-view [data]="d"></cx-credit-report-view>
+        }
+      </cx-view-dialog>
     </div>
   `,
   styles: [`
-    .cx-cb-grid { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(300px, 1.2fr); gap: 16px; }
-    @media (max-width: 860px) { .cx-cb-grid { grid-template-columns: 1fr; } }
+    .cx-cb-grid { display: grid; grid-template-columns: minmax(280px, 360px) minmax(300px, 1fr); gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .cx-cb-grid { grid-template-columns: 1fr; } }
     .cx-cb-form, .cx-cb-result { padding: 18px; }
+    .cx-cb-form { position: sticky; top: 12px; }
+    @media (max-width: 900px) { .cx-cb-form { position: static; } }
     .cx-cb-tabs { display: inline-flex; gap: 4px; background: var(--cx-surface-2, var(--cx-stone-100)); padding: 3px; border-radius: 10px; margin-bottom: 16px; }
     .cx-cb-tab { padding: 6px 14px; border: none; background: transparent; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--cx-text-secondary); cursor: pointer; }
     .cx-cb-tab.is-active { background: var(--cx-surface); color: var(--cx-text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .cx-cb-or { text-align: center; font-size: 12px; color: var(--cx-text-muted); margin: 12px 0; }
     .cx-cb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .cx-cb-result-head { display: flex; justify-content: space-between; align-items: flex-start; }
-    .cx-cb-subject { font-size: 16px; font-weight: 600; color: var(--cx-text); margin-top: 2px; }
-    .cx-cb-status { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 3px 10px; border-radius: 999px; background: var(--cx-stone-100); color: var(--cx-text-secondary); }
-    .cx-cb-status[data-status="hit"] { background: color-mix(in srgb, var(--cx-success) 12%, transparent); color: var(--cx-success); }
-    .cx-cb-status[data-status="no_hit"] { background: color-mix(in srgb, var(--cx-warning) 14%, transparent); color: var(--cx-warning); }
-    .cx-cb-status[data-status="error"], .cx-cb-status[data-status="not_configured"] { background: color-mix(in srgb, var(--cx-danger) 12%, transparent); color: var(--cx-danger); }
-    .cx-cb-score { display: flex; align-items: baseline; gap: 14px; margin: 18px 0; }
-    .cx-cb-score-num { font-size: 44px; font-weight: 800; color: var(--cx-primary-600); line-height: 1; }
-    .cx-cb-score-band { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 12px; border-radius: 999px; background: var(--cx-stone-100); color: var(--cx-text-secondary); }
-    .cx-cb-score-band[data-band="low"] { background: color-mix(in srgb, var(--cx-success) 14%, transparent); color: var(--cx-success); }
-    .cx-cb-score-band[data-band="high"] { background: color-mix(in srgb, var(--cx-danger) 12%, transparent); color: var(--cx-danger); }
-    .cx-cb-summary { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--cx-border); padding-top: 12px; margin-top: 6px; }
-    .cx-cb-summary-row { display: flex; justify-content: space-between; font-size: 13px; }
-    .cx-cb-summary-row > span:first-child { color: var(--cx-text-muted); }
-    .cx-cb-note { font-size: 14px; color: var(--cx-text-secondary); margin: 18px 0; }
-    .cx-cb-note-err { color: var(--cx-danger); }
-    .cx-cb-empty { text-align: center; color: var(--cx-text-muted); padding: 32px 0; }
-    .cx-cb-empty p { margin-top: 10px; font-size: 13px; }
-    .cx-cb-history-title { font-size: 14px; font-weight: 600; margin: 24px 0 12px; color: var(--cx-text); }
+    .cx-cb-result-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .cx-cb-empty { text-align: center; color: var(--cx-text-muted); padding: 42px 12px; }
+    .cx-cb-empty p { margin-top: 10px; font-size: 13px; max-width: 42ch; margin-inline: auto; }
+
+    .cx-cb-history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 26px 0 10px; }
+    .cx-cb-history-title { font-size: 14px; font-weight: 600; margin: 0; color: var(--cx-text); }
+    .cx-cb-filters {
+      display: grid; grid-template-columns: 1fr; gap: 0.65rem;
+      padding: 0.85rem; background: var(--cx-surface);
+      border: 1px solid var(--cx-border); border-radius: var(--cx-radius-xl);
+      margin-bottom: 1rem;
+    }
+    @media (min-width: 700px) { .cx-cb-filters { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1100px) { .cx-cb-filters { grid-template-columns: repeat(4, 1fr); } }
+
+    .cx-cb-detail-loading { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 12px; border-radius: var(--cx-radius-lg, 10px); background: var(--cx-surface-2, var(--cx-stone-100)); color: var(--cx-text-muted); font-size: 12.5px; }
     .cx-spin { animation: cx-cb-spin 1s linear infinite; }
     @keyframes cx-cb-spin { to { transform: rotate(360deg); } }
   `],
@@ -144,25 +185,47 @@ export class CreditBureauComponent implements OnInit {
 
   columns: TableColumn[] = [
     { key: 'created_at', label: 'When', type: 'date' },
-    { key: 'subject_type', label: 'Type' },
+    { key: 'subject_type', label: 'Type', type: 'badge', badgeMap: {
+      consumer: { label: 'Consumer', class: 'cx-badge-neutral' },
+      commercial: { label: 'Commercial', class: 'cx-badge-info' },
+    } },
     { key: 'identifier', label: 'Subject' },
-    { key: 'customer_name', label: 'Customer' },
+    { key: 'customer_name', label: 'Customer', sortable: false },
+    { key: 'application_id', label: 'Loan', sortable: false },
     { key: 'score', label: 'Score', align: 'right' },
     { key: 'risk_band', label: 'Band' },
-    { key: 'status', label: 'Status', type: 'badge', badgeMap: {
+    { key: 'status', label: 'Result', type: 'badge', badgeMap: {
       hit: { label: 'Hit', class: 'cx-badge-success' },
       no_hit: { label: 'No hit', class: 'cx-badge-warning' },
       error: { label: 'Error', class: 'cx-badge-danger' },
       not_configured: { label: 'Not configured', class: 'cx-badge-danger' },
     } },
+    // Plain text, not a badge: most rows have no workflow decision (standalone
+    // checks), and a badge column would render an empty pill on every one.
+    { key: 'decision_label', label: 'Decision', sortable: false },
+    { key: 'provider_ref', label: 'Reference', sortable: false },
     { key: 'initiated_by', label: 'By' },
   ];
   rows = signal<any[]>([]);
   loading = signal(true);
   pagination = signal<TablePagination | null>(null);
+
+  /** Options come from what the history actually contains — risk bands are provider text. */
+  facets = signal<{ statuses: string[]; subject_types: string[]; risk_bands: string[]; decisions: string[] }>(
+    { statuses: [], subject_types: [], risk_bands: [], decisions: [] },
+  );
+
+  filters = { status: '', subject_type: '', risk_band: '', linked: '', decision: '', date_from: '', date_to: '' };
+
+  detailOpen = signal(false);
+  detailLoading = signal(false);
+  detail = signal<any | null>(null);
+
   private q: any = {};
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void { this.load(); this.loadFacets(); }
+
+  // ── Check ────────────────────────────────────────────────────────────────
 
   runCheck(): void {
     if (this.checking()) return;
@@ -176,29 +239,88 @@ export class CreditBureauComponent implements OnInit {
     }
     this.checking.set(true);
     this.api.post('/credit-bureau/check', body).subscribe({
-      next: r => { this.checking.set(false); this.result.set(r.data); this.load(); },
+      next: r => { this.checking.set(false); this.result.set(r.data); this.load(); this.loadFacets(); },
       error: e => { this.checking.set(false); this.toast.error(e.error?.message || 'Check failed.'); },
     });
   }
 
+  // ── History ──────────────────────────────────────────────────────────────
+
   onQuery(e: TableQueryEvent) { this.q = e; this.load(); }
+
+  onFilterChange(): void {
+    this.q = { ...this.q, page: 1 };
+    this.load();
+  }
+
+  clearFilters(): void {
+    this.filters = { status: '', subject_type: '', risk_band: '', linked: '', decision: '', date_from: '', date_to: '' };
+    this.onFilterChange();
+  }
+
+  activeFilterCount(): number {
+    return Object.values(this.filters).filter(v => v !== '').length;
+  }
+
   load(): void {
     this.loading.set(true);
-    this.api.get('/credit-bureau/checks', { ...this.q }).subscribe({
-      next: r => { this.rows.set(r.data || []); this.pagination.set(r.meta || null); this.loading.set(false); },
+    const params: any = { ...this.q };
+    Object.entries(this.filters).forEach(([k, v]) => { if (v !== '') params[k] = v; });
+    this.api.get('/credit-bureau/checks', params).subscribe({
+      next: r => {
+        this.rows.set((r.data || []).map((row: any) => ({
+          ...row,
+          decision_label: row.decision ? this.decisionLabel(row.decision) : '',
+        })));
+        this.pagination.set(r.meta || null);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
 
+  private loadFacets(): void {
+    this.api.get('/credit-bureau/checks/facets').subscribe({
+      // Non-fatal: without facets the dropdowns just show "All …".
+      next: r => this.facets.set({ statuses: [], subject_types: [], risk_bands: [], decisions: [], ...(r.data || {}) }),
+      error: () => {},
+    });
+  }
+
+  // ── Detail modal ─────────────────────────────────────────────────────────
+
+  /**
+   * List rows carry no raw_response (it is heavy), so fetch the full record.
+   * The row we already have renders immediately so the modal is never blank.
+   */
+  openDetail(row: any): void {
+    this.detail.set(row);
+    this.detailOpen.set(true);
+    if (row?.raw_response !== undefined || !row?.id) return;
+    this.detailLoading.set(true);
+    this.api.get(`/credit-bureau/checks/${row.id}`).subscribe({
+      next: r => { this.detail.set(r.data); this.detailLoading.set(false); },
+      error: () => { this.detailLoading.set(false); this.toast.error('Could not load the full report.'); },
+    });
+  }
+
+  closeDetail(): void { this.detailOpen.set(false); this.detail.set(null); }
+
+  detailSubtitle(): string {
+    const d = this.detail();
+    if (!d) return '';
+    return [d.identifier, this.titleCase(d.subject_type), d.created_at].filter(Boolean).join(' · ');
+  }
+
+  // ── Labels ───────────────────────────────────────────────────────────────
+
   statusLabel(s: string): string {
-    return { hit: 'Hit', no_hit: 'No hit', error: 'Error', not_configured: 'Not configured' }[s] || s;
+    return ({ hit: 'Hit', no_hit: 'No hit', error: 'Error', not_configured: 'Not configured' } as any)[s] || s;
   }
-  bandTone(band?: string | null): string {
-    const b = (band || '').toLowerCase();
-    if (b.includes('low')) return 'low';
-    if (b.includes('high')) return 'high';
-    return '';
+  decisionLabel(d: string): string {
+    return ({ auto_pass: 'Auto-passed', auto_fail: 'Auto-failed', manual: 'Manual review' } as any)[d] || d;
   }
-  prettyKey(k: string): string { return k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '); }
-  summaryRows(s: any): [string, any][] { return Object.entries(s || {}); }
+  titleCase(s: string): string {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+  }
 }
