@@ -62,6 +62,9 @@ export class ChatBubbleComponent implements OnInit, OnDestroy {
   }
 
   private playSound(): void {
-    try { this.audio?.play(); } catch (e) {}
+    // play() returns a promise that REJECTS (not throws) when autoplay is
+    // blocked before a user gesture — a try/catch can't catch it, so the
+    // rejection escaped to the global ErrorHandler (Sentry PHP-6/PHP-7).
+    this.audio?.play()?.catch(() => {});
   }
 }
