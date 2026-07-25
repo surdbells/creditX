@@ -31,8 +31,10 @@ class BankStatementLine
     #[ORM\JoinColumn(name: 'reconciliation_id', referencedColumnName: 'id', nullable: false)]
     private BankReconciliation $reconciliation;
 
-    #[ORM\Column(type: 'date')]
-    private \DateTimeInterface $valueDate;
+    // date_immutable — the service assigns DateTimeImmutable; the mutable
+    // 'date' type's DBAL converter rejects it at flush time.
+    #[ORM\Column(type: 'date_immutable')]
+    private \DateTimeImmutable $valueDate;
 
     #[ORM\Column(type: 'string', length: 500)]
     private string $description = '';
@@ -56,8 +58,8 @@ class BankStatementLine
     public function getId(): string { return $this->id; }
     public function getReconciliation(): BankReconciliation { return $this->reconciliation; }
     public function setReconciliation(BankReconciliation $v): void { $this->reconciliation = $v; }
-    public function getValueDate(): \DateTimeInterface { return $this->valueDate; }
-    public function setValueDate(\DateTimeInterface $v): void { $this->valueDate = $v; }
+    public function getValueDate(): \DateTimeImmutable { return $this->valueDate; }
+    public function setValueDate(\DateTimeImmutable $v): void { $this->valueDate = $v; }
     public function getDescription(): string { return $this->description; }
     public function setDescription(string $v): void { $this->description = mb_substr($v, 0, 500); }
     public function getReference(): ?string { return $this->reference; }

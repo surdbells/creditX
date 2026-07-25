@@ -39,8 +39,11 @@ class BankReconciliation
     #[ORM\Column(name: 'gl_code', type: 'string', length: 20)]
     private string $glCode;
 
-    #[ORM\Column(type: 'date')]
-    private \DateTimeInterface $statementDate;
+    // date_immutable, matching the rest of the accounting module (JournalEntry,
+    // LedgerTransaction). The service assigns DateTimeImmutable; the mutable
+    // 'date' type's DBAL converter rejects it at flush time.
+    #[ORM\Column(type: 'date_immutable')]
+    private \DateTimeImmutable $statementDate;
 
     /** Bank-statement opening/closing balances (operator-entered). */
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
@@ -80,8 +83,8 @@ class BankReconciliation
     public function setGlId(string $v): void { $this->glId = $v; }
     public function getGlCode(): string { return $this->glCode; }
     public function setGlCode(string $v): void { $this->glCode = $v; }
-    public function getStatementDate(): \DateTimeInterface { return $this->statementDate; }
-    public function setStatementDate(\DateTimeInterface $v): void { $this->statementDate = $v; }
+    public function getStatementDate(): \DateTimeImmutable { return $this->statementDate; }
+    public function setStatementDate(\DateTimeImmutable $v): void { $this->statementDate = $v; }
     public function getOpeningBalance(): string { return $this->openingBalance; }
     public function setOpeningBalance(string $v): void { $this->openingBalance = $v; }
     public function getClosingBalance(): string { return $this->closingBalance; }
