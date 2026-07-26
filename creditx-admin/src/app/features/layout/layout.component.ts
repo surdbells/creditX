@@ -65,6 +65,11 @@ export class LayoutComponent {
       { label: 'Deposit Products', icon: 'folder-kanban', route: '/deposit-products', permission: 'deposits.view' },
       { label: 'Interest Run', icon: 'percent', route: '/deposit-interest', permission: 'deposits.interest' },
     ]},
+    { label: 'Investments', items: [
+      { label: 'Investments', icon: 'trending-up', route: '/investments', permission: 'investments.view' },
+      { label: 'Investment Products', icon: 'folder-kanban', route: '/investment-products', permission: 'investments.view' },
+      { label: 'Interest Run', icon: 'percent', route: '/investment-accrual', permission: 'investments.interest' },
+    ]},
     // Reports — top-level group with one sidebar entry per report.
     // Replaces:
     //   - The old 'Performance' group (4 entries) which deep-linked into
