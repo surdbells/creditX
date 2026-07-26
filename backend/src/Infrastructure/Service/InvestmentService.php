@@ -120,7 +120,19 @@ final class InvestmentService
             }
             $maturity = $placement->modify("+{$tenorDays} days");
         } else {
+            // Open-ended: no tenor, no maturity — it runs until the investor
+            // withdraws or closes it.
             $tenorDays = null;
+            // AT_MATURITY is meaningless without a maturity date: interest would
+            // accrue into the liability forever with nothing to trigger
+            // settlement, trapping the investor's earnings. Refuse rather than
+            // silently re-mapping the terms the product promised.
+            if ($product->getPayoutMode() === InvestmentPayoutMode::AT_MATURITY) {
+                throw new DomainException(
+                    "Product {$product->getCode()} is open-ended but its payout mode is 'at maturity', which has no "
+                  . 'maturity to pay out on. Set the product to periodic or compounded payout.'
+                );
+            }
         }
 
         $settlementGl = $this->settlementGl($settlementGlId);
@@ -136,7 +148,9 @@ final class InvestmentService
             // Snapshot terms.
             $inv->setType($product->getType());
             $inv->setInterestRate($product->getInterestRate());
-            $inv->setPayoutMode($isFixed ? $product->getPayoutMode() : InvestmentPayoutMode::COMPOUNDED);
+            // Open-ended honours the product's mode too (periodic = income fund,
+            // compounded = growth fund); only AT_MATURITY is excluded above.
+            $inv->setPayoutMode($product->getPayoutMode());
             $inv->setPayoutFrequency($product->getPayoutFrequency());
             $inv->setTenorDays($tenorDays);
             $inv->setWhtRate($product->getWhtRate());
@@ -199,9 +213,10 @@ final class InvestmentService
 
         $this->em->beginTransaction();
         try {
-            // Recognise interest up to the top-up date first, so the new money
-            // doesn't earn interest for the period before it arrived.
-            $this->accrueThrough($inv, $date, $settlementGlId, $userId, /* inner */ true);
+            // Recognise interest up to the top-up date first (whole periods +
+            // the part period), so the new money doesn't earn for the days
+            // before it arrived and the old balance earns to the day.
+            $this->accrueToDate($inv, $date, $settlementGlId, $userId);
 
             $journal = $this->ledger->postJournal(
                 entryType: JournalEntryType::INVESTMENT_PLACEMENT,
@@ -247,7 +262,8 @@ final class InvestmentService
 
         $this->em->beginTransaction();
         try {
-            $this->accrueThrough($inv, $date, $settlementGlId, $userId, true);
+            // Earn to the actual day of withdrawal, not just the last boundary.
+            $this->accrueToDate($inv, $date, $settlementGlId, $userId);
 
             if (bccomp($amount, $inv->getBalance(), 2) > 0) {
                 throw new DomainException(sprintf('Withdrawal %s exceeds the available balance %s.', $amount, $inv->getBalance()));
@@ -343,76 +359,12 @@ final class InvestmentService
                 continue;
             }
 
-            $gross = $this->interest($inv->getBalance(), $inv->getInterestRate(), $days, $inv->getDayCountBasis());
-            $date  = $end->format('Y-m-d');
-
-            if (bccomp($gross, self::MIN_POSTABLE, 2) >= 0) {
-                switch ($inv->getPayoutMode()) {
-                    case InvestmentPayoutMode::AT_MATURITY:
-                        // Build the liability; settle (with WHT) at maturity.
-                        $journal = $this->ledger->postJournal(
-                            entryType: JournalEntryType::INVESTMENT_INTEREST,
-                            postingDate: $date,
-                            narration: sprintf('Investment interest accrual — %s', $inv->getInvestmentNumber()),
-                            postedBy: $userId,
-                            lines: [
-                                ['gl' => $expenseGl,   'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST ACCRUAL'],
-                                ['gl' => $liabilityGl, 'type' => TransactionType::CR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST ACCRUED'],
-                            ],
-                            reference: $inv->getInvestmentNumber(),
-                        );
-                        $inv->setAccruedInterest(bcadd($inv->getAccruedInterest(), $gross, 2));
-                        $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
-                        $this->record($inv, InvestmentTransactionType::ACCRUAL, $gross, $end, 'Interest accrued', $journal->getId(), $userId, $gross, '0.00', $gross);
-                        $sumGross = bcadd($sumGross, $gross, 2);
-                        break;
-
-                    case InvestmentPayoutMode::PERIODIC:
-                        [$wht, $net] = $this->splitWht($gross, $inv->getWhtRate());
-                        $lines = [['gl' => $expenseGl, 'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST']];
-                        $lines[] = ['gl' => $settlementGl, 'type' => TransactionType::CR, 'amount' => $net, 'narration' => 'INTEREST PAID (NET)'];
-                        if (bccomp($wht, '0.00', 2) > 0) {
-                            $lines[] = ['gl' => $whtGl, 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT ON INVESTMENT INTEREST'];
-                        }
-                        $journal = $this->ledger->postJournal(
-                            entryType: JournalEntryType::INVESTMENT_PAYOUT,
-                            postingDate: $date,
-                            narration: sprintf('Investment interest payout — %s', $inv->getInvestmentNumber()),
-                            postedBy: $userId,
-                            lines: $lines,
-                            reference: $inv->getInvestmentNumber(),
-                        );
-                        $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
-                        $inv->setInterestPaidToDate(bcadd($inv->getInterestPaidToDate(), $net, 2));
-                        $inv->setWhtWithheldToDate(bcadd($inv->getWhtWithheldToDate(), $wht, 2));
-                        $this->record($inv, InvestmentTransactionType::PAYOUT, $gross, $end, 'Interest paid out', $journal->getId(), $userId, $gross, $wht, $net);
-                        $sumGross = bcadd($sumGross, $gross, 2); $sumWht = bcadd($sumWht, $wht, 2); $sumNet = bcadd($sumNet, $net, 2);
-                        break;
-
-                    case InvestmentPayoutMode::COMPOUNDED:
-                        [$wht, $net] = $this->splitWht($gross, $inv->getWhtRate());
-                        $lines = [['gl' => $expenseGl, 'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST']];
-                        $lines[] = ['gl' => $liabilityGl, 'type' => TransactionType::CR, 'amount' => $net, 'narration' => 'INTEREST CAPITALISED (NET)'];
-                        if (bccomp($wht, '0.00', 2) > 0) {
-                            $lines[] = ['gl' => $whtGl, 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT ON INVESTMENT INTEREST'];
-                        }
-                        $journal = $this->ledger->postJournal(
-                            entryType: JournalEntryType::INVESTMENT_INTEREST,
-                            postingDate: $date,
-                            narration: sprintf('Investment interest capitalised — %s', $inv->getInvestmentNumber()),
-                            postedBy: $userId,
-                            lines: $lines,
-                            reference: $inv->getInvestmentNumber(),
-                        );
-                        $inv->setBalance(bcadd($inv->getBalance(), $net, 2));
-                        $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
-                        $inv->setInterestPaidToDate(bcadd($inv->getInterestPaidToDate(), $net, 2));
-                        $inv->setWhtWithheldToDate(bcadd($inv->getWhtWithheldToDate(), $wht, 2));
-                        $this->record($inv, InvestmentTransactionType::CAPITALISATION, $gross, $end, 'Interest capitalised', $journal->getId(), $userId, $gross, $wht, $net);
-                        $sumGross = bcadd($sumGross, $gross, 2); $sumWht = bcadd($sumWht, $wht, 2); $sumNet = bcadd($sumNet, $net, 2);
-                        break;
-                }
+            $r = $this->postInterestFor($inv, $days, $end, false, $settlementGl, $liabilityGl, $expenseGl, $whtGl, $userId);
+            if ($r !== null) {
                 $periods++;
+                $sumGross = bcadd($sumGross, $r['gross'], 2);
+                $sumWht   = bcadd($sumWht, $r['wht'], 2);
+                $sumNet   = bcadd($sumNet, $r['net'], 2);
             }
 
             $inv->setLastAccrualDate($end);
@@ -421,6 +373,163 @@ final class InvestmentService
 
         $inv->setUpdatedBy($userId);
         return ['periods' => $periods, 'gross' => $sumGross, 'wht' => $sumWht, 'net' => $sumNet];
+    }
+
+    /**
+     * Accrue the PARTIAL period from the last accrual up to $asOf, without
+     * advancing the period boundary.
+     *
+     * Whole-period accrual alone would short-change an investor who exits
+     * mid-period: an open-ended withdrawal (or an early liquidation) on day 45
+     * of a monthly cycle would earn nothing for days 31–45. This credits
+     * interest to the actual day, which is the accurate treatment. The next
+     * whole period then runs from $asOf, so nothing is double-counted.
+     *
+     * Must run inside a transaction.
+     *
+     * @return array{gross:string, wht:string, net:string}
+     */
+    private function accrueStub(Investment $inv, \DateTimeImmutable $asOf, GeneralLedger $settlementGl, GeneralLedger $liabilityGl, GeneralLedger $expenseGl, GeneralLedger $whtGl, ?string $userId): array
+    {
+        $zero = ['gross' => '0.00', 'wht' => '0.00', 'net' => '0.00'];
+        if (!$inv->isActive()) {
+            return $zero;
+        }
+        // Never accrue past maturity — the boundary loop already caps there.
+        $end = $inv->isFixedTerm() && $inv->getMaturityDate() !== null && $asOf > $inv->getMaturityDate()
+            ? $inv->getMaturityDate()
+            : $asOf;
+
+        $start = $inv->getLastAccrualDate() ?? $inv->getPlacementDate();
+        $days = $this->days($start, $end);
+        if ($days <= 0) {
+            return $zero;
+        }
+
+        $r = $this->postInterestFor($inv, $days, $end, true, $settlementGl, $liabilityGl, $expenseGl, $whtGl, $userId);
+        // Move the accrual watermark so the next whole period starts here.
+        $inv->setLastAccrualDate($end);
+        $inv->setUpdatedBy($userId);
+
+        return $r ?? $zero;
+    }
+
+    /**
+     * Recognise interest for one window of $days ending $end, per payout mode.
+     * Shared by the whole-period loop and the partial-period stub so both post
+     * identically. Returns null when the amount is below the posting floor.
+     *
+     * @return array{gross:string, wht:string, net:string}|null
+     */
+    private function postInterestFor(
+        Investment $inv,
+        int $days,
+        \DateTimeImmutable $end,
+        bool $isStub,
+        GeneralLedger $settlementGl,
+        GeneralLedger $liabilityGl,
+        GeneralLedger $expenseGl,
+        GeneralLedger $whtGl,
+        ?string $userId,
+    ): ?array {
+        $gross = $this->interest($inv->getBalance(), $inv->getInterestRate(), $days, $inv->getDayCountBasis());
+        if (bccomp($gross, self::MIN_POSTABLE, 2) < 0) {
+            return null;
+        }
+        $date = $end->format('Y-m-d');
+        $suffix = $isStub ? sprintf(' (%d-day part period)', $days) : '';
+
+        switch ($inv->getPayoutMode()) {
+            case InvestmentPayoutMode::AT_MATURITY:
+                // Build the liability; settle (with WHT) at maturity.
+                $journal = $this->ledger->postJournal(
+                    entryType: JournalEntryType::INVESTMENT_INTEREST,
+                    postingDate: $date,
+                    narration: sprintf('Investment interest accrual — %s%s', $inv->getInvestmentNumber(), $suffix),
+                    postedBy: $userId,
+                    lines: [
+                        ['gl' => $expenseGl,   'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST ACCRUAL'],
+                        ['gl' => $liabilityGl, 'type' => TransactionType::CR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST ACCRUED'],
+                    ],
+                    reference: $inv->getInvestmentNumber(),
+                );
+                $inv->setAccruedInterest(bcadd($inv->getAccruedInterest(), $gross, 2));
+                $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
+                $this->record($inv, InvestmentTransactionType::ACCRUAL, $gross, $end, 'Interest accrued' . $suffix, $journal->getId(), $userId, $gross, '0.00', $gross);
+                return ['gross' => $gross, 'wht' => '0.00', 'net' => '0.00'];
+
+            case InvestmentPayoutMode::PERIODIC:
+                [$wht, $net] = $this->splitWht($gross, $inv->getWhtRate());
+                $lines = [['gl' => $expenseGl, 'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST']];
+                $lines[] = ['gl' => $settlementGl, 'type' => TransactionType::CR, 'amount' => $net, 'narration' => 'INTEREST PAID (NET)'];
+                if (bccomp($wht, '0.00', 2) > 0) {
+                    $lines[] = ['gl' => $whtGl, 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT ON INVESTMENT INTEREST'];
+                }
+                $journal = $this->ledger->postJournal(
+                    entryType: JournalEntryType::INVESTMENT_PAYOUT,
+                    postingDate: $date,
+                    narration: sprintf('Investment interest payout — %s%s', $inv->getInvestmentNumber(), $suffix),
+                    postedBy: $userId,
+                    lines: $lines,
+                    reference: $inv->getInvestmentNumber(),
+                );
+                $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
+                $inv->setInterestPaidToDate(bcadd($inv->getInterestPaidToDate(), $net, 2));
+                $inv->setWhtWithheldToDate(bcadd($inv->getWhtWithheldToDate(), $wht, 2));
+                $this->record($inv, InvestmentTransactionType::PAYOUT, $gross, $end, 'Interest paid out' . $suffix, $journal->getId(), $userId, $gross, $wht, $net);
+                return ['gross' => $gross, 'wht' => $wht, 'net' => $net];
+
+            case InvestmentPayoutMode::COMPOUNDED:
+                [$wht, $net] = $this->splitWht($gross, $inv->getWhtRate());
+                $lines = [['gl' => $expenseGl, 'type' => TransactionType::DR, 'amount' => $gross, 'narration' => 'INVESTMENT INTEREST']];
+                $lines[] = ['gl' => $liabilityGl, 'type' => TransactionType::CR, 'amount' => $net, 'narration' => 'INTEREST CAPITALISED (NET)'];
+                if (bccomp($wht, '0.00', 2) > 0) {
+                    $lines[] = ['gl' => $whtGl, 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT ON INVESTMENT INTEREST'];
+                }
+                $journal = $this->ledger->postJournal(
+                    entryType: JournalEntryType::INVESTMENT_INTEREST,
+                    postingDate: $date,
+                    narration: sprintf('Investment interest capitalised — %s%s', $inv->getInvestmentNumber(), $suffix),
+                    postedBy: $userId,
+                    lines: $lines,
+                    reference: $inv->getInvestmentNumber(),
+                );
+                $inv->setBalance(bcadd($inv->getBalance(), $net, 2));
+                $inv->setInterestEarnedToDate(bcadd($inv->getInterestEarnedToDate(), $gross, 2));
+                $inv->setInterestPaidToDate(bcadd($inv->getInterestPaidToDate(), $net, 2));
+                $inv->setWhtWithheldToDate(bcadd($inv->getWhtWithheldToDate(), $wht, 2));
+                $this->record($inv, InvestmentTransactionType::CAPITALISATION, $gross, $end, 'Interest capitalised' . $suffix, $journal->getId(), $userId, $gross, $wht, $net);
+                return ['gross' => $gross, 'wht' => $wht, 'net' => $net];
+        }
+
+        return null;
+    }
+
+    /**
+     * Whole periods PLUS the partial period up to $asOf. This is what every
+     * exit path (withdrawal, close, liquidation) uses so the investor earns to
+     * the actual day. Must run inside a transaction.
+     *
+     * @return array{periods:int, gross:string, wht:string, net:string}
+     */
+    private function accrueToDate(Investment $inv, string $asOf, string $settlementGlId, ?string $userId): array
+    {
+        $r = $this->accrueThrough($inv, $asOf, $settlementGlId, $userId, true);
+        $stub = $this->accrueStub(
+            $inv,
+            new \DateTimeImmutable($asOf),
+            $this->settlementGl($settlementGlId),
+            $this->role(GlMappingRegistry::INVESTMENT_LIABILITY),
+            $this->role(GlMappingRegistry::INVESTMENT_INTEREST_EXPENSE),
+            $this->role(GlMappingRegistry::WHT_PAYABLE),
+            $userId,
+        );
+        return [
+            'periods' => $r['periods'] + (bccomp($stub['gross'], '0.00', 2) > 0 ? 1 : 0),
+            'gross'   => bcadd($r['gross'], $stub['gross'], 2),
+            'wht'     => bcadd($r['wht'], $stub['wht'], 2),
+            'net'     => bcadd($r['net'], $stub['net'], 2),
+        ];
     }
 
     // ── Maturity & liquidation ────────────────────────────────────────────────
@@ -505,6 +614,76 @@ final class InvestmentService
     }
 
     /**
+     * Close an open-ended investment: accrue to the actual closing date, then
+     * return the whole balance (plus any unsettled interest, net of WHT) and
+     * mark it CLOSED.
+     *
+     * This is the open-ended counterpart to mature(). There is no maturity to
+     * reach and no early-exit penalty — the investor can leave whenever they
+     * like, which is the point of an open-ended investment.
+     */
+    public function close(Investment $inv, string $date, string $settlementGlId, ?string $userId): Investment
+    {
+        $this->assertActive($inv);
+        if ($inv->isFixedTerm()) {
+            throw new DomainException('A fixed-term investment is matured or liquidated, not closed.');
+        }
+        $this->assertDate($date);
+        $this->periodGuard->assertDateOpen($date);
+
+        $settlementGl = $this->settlementGl($settlementGlId);
+        $liabilityGl  = $this->role(GlMappingRegistry::INVESTMENT_LIABILITY);
+        $whtGl        = $this->role(GlMappingRegistry::WHT_PAYABLE);
+
+        $this->em->beginTransaction();
+        try {
+            $this->accrueToDate($inv, $date, $settlementGlId, $userId);
+
+            $principal = $inv->getBalance();
+            $accrued   = $inv->getAccruedInterest(); // normally 0 — periodic pays, compounded capitalises
+            [$wht, $netInterest] = bccomp($accrued, '0.00', 2) > 0
+                ? $this->splitWht($accrued, $inv->getWhtRate())
+                : ['0.00', '0.00'];
+
+            $liabilityHeld = bcadd($principal, $accrued, 2);
+            $cashOut = bcadd($principal, $netInterest, 2);
+
+            if (bccomp($liabilityHeld, '0.00', 2) > 0) {
+                $lines = [['gl' => $liabilityGl, 'type' => TransactionType::DR, 'amount' => $liabilityHeld, 'narration' => 'INVESTMENT CLOSURE']];
+                $lines[] = ['gl' => $settlementGl, 'type' => TransactionType::CR, 'amount' => $cashOut, 'narration' => 'CLOSURE PROCEEDS'];
+                if (bccomp($wht, '0.00', 2) > 0) {
+                    $lines[] = ['gl' => $whtGl, 'type' => TransactionType::CR, 'amount' => $wht, 'narration' => 'WHT ON INVESTMENT INTEREST'];
+                }
+                $journal = $this->ledger->postJournal(
+                    entryType: JournalEntryType::INVESTMENT_WITHDRAWAL,
+                    postingDate: $date,
+                    narration: sprintf('Investment closed — %s', $inv->getInvestmentNumber()),
+                    postedBy: $userId,
+                    lines: $lines,
+                    reference: $inv->getInvestmentNumber(),
+                );
+                $inv->setInterestPaidToDate(bcadd($inv->getInterestPaidToDate(), $netInterest, 2));
+                $inv->setWhtWithheldToDate(bcadd($inv->getWhtWithheldToDate(), $wht, 2));
+                $inv->setAccruedInterest('0.00');
+                $inv->setBalance('0.00');
+                $this->record($inv, InvestmentTransactionType::WITHDRAWAL, $cashOut, new \DateTimeImmutable($date), 'Closed — balance returned', $journal->getId(), $userId, $accrued ?: null, $wht ?: null, $netInterest ?: null);
+            }
+
+            $inv->setStatus(InvestmentStatus::CLOSED);
+            $inv->setClosedDate(new \DateTimeImmutable($date));
+            $inv->setNextPayoutDate(null);
+            $inv->setUpdatedBy($userId);
+
+            $this->em->flush();
+            $this->em->commit();
+            return $inv;
+        } catch (\Throwable $e) {
+            $this->em->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Liquidate a fixed-term investment early. Accrues to $date, forfeits the
      * penalty portion of the accrued (unsettled) interest, and pays principal +
      * the net of the remaining interest. Principal is never forfeited.
@@ -525,8 +704,11 @@ final class InvestmentService
 
         $this->em->beginTransaction();
         try {
-            // Accrue any whole periods up to the liquidation date.
-            $this->accrueThrough($inv, $date, $settlementGlId, $userId, true);
+            // Interest is earned to the actual liquidation date (whole periods +
+            // the part period); the penalty below is then applied to it. Without
+            // the part period the investor would be penalised twice — once by
+            // losing the stub, once by the penalty.
+            $this->accrueToDate($inv, $date, $settlementGlId, $userId);
 
             $principal = $inv->getBalance();
             // Only accrued-but-unsettled interest is penalised (compounded/periodic
@@ -587,8 +769,15 @@ final class InvestmentService
     // ── Performance (read-only) ───────────────────────────────────────────────
 
     /**
-     * Investor performance snapshot. Projected figures assume the investment
-     * runs to maturity at its locked rate (fixed-term).
+     * Investor performance snapshot.
+     *
+     * Fixed-term: projections assume the investment runs to maturity at its
+     * locked rate, so the investor sees a guaranteed maturity value.
+     *
+     * Open-ended: there is no maturity to project to, so instead we report what
+     * is meaningful for a running investment — days invested, earnings to date,
+     * and an indicative next-12-months figure at the current balance and rate
+     * (indicative only: the balance moves with top-ups and withdrawals).
      *
      * @return array<string, mixed>
      */
@@ -596,8 +785,11 @@ final class InvestmentService
     {
         $rate = $inv->getInterestRate();
         $basis = $inv->getDayCountBasis();
+        $today = new \DateTimeImmutable('today');
 
         $projectedGross = null; $projectedNet = null; $projectedValue = null; $daysToMaturity = null;
+        $indicativeAnnualGross = null; $indicativeAnnualNet = null;
+
         if ($inv->isFixedTerm() && $inv->getTenorDays() !== null) {
             // Full-term interest on principal at the locked rate.
             $projectedGross = $this->interest($inv->getPrincipal(), $rate, $inv->getTenorDays(), $basis);
@@ -605,9 +797,18 @@ final class InvestmentService
             $projectedNet = $pNet;
             $projectedValue = bcadd($inv->getPrincipal(), $pNet, 2);
             if ($inv->getMaturityDate() !== null && $inv->isActive()) {
-                $daysToMaturity = max(0, $this->days(new \DateTimeImmutable('today'), $inv->getMaturityDate()));
+                $daysToMaturity = max(0, $this->days($today, $inv->getMaturityDate()));
             }
+        } else {
+            // Open-ended — indicative 12-month earnings at the current balance.
+            $indicativeAnnualGross = $this->interest($inv->getBalance(), $rate, $basis, $basis);
+            [$iWht, $iNet] = $this->splitWht($indicativeAnnualGross, $inv->getWhtRate());
+            $indicativeAnnualNet = $iNet;
         }
+
+        // How long the money has actually been invested (to today, or to close).
+        $endRef = $inv->getClosedDate() ?? $today;
+        $daysInvested = max(0, $this->days($inv->getPlacementDate(), $endRef));
 
         return [
             'investment_number'       => $inv->getInvestmentNumber(),
@@ -624,10 +825,15 @@ final class InvestmentService
             'wht_withheld_to_date'    => $inv->getWhtWithheldToDate(),
             'placement_date'          => $inv->getPlacementDate()->format('Y-m-d'),
             'maturity_date'           => $inv->getMaturityDate()?->format('Y-m-d'),
+            'days_invested'           => $daysInvested,
+            // Fixed-term only — null for open-ended (no maturity to project to).
             'days_to_maturity'        => $daysToMaturity,
             'projected_gross_interest'=> $projectedGross,
             'projected_net_interest'  => $projectedNet,
             'projected_maturity_value'=> $projectedValue,
+            // Open-ended only — indicative next-12-months at the current balance.
+            'indicative_annual_gross' => $indicativeAnnualGross,
+            'indicative_annual_net'   => $indicativeAnnualNet,
         ];
     }
 
