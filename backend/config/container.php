@@ -178,6 +178,19 @@ return [
     \App\Domain\Repository\PostingAuditRepository::class => function (ContainerInterface $c): \App\Domain\Repository\PostingAuditRepository {
         return new \App\Domain\Repository\PostingAuditRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Infrastructure\Service\EndOfDayService::class => function (ContainerInterface $c): \App\Infrastructure\Service\EndOfDayService {
+        return new \App\Infrastructure\Service\EndOfDayService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(\App\Domain\Repository\AccountingCalendarRepository::class),
+            $c->get(\App\Infrastructure\Service\AccountingDateService::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(AuditService::class),
+            $c->get(OverdueService::class),
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(InterestAccrualService::class),
+            $c->get(LoggerInterface::class),
+        );
+    },
     \App\Infrastructure\Service\AccountingDateService::class => function (ContainerInterface $c): \App\Infrastructure\Service\AccountingDateService {
         return new \App\Infrastructure\Service\AccountingDateService(
             $c->get(\App\Domain\Repository\AccountingCalendarRepository::class),
