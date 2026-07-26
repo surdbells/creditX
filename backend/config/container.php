@@ -172,6 +172,18 @@ return [
     GlAccountMappingRepository::class => function (ContainerInterface $c): GlAccountMappingRepository {
         return new GlAccountMappingRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\AccountingCalendarRepository::class => function (ContainerInterface $c): \App\Domain\Repository\AccountingCalendarRepository {
+        return new \App\Domain\Repository\AccountingCalendarRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Infrastructure\Service\AccountingDateService::class => function (ContainerInterface $c): \App\Infrastructure\Service\AccountingDateService {
+        return new \App\Infrastructure\Service\AccountingDateService(
+            $c->get(\App\Domain\Repository\AccountingCalendarRepository::class),
+            $c->get(SettingsCacheService::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(\App\Domain\Repository\SystemSettingRepository::class),
+            $c->get(EntityManagerInterface::class),
+        );
+    },
     \App\Domain\Repository\InvestmentProductRepository::class => function (ContainerInterface $c): \App\Domain\Repository\InvestmentProductRepository {
         return new \App\Domain\Repository\InvestmentProductRepository($c->get(EntityManagerInterface::class));
     },

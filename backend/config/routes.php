@@ -46,6 +46,7 @@ use App\Action\ResolveBankAccountAction;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\CustomerAuthMiddleware;
 use App\Infrastructure\Middleware\InvestorAuthMiddleware;
+use App\Infrastructure\Middleware\PostingContextMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
 use Slim\App;
@@ -950,7 +951,12 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('users.edit'));
         });
 
-    })->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
+    // Middleware order matters here. Slim dispatches group middleware LIFO —
+    // the LAST added runs OUTERMOST — so AuthMiddleware is added last to run
+    // first, and PostingContextMiddleware then runs inside it, once the user's
+    // id/permissions/roles attributes exist for it to publish.
+    })->add(new PostingContextMiddleware())
+      ->add(new AuthMiddleware($app->getContainer()->get(JwtService::class)));
 
     // ─── Customer self-service portal ───
     // Deliberately OUTSIDE the staff /api group above: portal endpoints are
