@@ -188,6 +188,50 @@ return [
             $c->get(FeeTypeRepository::class),
         );
     },
+    // ─── Investment actions that take a constructor flag ───
+    // mature / liquidate / close share one action class (same body, different
+    // service call), and the accrual endpoint differs only by preview-vs-post.
+    // Autowiring can't supply those scalars, so each variant is a named entry
+    // referenced by string from routes.php.
+    'investment.settle.mature' => function (ContainerInterface $c): \App\Action\Investment\SettleInvestmentAction {
+        return new \App\Action\Investment\SettleInvestmentAction(
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(\App\Domain\Repository\InvestmentRepository::class),
+            $c->get(AuditService::class),
+            \App\Action\Investment\SettleInvestmentAction::MODE_MATURE,
+        );
+    },
+    'investment.settle.liquidate' => function (ContainerInterface $c): \App\Action\Investment\SettleInvestmentAction {
+        return new \App\Action\Investment\SettleInvestmentAction(
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(\App\Domain\Repository\InvestmentRepository::class),
+            $c->get(AuditService::class),
+            \App\Action\Investment\SettleInvestmentAction::MODE_LIQUIDATE,
+        );
+    },
+    'investment.settle.close' => function (ContainerInterface $c): \App\Action\Investment\SettleInvestmentAction {
+        return new \App\Action\Investment\SettleInvestmentAction(
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(\App\Domain\Repository\InvestmentRepository::class),
+            $c->get(AuditService::class),
+            \App\Action\Investment\SettleInvestmentAction::MODE_CLOSE,
+        );
+    },
+    'investment.accrual.run' => function (ContainerInterface $c): \App\Action\Investment\RunInvestmentAccrualAction {
+        return new \App\Action\Investment\RunInvestmentAccrualAction(
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(AuditService::class),
+            false,
+        );
+    },
+    'investment.accrual.preview' => function (ContainerInterface $c): \App\Action\Investment\RunInvestmentAccrualAction {
+        return new \App\Action\Investment\RunInvestmentAccrualAction(
+            $c->get(\App\Infrastructure\Service\InvestmentService::class),
+            $c->get(AuditService::class),
+            true,
+        );
+    },
+
     \App\Infrastructure\Service\InvestmentService::class => function (ContainerInterface $c): \App\Infrastructure\Service\InvestmentService {
         return new \App\Infrastructure\Service\InvestmentService(
             $c->get(EntityManagerInterface::class),

@@ -23,6 +23,7 @@ use App\Action\Approval;
 use App\Action\ApprovalWorkflow;
 use App\Action\Accounting;
 use App\Action\Deposit;
+use App\Action\Investment;
 use App\Action\Disbursement;
 use App\Action\MakerChecker;
 use App\Action\Payment;
@@ -590,6 +591,48 @@ return function (App $app): void {
         $api->post('/deposits/interest/run', Deposit\RunDepositInterestAction::class)
             ->add(new RbacMiddleware('deposits.interest'));
 
+        // ─── Investments (fixed-term + open-ended) ───
+        // Products carry the type, rate, payout mode/frequency, tenor bounds,
+        // WHT rate and early-liquidation penalty. Terms are snapshotted onto
+        // each investment at placement, so edits here only affect NEW money.
+        $api->get('/investments/products', Investment\ListInvestmentProductsAction::class)
+            ->add(new RbacMiddleware('investments.view'));
+        $api->post('/investments/products', Investment\CreateInvestmentProductAction::class)
+            ->add(new RbacMiddleware('investments.create'));
+        $api->get('/investments/products/{id}', Investment\GetInvestmentProductAction::class)
+            ->add(new RbacMiddleware('investments.view'));
+        $api->put('/investments/products/{id}', Investment\UpdateInvestmentProductAction::class)
+            ->add(new RbacMiddleware('investments.create'));
+
+        // Accrual run — must precede /investments/{id} or "accrual" matches as an id.
+        $api->get('/investments/accrual/preview', 'investment.accrual.preview')
+            ->add(new RbacMiddleware('investments.interest'));
+        $api->post('/investments/accrual/run', 'investment.accrual.run')
+            ->add(new RbacMiddleware('investments.interest'));
+
+        // Placements and money movements. Anything that posts a GL journal is
+        // gated by investments.transact; reads by investments.view.
+        $api->get('/investments', Investment\ListInvestmentsAction::class)
+            ->add(new RbacMiddleware('investments.view'));
+        $api->post('/investments', Investment\PlaceInvestmentAction::class)
+            ->add(new RbacMiddleware('investments.transact'));
+        $api->get('/investments/{id}', Investment\GetInvestmentAction::class)
+            ->add(new RbacMiddleware('investments.view'));
+        $api->get('/investments/{id}/statement', Investment\InvestmentStatementAction::class)
+            ->add(new RbacMiddleware('investments.view'));
+        $api->post('/investments/{id}/top-up', Investment\TopUpInvestmentAction::class)
+            ->add(new RbacMiddleware('investments.transact'));
+        $api->post('/investments/{id}/withdraw', Investment\WithdrawInvestmentAction::class)
+            ->add(new RbacMiddleware('investments.transact'));
+        // Terminal settlements — mature (fixed at term), liquidate (fixed early,
+        // with penalty), close (open-ended, no penalty).
+        $api->post('/investments/{id}/mature', 'investment.settle.mature')
+            ->add(new RbacMiddleware('investments.transact'));
+        $api->post('/investments/{id}/liquidate', 'investment.settle.liquidate')
+            ->add(new RbacMiddleware('investments.transact'));
+        $api->post('/investments/{id}/close', 'investment.settle.close')
+            ->add(new RbacMiddleware('investments.transact'));
+
         // ─── Repayment Schedule ───
         $api->get('/loans/{loanId}/repayment-schedule', Accounting\RepaymentScheduleAction::class)
             ->add(new RbacMiddleware('loans.view'));
@@ -929,6 +972,10 @@ return function (App $app): void {
             $secure->get('/loans', Portal\ListMyLoansAction::class);
             $secure->get('/loans/{id}', Portal\GetMyLoanAction::class);
             $secure->get('/loans/{id}/schedule', Portal\MyRepaymentScheduleAction::class);
+            // Investor-facing: the customer's own investments and how they are
+            // performing. Scoped to the token's customer id, never a param.
+            $secure->get('/investments', Portal\ListMyInvestmentsAction::class);
+            $secure->get('/investments/{id}', Portal\GetMyInvestmentAction::class);
         })->add(new CustomerAuthMiddleware($app->getContainer()->get(JwtService::class)));
     });
 };

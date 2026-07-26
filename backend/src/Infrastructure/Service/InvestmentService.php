@@ -532,6 +532,85 @@ final class InvestmentService
         ];
     }
 
+    /**
+     * Accrue every active investment up to $asOf — the periodic run an operator
+     * (or the scheduled sweep) triggers.
+     *
+     * All-or-nothing in ONE transaction, matching OverdueService and
+     * PeriodCloseService: a partially-applied interest run is far worse to
+     * reconcile than a failed one. The offending investment is named in the
+     * error so the operator can fix it (usually an unmapped GL) and re-run.
+     *
+     * @param bool $preview compute only — roll back without posting.
+     * @return array{as_of:string, investments:int, periods:int, gross:string, wht:string, net:string, lines:array<int,array<string,mixed>>}
+     */
+    public function accrueAll(string $asOf, string $settlementGlId, ?string $userId, bool $preview = false): array
+    {
+        $this->assertDate($asOf);
+        $active = $this->investmentRepo->findActive();
+
+        $totals = ['periods' => 0, 'gross' => '0.00', 'wht' => '0.00', 'net' => '0.00'];
+        $lines = [];
+        $touched = 0;
+
+        $this->em->beginTransaction();
+        try {
+            foreach ($active as $inv) {
+                try {
+                    $r = $this->accrueThrough($inv, $asOf, $settlementGlId, $userId, /* inner */ true);
+                } catch (\Throwable $e) {
+                    throw new DomainException(sprintf(
+                        'Accrual failed on investment %s: %s',
+                        $inv->getInvestmentNumber(),
+                        $e->getMessage(),
+                    ), 0, $e);
+                }
+                if ($r['periods'] === 0) {
+                    continue;
+                }
+                $touched++;
+                $totals['periods'] += $r['periods'];
+                foreach (['gross', 'wht', 'net'] as $k) {
+                    $totals[$k] = bcadd($totals[$k], $r[$k], 2);
+                }
+                $lines[] = [
+                    'investment_id'     => $inv->getId(),
+                    'investment_number' => $inv->getInvestmentNumber(),
+                    'customer_name'     => $inv->getCustomer()->getFullName(),
+                    'payout_mode'       => $inv->getPayoutMode()->value,
+                    'periods'           => $r['periods'],
+                    'gross'             => $r['gross'],
+                    'wht'               => $r['wht'],
+                    'net'               => $r['net'],
+                    'balance_after'     => $inv->getBalance(),
+                ];
+            }
+
+            $this->em->flush();
+            if ($preview) {
+                // Nothing is kept — the caller only wanted the numbers.
+                $this->em->rollback();
+                $this->em->clear();
+            } else {
+                $this->em->commit();
+            }
+        } catch (\Throwable $e) {
+            $this->em->rollback();
+            throw $e;
+        }
+
+        return [
+            'as_of'       => $asOf,
+            'preview'     => $preview,
+            'investments' => $touched,
+            'periods'     => $totals['periods'],
+            'gross'       => $totals['gross'],
+            'wht'         => $totals['wht'],
+            'net'         => $totals['net'],
+            'lines'       => $lines,
+        ];
+    }
+
     // ── Maturity & liquidation ────────────────────────────────────────────────
 
     /**

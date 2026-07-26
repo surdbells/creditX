@@ -104,6 +104,12 @@ $permissionsDef = [
         ['deposits.transact', 'Open Accounts & Post Deposits/Withdrawals'],
         ['deposits.interest', 'Run Deposit Interest Accrual'],
     ],
+    'investments' => [
+        ['investments.view', 'View Investment Products & Investments'],
+        ['investments.create', 'Create/Edit Investment Products'],
+        ['investments.transact', 'Place, Top Up, Withdraw & Settle Investments'],
+        ['investments.interest', 'Run Investment Interest Accrual'],
+    ],
     'payments' => [
         ['payments.view', 'View Payments'],
         ['payments.create', 'Post Payments'],
@@ -193,6 +199,7 @@ $rolesDef = [
     ['Accountant', 'accountant', 'Financial operations and reporting', true, [
         'accounting.view', 'accounting.create', 'accounting.edit', 'accounting.journal', 'accounting.reverse',
         'deposits.view', 'deposits.create', 'deposits.transact', 'deposits.interest',
+        'investments.view', 'investments.create', 'investments.transact', 'investments.interest',
         'payments.view', 'payments.create', 'payments.bulk_upload',
         'loans.view', 'customers.view',
         'reports.portfolio', 'reports.par',
