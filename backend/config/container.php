@@ -191,6 +191,9 @@ return [
             $c->get(LoggerInterface::class),
         );
     },
+    \App\Domain\Repository\BackdateApprovalRepository::class => function (ContainerInterface $c): \App\Domain\Repository\BackdateApprovalRepository {
+        return new \App\Domain\Repository\BackdateApprovalRepository($c->get(EntityManagerInterface::class));
+    },
     \App\Infrastructure\Service\AccountingDateService::class => function (ContainerInterface $c): \App\Infrastructure\Service\AccountingDateService {
         return new \App\Infrastructure\Service\AccountingDateService(
             $c->get(\App\Domain\Repository\AccountingCalendarRepository::class),
@@ -198,8 +201,35 @@ return [
             $c->get(PeriodGuardService::class),
             $c->get(\App\Domain\Repository\SystemSettingRepository::class),
             $c->get(EntityManagerInterface::class),
+            $c->get(\App\Domain\Repository\BackdateApprovalRepository::class),
         );
     },
+    // Approval routes share one action; the mode is a constructor scalar, so
+    // each variant is a named entry (same pattern as the investment settlements).
+    'accounting.backdate.list' => fn(ContainerInterface $c) => new \App\Action\Accounting\BackdateApprovalAction(
+        $c->get(\App\Domain\Repository\BackdateApprovalRepository::class),
+        $c->get(\App\Infrastructure\Service\AccountingDateService::class),
+        $c->get(AuditService::class),
+        \App\Action\Accounting\BackdateApprovalAction::MODE_LIST,
+    ),
+    'accounting.backdate.request' => fn(ContainerInterface $c) => new \App\Action\Accounting\BackdateApprovalAction(
+        $c->get(\App\Domain\Repository\BackdateApprovalRepository::class),
+        $c->get(\App\Infrastructure\Service\AccountingDateService::class),
+        $c->get(AuditService::class),
+        \App\Action\Accounting\BackdateApprovalAction::MODE_REQUEST,
+    ),
+    'accounting.backdate.approve' => fn(ContainerInterface $c) => new \App\Action\Accounting\BackdateApprovalAction(
+        $c->get(\App\Domain\Repository\BackdateApprovalRepository::class),
+        $c->get(\App\Infrastructure\Service\AccountingDateService::class),
+        $c->get(AuditService::class),
+        \App\Action\Accounting\BackdateApprovalAction::MODE_APPROVE,
+    ),
+    'accounting.backdate.reject' => fn(ContainerInterface $c) => new \App\Action\Accounting\BackdateApprovalAction(
+        $c->get(\App\Domain\Repository\BackdateApprovalRepository::class),
+        $c->get(\App\Infrastructure\Service\AccountingDateService::class),
+        $c->get(AuditService::class),
+        \App\Action\Accounting\BackdateApprovalAction::MODE_REJECT,
+    ),
     \App\Domain\Repository\InvestmentProductRepository::class => function (ContainerInterface $c): \App\Domain\Repository\InvestmentProductRepository {
         return new \App\Domain\Repository\InvestmentProductRepository($c->get(EntityManagerInterface::class));
     },

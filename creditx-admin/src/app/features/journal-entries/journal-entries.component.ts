@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PostingDateComponent } from '../../shared/components/posting-date/posting-date.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
@@ -49,7 +50,7 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
 @Component({
   selector: 'app-journal-entries',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe, PostingDateComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -376,8 +377,9 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
         <div class="cx-je-modal-body">
           <div class="cx-je-form-grid">
             <div class="cx-je-filter-group">
-              <label class="cx-je-filter-label">Posting Date</label>
-              <input type="date" class="cx-input" [(ngModel)]="draft.posting_date" />
+              <!-- Shows system vs accounting date, and only offers a picker to
+                   users who may change it (§13). -->
+              <cx-posting-date label="Posting Date" [(date)]="draft.posting_date"></cx-posting-date>
             </div>
             <div class="cx-je-filter-group">
               <label class="cx-je-filter-label">Reference (optional)</label>

@@ -428,6 +428,10 @@ final class LedgerService
             $backdateReason,
         );
 
+        // Single-use: burn the manager's authorisation now that it has been
+        // relied upon, so one approval cannot cover a run of backdated entries.
+        $this->accountingDate->consumeApprovalFor($postingDate, $postedBy, $header->getId());
+
         return $header;
     }
 

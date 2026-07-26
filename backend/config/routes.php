@@ -428,6 +428,19 @@ return function (App $app): void {
         $api->post('/accounting/period/reopen', Accounting\ReopenBusinessDateAction::class)
             ->add(new RbacMiddleware('accounting.reopen_period'));
 
+        // Backdated-posting approvals (§10). Requesting needs the same
+        // permission as backdating itself — you may only ask for what you could
+        // otherwise do. Deciding needs the senior accounting permission, and
+        // the action refuses self-approval.
+        $api->get('/accounting/backdate-approvals', 'accounting.backdate.list')
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/backdate-approvals', 'accounting.backdate.request')
+            ->add(new RbacMiddleware('accounting.backdate'));
+        $api->post('/accounting/backdate-approvals/{id}/approve', 'accounting.backdate.approve')
+            ->add(new RbacMiddleware('accounting.reopen_period'));
+        $api->post('/accounting/backdate-approvals/{id}/reject', 'accounting.backdate.reject')
+            ->add(new RbacMiddleware('accounting.reopen_period'));
+
         $api->get('/accounting/journals', Accounting\ListJournalsAction::class)
             ->add(new RbacMiddleware('accounting.view'));
         // Accountant-authored manual journal (opex, capital, corrections).

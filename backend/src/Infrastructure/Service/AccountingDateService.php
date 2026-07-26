@@ -68,6 +68,9 @@ final class AccountingDateService
         private readonly PeriodGuardService $periodGuard,
         private readonly SystemSettingRepository $settingRepo,
         private readonly EntityManagerInterface $em,
+        // Optional so the service still constructs where approvals are not in
+        // play (tests, and installs that never enable the approval workflow).
+        private readonly ?\App\Domain\Repository\BackdateApprovalRepository $approvals = null,
     ) {}
 
     // ── Dates ───────────────────────────────────────────────────────────────
@@ -235,7 +238,36 @@ final class AccountingDateService
             ));
         }
 
+        // §10 — when approval is required, the permission alone is not enough:
+        // a manager must have authorised THIS user for THIS date. System jobs
+        // are exempt; no human chose their dates, so there is nothing to approve.
+        if ($this->backdatingRequiresApproval() && !$ctx->isSystem()) {
+            if ($ctx->userId === null || $this->approvals?->findUsable($ctx->userId, $date) === null) {
+                throw new DomainException(
+                    'Backdated posting to ' . $date . ' requires manager approval. '
+                  . 'Request approval from Accounting → Accounting Period, then post again.'
+                );
+            }
+        }
+
         $this->assertWeekendAllowed($date);
+    }
+
+    /**
+     * Consume the approval a backdated posting relied on, so it cannot be
+     * reused. Called from the ledger once the journal exists.
+     */
+    public function consumeApprovalFor(string $date, ?string $userId, ?string $journalId): void
+    {
+        if (!$this->isEnforced() || !$this->backdatingRequiresApproval() || $this->approvals === null) {
+            return;
+        }
+        $userId ??= PostingContextRegistry::get()->userId;
+        if ($userId === null || $date >= $this->currentAccountingDate()) {
+            return;
+        }
+        $approval = $this->approvals->findUsable($userId, $date);
+        $approval?->markUsed($journalId);
     }
 
     /**
