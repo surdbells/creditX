@@ -196,6 +196,18 @@ class Customer
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isPortalEnabled = false;
 
+    /**
+     * Whether this person may sign in to the INVESTOR portal — a separate app
+     * from customer self-service, with its own token scope.
+     *
+     * Independent of isPortalEnabled on purpose: someone can invest without
+     * borrowing, borrow without investing, or do both. Investor access is
+     * granted by staff (there is no investor self-registration), so this flag
+     * is only ever set from the admin side.
+     */
+    #[ORM\Column(name: 'is_investor', type: 'boolean', options: ['default' => false])]
+    private bool $isInvestor = false;
+
     #[ORM\Column(type: 'string', length: 20, nullable: true, enumType: CustomerPortalStatus::class)]
     private ?CustomerPortalStatus $portalStatus = null;
 
@@ -286,6 +298,7 @@ class Customer
     public function getGrossPay(): ?string { return $this->grossPay; }
     public function getPasswordHash(): ?string { return $this->passwordHash; }
     public function isPortalEnabled(): bool { return $this->isPortalEnabled; }
+    public function isInvestor(): bool { return $this->isInvestor; }
     public function getPortalStatus(): ?CustomerPortalStatus { return $this->portalStatus; }
     public function getEmailVerifiedAt(): ?\DateTimeInterface { return $this->emailVerifiedAt; }
     public function isEmailVerified(): bool { return $this->emailVerifiedAt !== null; }
@@ -347,6 +360,7 @@ class Customer
     public function setGrossPay(?string $v): void { $this->grossPay = $v; }
     public function setPasswordHash(?string $v): void { $this->passwordHash = $v; }
     public function setIsPortalEnabled(bool $v): void { $this->isPortalEnabled = $v; }
+    public function setIsInvestor(bool $v): void { $this->isInvestor = $v; }
     public function setPortalStatus(?CustomerPortalStatus $v): void { $this->portalStatus = $v; }
     public function setEmailVerifiedAt(?\DateTimeInterface $v): void { $this->emailVerifiedAt = $v; }
     public function setLastLoginIp(?string $v): void { $this->lastLoginIp = $v; }
@@ -577,6 +591,7 @@ class Customer
             'work_id_expiry_date' => $this->workIdExpiryDate?->format('Y-m-d'),
             'gross_pay'          => $this->grossPay,
             'is_portal_enabled'  => $this->isPortalEnabled,
+            'is_investor'        => $this->isInvestor,
             'portal_status'      => $this->portalStatus?->value,
             'portal_status_label'=> $this->portalStatus?->label(),
             'verified'           => $this->verified,

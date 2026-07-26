@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Action\Portal;
+namespace App\Action\Invest;
 
 use App\Domain\Repository\{InvestmentRepository, InvestmentTransactionRepository};
 use App\Infrastructure\Service\{ApiResponse, InvestmentService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 /**
- * GET /api/portal/investments/{id} — one of the authenticated investor's own
+ * GET /api/invest/investments/{id} — one of the authenticated investor's own
  * investments, with performance and full statement.
  *
  * Ownership is re-checked against the token's customer id: requesting another

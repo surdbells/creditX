@@ -1,10 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
-import {
-  ApiResponse, ApplyLoanRequest, Customer, Investment, InvestmentPerformance,
-  InvestmentPortfolio, InvestmentTransaction, Loan, LoanProduct, RepaymentScheduleItem,
-} from '../models';
+import { ApiResponse, ApplyLoanRequest, Customer, Loan, LoanProduct, RepaymentScheduleItem } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class PortalService {
@@ -46,22 +43,5 @@ export class PortalService {
 
   getSchedule(id: string): Observable<ApiResponse<RepaymentScheduleItem[]>> {
     return this.api.get<RepaymentScheduleItem[]>(`/portal/loans/${id}/schedule`);
-  }
-
-  /**
-   * The signed-in investor's own investments, each with its performance block
-   * plus a portfolio summary. Scoped server-side to the token's customer.
-   */
-  listInvestments(): Observable<ApiResponse<InvestmentPortfolio>> {
-    return this.api.get<InvestmentPortfolio>('/portal/investments');
-  }
-
-  /** One investment with performance and the full statement. */
-  getInvestment(id: string): Observable<ApiResponse<{
-    investment: Investment;
-    performance: InvestmentPerformance;
-    transactions: InvestmentTransaction[];
-  }>> {
-    return this.api.get<any>(`/portal/investments/${id}`);
   }
 }

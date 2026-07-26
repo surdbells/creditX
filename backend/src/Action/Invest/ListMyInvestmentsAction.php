@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Action\Portal;
+namespace App\Action\Invest;
 
 use App\Domain\Repository\InvestmentRepository;
 use App\Infrastructure\Service\{ApiResponse, InvestmentService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 /**
- * GET /api/portal/investments — the authenticated investor's own investments,
- * each with its performance block so the portal can show what the money has
+ * GET /api/invest/investments — the authenticated investor's own investments,
+ * each with its performance block so the app can show what the money has
  * earned without a second call.
  *
- * The customer id comes from the token, never from a query param, so an
- * investor can never see another investor's holdings.
+ * The customer id comes from the investor-scoped token, never from a query
+ * param, so an investor can never see another investor's holdings.
  */
 final class ListMyInvestmentsAction
 {

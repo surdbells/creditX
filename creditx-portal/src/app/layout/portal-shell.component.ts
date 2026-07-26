@@ -125,7 +125,6 @@ export class PortalShellComponent {
     { label: 'Dashboard', icon: 'layout-dashboard', route: '/dashboard' },
     { label: 'My loans', icon: 'file-text', route: '/loans' },
     { label: 'Apply for a loan', icon: 'plus-circle', route: '/loans/apply' },
-    { label: 'My investments', icon: 'trending-up', route: '/investments' },
     { label: 'Profile', icon: 'user', route: '/profile' },
   ];
 

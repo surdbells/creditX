@@ -40,10 +40,12 @@ use App\Action\Team;
 use App\Action\Reconciliation;
 use App\Action\CreditBureau;
 use App\Action\Portal;
+use App\Action\Invest;
 use App\Action\ListBanksAction;
 use App\Action\ResolveBankAccountAction;
 use App\Infrastructure\Middleware\AuthMiddleware;
 use App\Infrastructure\Middleware\CustomerAuthMiddleware;
+use App\Infrastructure\Middleware\InvestorAuthMiddleware;
 use App\Infrastructure\Middleware\RbacMiddleware;
 use App\Infrastructure\Service\JwtService;
 use Slim\App;
@@ -615,6 +617,10 @@ return function (App $app): void {
         // Withholding tax withheld from investor interest, for FIRS remittance.
         $api->get('/investments/wht-remittance', Investment\WhtRemittanceAction::class)
             ->add(new RbacMiddleware('investments.view'));
+        // Grant / revoke a customer's access to the investor portal. There is no
+        // investor self-registration — this is the only way in.
+        $api->put('/investments/investors/{customerId}', Investment\SetInvestorAccessAction::class)
+            ->add(new RbacMiddleware('investments.transact'));
 
         // Placements and money movements. Anything that posts a GL journal is
         // gated by investments.transact; reads by investments.view.
@@ -978,10 +984,32 @@ return function (App $app): void {
             $secure->get('/loans', Portal\ListMyLoansAction::class);
             $secure->get('/loans/{id}', Portal\GetMyLoanAction::class);
             $secure->get('/loans/{id}/schedule', Portal\MyRepaymentScheduleAction::class);
-            // Investor-facing: the customer's own investments and how they are
-            // performing. Scoped to the token's customer id, never a param.
-            $secure->get('/investments', Portal\ListMyInvestmentsAction::class);
-            $secure->get('/investments/{id}', Portal\GetMyInvestmentAction::class);
         })->add(new CustomerAuthMiddleware($app->getContainer()->get(JwtService::class)));
+    });
+
+    // ─── Investor portal (/api/invest) ───
+    //
+    // A SEPARATE app from customer self-service. Investors are Customer records
+    // flagged is_investor, but their tokens carry scope='investor', which only
+    // InvestorAuthMiddleware accepts — so a loan-portal token cannot read
+    // investments, and an investor token cannot reach loan self-service, even
+    // for the same person.
+    //
+    // There is no registration endpoint: staff grant access via
+    // PUT /api/investments/investors/{customerId}. Sign-in is passwordless by
+    // default (emailed code); the password path exists for investors who also
+    // hold a customer-portal password.
+    $app->group('/api/invest', function (RouteCollectorProxy $invest) use ($app) {
+        $invest->post('/auth/request-otp', Invest\RequestOtpAction::class);
+        $invest->post('/auth/verify-otp', Invest\VerifyOtpAction::class);
+        $invest->post('/auth/login', Invest\LoginAction::class);
+        $invest->post('/auth/refresh', Invest\RefreshAction::class);
+
+        $invest->group('', function (RouteCollectorProxy $secure) {
+            $secure->post('/auth/logout', Invest\LogoutAction::class);
+            $secure->get('/me', Invest\MeAction::class);
+            $secure->get('/investments', Invest\ListMyInvestmentsAction::class);
+            $secure->get('/investments/{id}', Invest\GetMyInvestmentAction::class);
+        })->add(new InvestorAuthMiddleware($app->getContainer()->get(JwtService::class)));
     });
 };
