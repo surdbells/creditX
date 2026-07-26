@@ -16,6 +16,7 @@ import { LucideAngularModule,
   Scale, History, ShieldAlert, Link, UserRound, Package, ShieldCheck,
   PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2, BadgeCheck, Send, Palette,
   ChevronsDown, ChevronsUp, Wallet,
+  Hand, ChevronUp, ArrowRight,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -51,6 +52,7 @@ export const appConfig: ApplicationConfig = {
         Scale, History, ShieldAlert, Link, UserRound, Package, ShieldCheck,
         PiggyBank, ArrowLeft, ArrowDownCircle, ArrowUpCircle, Play, Undo2, BadgeCheck, Send, Palette,
         ChevronsDown, ChevronsUp, Wallet,
+  Hand, ChevronUp, ArrowRight,
       })
     ),
   ],

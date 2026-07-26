@@ -12,6 +12,75 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const INVESTMENTS_GUIDE: PageGuide = {
+  id: 'investments',
+  titleKey: 'Investments',
+  purposeKey: 'Place, service and settle money that investors deposit with the institution.',
+  descriptionKey:
+    'Investments are the funding side of the book. A fixed-term placement is locked for an agreed '
+    + 'tenor at an agreed rate and matures on a set date; an open-ended one has no maturity and the '
+    + 'investor can top up or withdraw at will. Interest accrues to the day, withholding tax is '
+    + 'deducted whenever interest is credited, and every movement posts to the ledger.',
+  actionKeys: [
+    'Place a new investment for a customer, fixed-term or open-ended',
+    'Top up or withdraw from an open-ended investment',
+    'Mature a fixed-term investment at the end of its tenor',
+    'Liquidate a fixed-term investment early, applying the penalty',
+    'Close an open-ended investment and return the balance',
+    'Open any investment to see its performance and full statement',
+  ],
+  sections: [
+    {
+      selector: '.cx-inv-filters',
+      titleKey: 'Finding investments',
+      bodyKey:
+        'Filter by status, by shape (fixed-term or open-ended) or by product. The search box matches '
+        + 'the investment number or the investor\'s name.',
+    },
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The portfolio',
+      bodyKey:
+        'Current value is principal plus interest earned but not yet paid out. A maturity date marked '
+        + '"due" has been reached but not yet settled. The actions on each row change with the '
+        + 'investment\'s shape — open-ended offers top up, withdraw and close; fixed-term offers '
+        + 'mature and liquidate.',
+    },
+  ],
+  workflowKeys: ['Create product', 'Place investment', 'Interest accrues', 'Mature or withdraw', 'Settled'],
+  dependsOnKeys: ['Investment Products', 'Customers', 'Default Ledgers', 'Chart of Accounts'],
+  usedByKeys: ['General Ledger', 'Investor portal', 'WHT remittance', 'Financial statements'],
+  businessRuleKeys: [
+    'Terms are locked onto the investment when it is placed — editing the product later never changes live money.',
+    'Interest is earned to the actual day of any exit, not just to the last period boundary.',
+    'Withholding tax is deducted whenever interest is credited to the investor.',
+    'Early liquidation forfeits a share of unsettled interest; the principal is always returned in full.',
+    'Only open-ended investments accept top-ups and withdrawals.',
+  ],
+  tipKeys: [
+    'The placement dialog projects the maturity value before you commit — check it against what the investor was quoted.',
+    'Run the interest job daily so accrued figures and the investor portal stay current.',
+    'Use Liquidate for an early fixed-term exit and Close for an open-ended one; only liquidation carries a penalty.',
+  ],
+  permissionKeys: ['investments.view', 'investments.transact'],
+  faq: [
+    {
+      questionKey: 'What is the difference between maturing and liquidating?',
+      answerKey: 'Maturing settles a fixed-term investment at the end of its agreed tenor. Liquidating ends it early and forfeits part of the unsettled interest.',
+    },
+    {
+      questionKey: 'Why can I not top up this investment?',
+      answerKey: 'Top-ups apply only to open-ended investments whose product allows them. A fixed-term placement is locked for its tenor.',
+    },
+    {
+      questionKey: 'Where does the investor see this?',
+      answerKey: 'In the investor portal, once staff have granted them access. They see their own holdings, earnings and statements — nothing else.',
+    },
+  ],
+};
 
 /**
  * Investments — place, service, and settle investor money.
@@ -28,7 +97,7 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   standalone: true,
   imports: [
     SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, MoneyPipe,
-    PageHeaderComponent, DataTableComponent, FormDialogComponent, CxViewDialogComponent,
+    PageHeaderComponent, DataTableComponent, FormDialogComponent, CxViewDialogComponent, PageGuideComponent,
   ],
   template: `
     <div class="cx-animate-in">
@@ -43,6 +112,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-inv-filters">
         <select class="cx-select" [(ngModel)]="filters.status" (change)="applyFilters()" aria-label="Status">
@@ -394,6 +465,8 @@ export class InvestmentsComponent implements OnInit {
   private toast = inject(ToastService);
   auth = inject(AuthService);
   settings = inject(SettingsService);
+
+  readonly guide = INVESTMENTS_GUIDE;
 
   columns: TableColumn[] = [
     { key: 'investment_number', label: 'Number' },

@@ -8,6 +8,81 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const ACCOUNTING_PERIOD_GUIDE: PageGuide = {
+  id: 'accounting-period',
+  titleKey: 'Accounting Period',
+  purposeKey: 'Controls which business date your financial postings land on, and closes each day.',
+  descriptionKey:
+    'CreditX separates the server date from the accounting date. Work keyed on Monday for Friday '
+    + 'still belongs to Friday, so the accounting date is what every posting uses while the audit '
+    + 'trail keeps the real timestamp. End-of-Day validates the books, closes the current date and '
+    + 'opens the next one.',
+  actionKeys: [
+    'See the accounting date beside the server date, and how far behind the books are',
+    'Validate — a dry run that checks the trial balance without posting anything',
+    'Run End-of-Day to close the current date and advance to the next',
+    'Reopen a closed date, with a mandatory reason, to make a correction',
+    'Review every backdated posting, with who made it and from where',
+  ],
+  sections: [
+    {
+      selector: '.cx-ap-grid',
+      titleKey: 'The two dates',
+      bodyKey:
+        'The accounting date is what postings use; the server date is simply today. When they differ, '
+        + 'the books are behind and End-of-Day has not yet been run for one or more days.',
+    },
+    {
+      selector: '.cx-ap-actions',
+      titleKey: 'Running End-of-Day',
+      bodyKey:
+        'Validate first — it checks the trial balance and reports without changing anything. If the '
+        + 'ledger does not balance, End-of-Day aborts and the date stays open, so an imbalance can '
+        + 'never be sealed in.',
+    },
+    {
+      selector: '.cx-ap-cal-grid',
+      titleKey: 'The calendar',
+      bodyKey:
+        'Green is open, gray closed, blue future, orange means End-of-Day is running. The ringed day '
+        + 'is the current accounting date; a dashed day has no stored record yet. Click a closed day '
+        + 'to reopen it if you have permission.',
+    },
+  ],
+  workflowKeys: ['Day\'s postings', 'Validate', 'Run End-of-Day', 'Date closes', 'Next date opens'],
+  dependsOnKeys: ['Chart of Accounts', 'Default Ledgers', 'accounting.* permissions'],
+  usedByKeys: ['Every posting screen', 'Journal Entries', 'Reports', 'Period Close'],
+  businessRuleKeys: [
+    'Future-dated postings are never permitted, for anyone — including system jobs.',
+    'A closed date rejects postings until it is explicitly reopened.',
+    'Backdating needs the permission, must fall inside the maximum backdate window, and may need manager approval.',
+    'End-of-Day aborts if the trial balance does not balance; the date stays open.',
+    'Only one End-of-Day may run at a time, and postings are locked while it does.',
+  ],
+  tipKeys: [
+    'Run Validate before End-of-Day — it catches an unbalanced ledger without committing anything.',
+    'If the books fall several days behind, run End-of-Day once per day in order rather than skipping ahead.',
+    'Reopening does not move the accounting date back; it just lets you post to that day again.',
+  ],
+  permissionKeys: ['accounting.view', 'accounting.run_eod', 'accounting.reopen_period', 'accounting.backdate'],
+  faq: [
+    {
+      questionKey: 'Why is the accounting date behind today?',
+      answerKey: 'End-of-Day has not been run for the intervening days. Until it is, postings continue to land on the older date.',
+    },
+    {
+      questionKey: 'End-of-Day failed — did anything post?',
+      answerKey: 'No. A failed run returns the date to open and posts nothing. The step list shows exactly which check stopped it.',
+    },
+    {
+      questionKey: 'Nothing is being enforced — why?',
+      answerKey: 'The framework ships switched off. Until accounting.enforce_accounting_date is enabled in Settings, postings use the date each module supplies.',
+    },
+  ],
+};
 
 /**
  * Accounting Period Management (§12).
@@ -28,7 +103,7 @@ import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-
   // so SearchableSelectDirective is deliberately not imported.
   imports: [
     CommonModule, FormsModule, LucideAngularModule,
-    PageHeaderComponent, FormDialogComponent, CxViewDialogComponent,
+    PageHeaderComponent, FormDialogComponent, CxViewDialogComponent, PageGuideComponent,
   ],
   template: `
     <div class="cx-animate-in">
@@ -36,6 +111,8 @@ import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-
         title="Accounting Period"
         subtitle="The accounting date your postings land on, and the End-of-Day that advances it"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       @if (!loading() && status(); as s) {
         @if (!s.enforced) {
@@ -314,6 +391,8 @@ export class AccountingPeriodComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   auth = inject(AuthService);
+
+  readonly guide = ACCOUNTING_PERIOD_GUIDE;
 
   loading = signal(true);
   calLoading = signal(false);

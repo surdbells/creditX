@@ -8,6 +8,65 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const INVESTMENT_ACCRUAL_GUIDE: PageGuide = {
+  id: 'investment-accrual',
+  titleKey: 'Investment Interest Run',
+  purposeKey: 'Recognises the interest owed to investors and posts it to the ledger.',
+  descriptionKey:
+    'Interest builds up on every active investment between period boundaries. This run recognises '
+    + 'everything reached on or before a chosen date — paying it out, adding it to the balance, or '
+    + 'holding it until maturity depending on each product — and deducts withholding tax whenever '
+    + 'interest is credited.',
+  actionKeys: [
+    'Preview the interest due up to a date without posting anything',
+    'Post the run, writing the journals and updating each balance',
+    'See the gross interest, tax withheld and net figures before committing',
+    'Review a per-investment breakdown of what the run will do',
+  ],
+  sections: [
+    {
+      selector: '.cx-ia-fields',
+      titleKey: 'Choosing the run',
+      bodyKey:
+        'Accrue up to a date — every period boundary on or before it is recognised. The settlement '
+        + 'account is where interest actually leaves from for investments that pay out periodically.',
+    },
+    {
+      selector: '.cx-ia-actions',
+      titleKey: 'Preview, then post',
+      bodyKey:
+        'Preview computes and posts nothing. Run & Post writes the journals, and only becomes '
+        + 'available once you have previewed and there is something to post.',
+    },
+  ],
+  workflowKeys: ['Investments placed', 'Interest accrues', 'Run interest', 'Ledger posted'],
+  dependsOnKeys: ['Investments', 'Default Ledgers', 'Investment GL accounts'],
+  usedByKeys: ['General Ledger', 'Investor portal', 'WHT remittance'],
+  businessRuleKeys: [
+    'The run is all-or-nothing — if one investment fails, nothing posts and the offending one is named.',
+    'Only whole periods reached on or before the date are recognised.',
+    'Withholding tax is deducted whenever interest is credited to the investor.',
+    'Re-running is safe: a period already recognised is not posted twice.',
+  ],
+  tipKeys: [
+    'The scheduled daily job does this automatically — use this page to catch up or to check figures before month end.',
+    'Always preview first; the per-investment table shows exactly which investors are affected.',
+  ],
+  permissionKeys: ['investments.interest'],
+  faq: [
+    {
+      questionKey: 'Is it safe to run this twice in one day?',
+      answerKey: 'Yes. Only period boundaries not already recognised are posted, so a second run finds nothing to do.',
+    },
+    {
+      questionKey: 'The run failed — what posted?',
+      answerKey: 'Nothing. The run is all-or-nothing so the ledger is untouched, and the error names the investment to fix.',
+    },
+  ],
+};
 
 /**
  * Investment Interest Run — recognise interest on every active investment up
@@ -22,13 +81,15 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
 @Component({
   selector: 'app-investment-accrual',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Investment Interest Run"
         subtitle="Recognise interest on active investments — preview first, then post"
         eyebrow="Investments"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-card cx-ia-controls">
         <div class="cx-ia-fields">
@@ -154,6 +215,8 @@ export class InvestmentAccrualComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
   auth = inject(AuthService);
+
+  readonly guide = INVESTMENT_ACCRUAL_GUIDE;
 
   asOf = new Date().toISOString().slice(0, 10);
   settlementGlId = '';

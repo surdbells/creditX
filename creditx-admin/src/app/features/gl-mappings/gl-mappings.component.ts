@@ -8,6 +8,68 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const GL_MAPPINGS_GUIDE: PageGuide = {
+  id: 'gl-mappings',
+  titleKey: 'Default Ledgers',
+  purposeKey: 'Decides which GL account each loan, investment and fee operation posts to.',
+  descriptionKey:
+    'Every posting the system makes — disbursement, repayment, interest, penalties, write-offs, '
+    + 'provisions, fees — has to reach a specific ledger account. This page names each of those '
+    + 'operations and lets you point it at the account you want, so double-entry stays accurate '
+    + 'without anyone editing code.',
+  actionKeys: [
+    'See every operation and the account it currently posts to',
+    'Repoint an operation at a different GL account',
+    'Revert an operation to the account it shipped with',
+    'Set the income account for each fee type',
+    'Spot roles that resolve to no account at all, flagged in red',
+  ],
+  sections: [
+    {
+      selector: '.cx-glm-note',
+      titleKey: 'Default versus custom',
+      bodyKey:
+        'Every role ships pointed at a sensible account. Leave it on Default and it uses that one; '
+        + 'choose another and the role is marked Custom. Changes affect NEW postings only — history '
+        + 'is never rewritten.',
+    },
+    {
+      selector: '.cx-glm-rows',
+      titleKey: 'One row per operation',
+      bodyKey:
+        'Each row names a real posting the system makes and shows the account it will use. The line '
+        + 'underneath tells you exactly which stage it fires at — placement, accrual, repayment and so on.',
+    },
+  ],
+  workflowKeys: ['Create GL accounts', 'Map operations here', 'Post transactions', 'Trial balance'],
+  dependsOnKeys: ['Chart of Accounts', 'Fee Types'],
+  usedByKeys: ['Loan disbursement', 'Repayments', 'Interest & provisions', 'Investments', 'Journal Entries'],
+  businessRuleKeys: [
+    'A change applies to future postings only; entries already on the ledger keep their original account.',
+    'Only active GL accounts can be selected.',
+    'A role with no resolvable account will make its posting fail loudly rather than post somewhere wrong.',
+    'Fee income accounts come from the fee type itself, so they appear here alongside the fixed roles.',
+  ],
+  tipKeys: [
+    'After adding a GL account, come here to point the relevant operation at it — creating the account alone changes nothing.',
+    'Any row flagged in red will block that operation until an account is set.',
+    'Settlement accounts (which bank the money moves through) are chosen per transaction, not here.',
+  ],
+  permissionKeys: ['accounting.view', 'accounting.edit'],
+  faq: [
+    {
+      questionKey: 'Will changing a mapping affect past transactions?',
+      answerKey: 'No. Postings already made keep the account they used. Only new postings follow the new mapping.',
+    },
+    {
+      questionKey: 'Why can I not set the bank account for disbursement here?',
+      answerKey: 'The settlement account is an operator decision per transaction — you pick it on the disbursement screen itself.',
+    },
+  ],
+};
 
 interface GlRole {
   key: string;
@@ -37,13 +99,15 @@ interface GlRole {
 @Component({
   selector: 'app-gl-mappings',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectDirective],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectDirective, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Default Ledgers"
         subtitle="The GL account each loan-lifecycle operation posts to — keeps double-entry accurate"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-glm-note">
         <lucide-icon name="info" [size]="15"></lucide-icon>
@@ -153,6 +217,8 @@ export class GlMappingsComponent implements OnInit {
 
   roles = signal<GlRole[]>([]);
   glAccounts = signal<any[]>([]);
+  readonly guide = GL_MAPPINGS_GUIDE;
+
   loading = signal(true);
   saving = signal<Set<string>>(new Set());
 

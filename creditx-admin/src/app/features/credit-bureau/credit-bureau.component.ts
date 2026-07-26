@@ -9,6 +9,66 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { CreditReportViewComponent } from './credit-report-view.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const CREDIT_BUREAU_GUIDE: PageGuide = {
+  id: 'credit-bureau',
+  titleKey: 'Credit Bureau',
+  purposeKey: 'Check a borrower\'s credit history with FirstCentral before lending to them.',
+  descriptionKey:
+    'Run a bureau check on a person or a business without starting a loan application. The full '
+    + 'report comes back — score, risk band and every section the bureau returns — and each enquiry '
+    + 'is recorded so you can show what was known at the time a decision was made.',
+  actionKeys: [
+    'Check a consumer by BVN, or by name and date of birth',
+    'Check a business by name or RC number',
+    'Read the complete bureau report, every field labelled',
+    'Search past enquiries and reopen any of them',
+    'Download the raw provider response for an audit file',
+  ],
+  sections: [
+    {
+      selector: '.cx-cb-form',
+      titleKey: 'Running a check',
+      bodyKey:
+        'For a person, BVN gives the most reliable match; name plus date of birth is the fallback. '
+        + 'For a business, use the RC number where you have it.',
+    },
+    {
+      selector: '.cx-cb-filters',
+      titleKey: 'Enquiry history',
+      bodyKey:
+        'Every check ever run is kept here. Filter by result, subject, risk band, or whether it came '
+        + 'from this page or from a loan workflow — then open any row to see the full report again.',
+    },
+  ],
+  workflowKeys: ['Customer applies', 'Credit check', 'Underwriting', 'Approval decision'],
+  dependsOnKeys: ['FirstCentral credentials', 'Credit bureau enabled in Settings'],
+  usedByKeys: ['Loan approval workflow', 'Underwriting decisions'],
+  businessRuleKeys: [
+    'Every enquiry is stored with its full report — a check can be evidenced long after the fact.',
+    'A "no hit" means the bureau holds no record for that subject; it is not the same as a poor score.',
+    'Commercial reports carry no numeric score, so they always go to a human for judgement.',
+    'Running a check is gated by its own permission, separate from the loan module.',
+  ],
+  tipKeys: [
+    'BVN gives a far more reliable match than name and date of birth — use it whenever you have it.',
+    'A credit-check step can be built into a product\'s approval workflow so it runs automatically.',
+    'The raw response download is the thing to attach to an audit or dispute file.',
+  ],
+  permissionKeys: ['credit_bureau.check'],
+  faq: [
+    {
+      questionKey: 'The check returned no score — why?',
+      answerKey: 'Either the bureau holds no record for that subject, or it is a commercial report, which does not carry a numeric score.',
+    },
+    {
+      questionKey: 'Does running a check here affect a loan application?',
+      answerKey: 'No. This is a standalone enquiry. Checks that gate an application are run by the approval workflow itself.',
+    },
+  ],
+};
 
 /**
  * Credit Bureau (FirstCentral) — standalone check module, gated by
@@ -26,10 +86,13 @@ import { CreditReportViewComponent } from './credit-report-view.component';
   imports: [
     CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent,
     DataTableComponent, CxViewDialogComponent, SearchableSelectDirective, CreditReportViewComponent,
+    PageGuideComponent,
   ],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Credit Bureau" subtitle="Run a FirstCentral credit check" eyebrow="Risk"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-cb-grid">
         <!-- Check form -->
@@ -177,6 +240,8 @@ import { CreditReportViewComponent } from './credit-report-view.component';
 export class CreditBureauComponent implements OnInit {
   private api = inject(ApiService);
   private toast = inject(ToastService);
+
+  readonly guide = CREDIT_BUREAU_GUIDE;
 
   subject: 'consumer' | 'commercial' = 'consumer';
   bvn = ''; name = ''; dob = ''; businessName = ''; rcNumber = '';
