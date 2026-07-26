@@ -172,6 +172,15 @@ return [
     GlAccountMappingRepository::class => function (ContainerInterface $c): GlAccountMappingRepository {
         return new GlAccountMappingRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\InvestmentProductRepository::class => function (ContainerInterface $c): \App\Domain\Repository\InvestmentProductRepository {
+        return new \App\Domain\Repository\InvestmentProductRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Domain\Repository\InvestmentRepository::class => function (ContainerInterface $c): \App\Domain\Repository\InvestmentRepository {
+        return new \App\Domain\Repository\InvestmentRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Domain\Repository\InvestmentTransactionRepository::class => function (ContainerInterface $c): \App\Domain\Repository\InvestmentTransactionRepository {
+        return new \App\Domain\Repository\InvestmentTransactionRepository($c->get(EntityManagerInterface::class));
+    },
     GlMappingService::class => function (ContainerInterface $c): GlMappingService {
         return new GlMappingService(
             $c->get(GlAccountMappingRepository::class),

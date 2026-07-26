@@ -38,6 +38,9 @@ final class GlMappingRegistry
     public const LOSS_ALLOWANCE        = 'loan.loss_allowance';
     public const OPENING_BALANCE_EQUITY = 'accounting.opening_balance_equity';
     public const RETAINED_EARNINGS      = 'accounting.retained_earnings';
+    public const INVESTMENT_LIABILITY   = 'investment.liability';
+    public const INVESTMENT_INTEREST_EXPENSE = 'investment.interest_expense';
+    public const WHT_PAYABLE            = 'tax.wht_payable';
 
     /**
      * Ordered role definitions. Each: key, label, category, default_code,
@@ -141,6 +144,30 @@ final class GlMappingRegistry
             'default_code' => 'RETEARN',
             'stage' => 'Period close',
             'description' => 'Equity account net income is closed into at period end.',
+        ],
+        [
+            'key' => self::INVESTMENT_LIABILITY,
+            'label' => 'Investment Liability',
+            'category' => 'Investments',
+            'default_code' => 'INVLIAB',
+            'stage' => 'Placement · Payout · Maturity',
+            'description' => 'Liability control account for principal (and capitalised interest) owed to investors.',
+        ],
+        [
+            'key' => self::INVESTMENT_INTEREST_EXPENSE,
+            'label' => 'Investment Interest Expense',
+            'category' => 'Investments',
+            'default_code' => 'INVINTEXP',
+            'stage' => 'Accrual',
+            'description' => 'Expense recognised as interest accrues on investments.',
+        ],
+        [
+            'key' => self::WHT_PAYABLE,
+            'label' => 'Withholding Tax Payable',
+            'category' => 'Investments',
+            'default_code' => 'WHTPAY',
+            'stage' => 'Interest payout',
+            'description' => 'Liability for withholding tax deducted from investor interest, pending remittance to FIRS.',
         ],
     ];
 
