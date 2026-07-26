@@ -64,6 +64,7 @@ final class InvestmentService
         private readonly GlMappingService $glMapping,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledger,
+        private readonly ?\Psr\Log\LoggerInterface $logger = null,
     ) {}
 
     // ── Placement ────────────────────────────────────────────────────────────
@@ -843,6 +844,105 @@ final class InvestmentService
             $this->em->rollback();
             throw $e;
         }
+    }
+
+    /**
+     * Settle every fixed-term investment that has reached maturity on or before
+     * $asOf — the scheduled maturity sweep.
+     *
+     * An investment flagged auto-rollover is matured and then IMMEDIATELY
+     * re-placed for its net proceeds on the same product and tenor. Booking it
+     * as settle-then-place (rather than a synthetic liability-to-liability
+     * transfer) keeps both journals individually balanced and leaves an
+     * explicit audit trail — the investor was paid out, then reinvested — with
+     * a net-zero effect on the settlement account. The new investment records
+     * rolled_from_id so the chain is traceable.
+     *
+     * Each investment is settled independently: one failure does not abort the
+     * others (unlike the interest run, where a partial batch would be a
+     * reconciliation problem — here each maturity is a self-contained event).
+     *
+     * @return array{as_of:string, matured:int, rolled_over:int, failed:int, paid_out:string, lines:array<int,array<string,mixed>>}
+     */
+    public function processMaturities(string $asOf, ?string $userId, ?string $settlementGlId = null): array
+    {
+        $this->assertDate($asOf);
+        $settlementGlId ??= $this->role(GlMappingRegistry::INVESTMENT_SETTLEMENT)->getId();
+
+        $due = $this->investmentRepo->findMaturing(new \DateTimeImmutable($asOf));
+
+        $matured = 0; $rolled = 0; $failed = 0; $paidOut = '0.00';
+        $lines = [];
+
+        foreach ($due as $inv) {
+            $number = $inv->getInvestmentNumber();
+            $wantsRollover = $inv->isAutoRollover();
+            $product = $inv->getProduct();
+            $tenor = $inv->getTenorDays();
+            $customerId = $inv->getCustomer()->getId();
+            $maturityDate = $inv->getMaturityDate()?->format('Y-m-d') ?? $asOf;
+
+            try {
+                $this->mature($inv, $settlementGlId, $userId, $maturityDate);
+                $matured++;
+                // Proceeds actually paid = the maturity movement's cash leg.
+                $proceeds = $inv->getPrincipal();
+                $line = [
+                    'investment_id'     => $inv->getId(),
+                    'investment_number' => $number,
+                    'customer_name'     => $inv->getCustomer()->getFullName(),
+                    'maturity_date'     => $maturityDate,
+                    'rolled_over'       => false,
+                    'new_investment'    => null,
+                ];
+
+                if ($wantsRollover && $product->isActive() && $tenor !== null) {
+                    // Re-place the net proceeds: principal + interest the
+                    // investor actually received on this investment.
+                    $reinvest = bcadd($inv->getPrincipal(), $inv->getInterestPaidToDate(), 2);
+                    try {
+                        $new = $this->place(
+                            $product, $customerId, $reinvest, $tenor, $maturityDate,
+                            $settlementGlId, $userId, true, $inv->getPayoutDepositAccountId(), $inv->getId(),
+                        );
+                        $inv->setStatus(InvestmentStatus::ROLLED_OVER);
+                        $this->em->flush();
+                        $rolled++;
+                        $line['rolled_over'] = true;
+                        $line['new_investment'] = $new->getInvestmentNumber();
+                        $line['reinvested'] = $reinvest;
+                    } catch (\Throwable $e) {
+                        // The maturity itself succeeded and the investor has
+                        // been paid — only the re-placement failed. Report it
+                        // rather than unwinding a correct settlement.
+                        $line['rollover_error'] = $e->getMessage();
+                        $failed++;
+                    }
+                } else {
+                    $paidOut = bcadd($paidOut, $proceeds, 2);
+                }
+
+                $lines[] = $line;
+            } catch (\Throwable $e) {
+                $failed++;
+                $lines[] = [
+                    'investment_number' => $number,
+                    'maturity_date'     => $maturityDate,
+                    'error'             => $e->getMessage(),
+                ];
+                $this->logger?->error('Investment maturity failed', ['investment' => $number, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return [
+            'as_of'       => $asOf,
+            'due'         => count($due),
+            'matured'     => $matured,
+            'rolled_over' => $rolled,
+            'failed'      => $failed,
+            'paid_out'    => $paidOut,
+            'lines'       => $lines,
+        ];
     }
 
     // ── Performance (read-only) ───────────────────────────────────────────────

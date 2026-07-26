@@ -242,6 +242,7 @@ return [
             $c->get(GlMappingService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(LoggerInterface::class),
         );
     },
     CustomerLedgerRepository::class => function (ContainerInterface $c): CustomerLedgerRepository {

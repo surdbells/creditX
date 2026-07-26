@@ -40,6 +40,7 @@ final class GlMappingRegistry
     public const RETAINED_EARNINGS      = 'accounting.retained_earnings';
     public const INVESTMENT_LIABILITY   = 'investment.liability';
     public const INVESTMENT_INTEREST_EXPENSE = 'investment.interest_expense';
+    public const INVESTMENT_SETTLEMENT  = 'investment.settlement';
     public const WHT_PAYABLE            = 'tax.wht_payable';
 
     /**
@@ -162,6 +163,14 @@ final class GlMappingRegistry
             'description' => 'Expense recognised as interest accrues on investments.',
         ],
         [
+            'key' => self::INVESTMENT_SETTLEMENT,
+            'label' => 'Default Investment Settlement',
+            'category' => 'Investments',
+            'default_code' => 'BANK',
+            'stage' => 'Automated accrual · Maturity sweep',
+            'description' => 'Bank / cash account the scheduled jobs settle investment interest and maturities through. Interactive placements and payouts still let the operator pick per transaction.',
+        ],
+        [
             'key' => self::WHT_PAYABLE,
             'label' => 'Withholding Tax Payable',
             'category' => 'Investments',
@@ -194,7 +203,23 @@ final class GlMappingRegistry
         return null;
     }
 
-    /** Reverse lookup: the role key whose historic default code is $code, or null. */
+    /**
+     * Reverse lookup: the role key whose historic default code is $code, or null.
+     * Used by GlMappingService::resolveByCode() so a posting service can keep
+     * passing the code it always hardcoded and still pick up an override.
+     *
+     * ORDER MATTERS when two roles share a default code. Today 'BANK' is shared
+     * by loan.repayment_settlement and investment.settlement; the loan role is
+     * declared first, so resolveByCode('BANK') — only ever called from the loan
+     * services — resolves to it. The investment settlement is never resolved by
+     * code: the scheduled jobs ask for INVESTMENT_SETTLEMENT by key, so its
+     * override applies to investments alone and the two cannot bleed into each
+     * other.
+     *
+     * If you add another role that reuses an existing default code, check every
+     * resolveByCode() call site for that code before declaring it, or resolve
+     * the new role by key only (the safer default).
+     */
     public static function keyForCode(string $code): ?string
     {
         $code = strtoupper($code);

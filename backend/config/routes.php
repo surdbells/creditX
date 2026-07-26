@@ -604,11 +604,17 @@ return function (App $app): void {
         $api->put('/investments/products/{id}', Investment\UpdateInvestmentProductAction::class)
             ->add(new RbacMiddleware('investments.create'));
 
-        // Accrual run — must precede /investments/{id} or "accrual" matches as an id.
+        // Fixed sub-paths must precede /investments/{id}, or they match as an id.
         $api->get('/investments/accrual/preview', 'investment.accrual.preview')
             ->add(new RbacMiddleware('investments.interest'));
         $api->post('/investments/accrual/run', 'investment.accrual.run')
             ->add(new RbacMiddleware('investments.interest'));
+        // Maturity sweep — the same job the cron runs, for catch-up / manual runs.
+        $api->post('/investments/maturity/run', Investment\RunMaturitySweepAction::class)
+            ->add(new RbacMiddleware('investments.transact'));
+        // Withholding tax withheld from investor interest, for FIRS remittance.
+        $api->get('/investments/wht-remittance', Investment\WhtRemittanceAction::class)
+            ->add(new RbacMiddleware('investments.view'));
 
         // Placements and money movements. Anything that posts a GL journal is
         // gated by investments.transact; reads by investments.view.
