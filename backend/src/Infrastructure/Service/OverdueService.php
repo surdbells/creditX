@@ -27,6 +27,7 @@ final class OverdueService
         private readonly ?NotificationDispatchService $notifService = null,
         private readonly ?PeriodGuardService $periodGuard = null,
         private readonly ?LedgerService $ledgerService = null,
+        private readonly ?GlMappingService $glMapping = null,
     ) {
     }
 
@@ -55,7 +56,8 @@ final class OverdueService
         $processedLoans = [];
         $penaltiesApplied = 0;
 
-        $penaltyGl = $this->glRepo->findByCode('PI');
+        // Default Ledgers override for penalty income, else the seeded 'PI'.
+        $penaltyGl = $this->glMapping?->resolveByCode('PI') ?? $this->glRepo->findByCode('PI');
         $today = new \DateTime('today');
 
         // Phase-2.5 D.4: wrap the scan in an outer transaction. Each

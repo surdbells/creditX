@@ -10,6 +10,7 @@ use App\Infrastructure\Service\BranchScopeService;
 use App\Infrastructure\Service\BulkImportService;
 use App\Infrastructure\Service\DisbursementService;
 use App\Infrastructure\Service\GlReconciliationService;
+use App\Infrastructure\Service\GlMappingService;
 use App\Infrastructure\Service\LedgerService;
 use App\Infrastructure\Service\LoanLifecycleService;
 use App\Infrastructure\Service\MakerCheckerExecutionService;
@@ -43,6 +44,7 @@ use App\Domain\Repository\CustomerLedgerRepository;
 use App\Domain\Repository\DocumentRepository;
 use App\Domain\Repository\FeeTypeRepository;
 use App\Domain\Repository\GeneralLedgerRepository;
+use App\Domain\Repository\GlAccountMappingRepository;
 use App\Domain\Repository\GovernmentRecordRepository;
 use App\Domain\Repository\LedgerTransactionRepository;
 use App\Domain\Repository\LocationRepository;
@@ -166,6 +168,15 @@ return [
     },
     GeneralLedgerRepository::class => function (ContainerInterface $c): GeneralLedgerRepository {
         return new GeneralLedgerRepository($c->get(EntityManagerInterface::class));
+    },
+    GlAccountMappingRepository::class => function (ContainerInterface $c): GlAccountMappingRepository {
+        return new GlAccountMappingRepository($c->get(EntityManagerInterface::class));
+    },
+    GlMappingService::class => function (ContainerInterface $c): GlMappingService {
+        return new GlMappingService(
+            $c->get(GlAccountMappingRepository::class),
+            $c->get(GeneralLedgerRepository::class),
+        );
     },
     CustomerLedgerRepository::class => function (ContainerInterface $c): CustomerLedgerRepository {
         return new CustomerLedgerRepository($c->get(EntityManagerInterface::class));
@@ -322,6 +333,7 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     InterestAccrualService::class => function (ContainerInterface $c): InterestAccrualService {
@@ -330,6 +342,7 @@ return [
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
             $c->get(LedgerTransactionRepository::class),
+            $c->get(GlMappingService::class),
         );
     },
     \App\Infrastructure\Service\BankReconciliationService::class => function (ContainerInterface $c): \App\Infrastructure\Service\BankReconciliationService {
@@ -367,6 +380,7 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     \App\Infrastructure\Service\LoanPayoffService::class => function (ContainerInterface $c): \App\Infrastructure\Service\LoanPayoffService {
@@ -378,6 +392,7 @@ return [
             $c->get(SettingsCacheService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     RepaymentService::class => function (ContainerInterface $c): RepaymentService {
@@ -390,6 +405,7 @@ return [
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
             $c->get(LedgerTransactionRepository::class),
+            $c->get(GlMappingService::class),
         );
     },
     BulkRepaymentService::class => function (ContainerInterface $c): BulkRepaymentService {
@@ -412,6 +428,7 @@ return [
             $c->get(NotificationDispatchService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     LoanLifecycleService::class => function (ContainerInterface $c): LoanLifecycleService {
@@ -423,6 +440,7 @@ return [
             $c->get(LoanCalculationService::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     NotificationDispatchService::class => function (ContainerInterface $c): NotificationDispatchService {

@@ -102,6 +102,7 @@ export class LayoutComponent {
     ]},
     { label: 'Accounting', items: [
       { label: 'Chart of Accounts', icon: 'landmark', route: '/accounting', permission: 'accounting.view' },
+      { label: 'Default Ledgers', icon: 'link', route: '/gl-mappings', permission: 'accounting.view' },
       { label: 'Journal Entries', icon: 'scroll-text', route: '/journal-entries', permission: 'accounting.view' },
       { label: 'GL Reconciliation', icon: 'scale', route: '/gl-reconciliation', permission: 'accounting.view' },
       { label: 'Income Statement', icon: 'trending-up', route: '/reports/income-statement', permission: 'accounting.view' },

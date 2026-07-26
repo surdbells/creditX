@@ -27,6 +27,7 @@ final class DisbursementService
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly GlMappingService $glMapping,
     ) {
     }
 
@@ -155,7 +156,7 @@ final class DisbursementService
             $customerLedger->setLoan($loan);
 
             // Find or create a parent GL for customer ledgers
-            $customerGl = $this->glRepo->findByCode('CUBGL');
+            $customerGl = $this->glMapping->resolveByCode('CUBGL');
             if ($customerGl === null) {
                 throw new DomainException('Customer balance GL (CUBGL) not found. Run seeder.');
             }
@@ -177,7 +178,7 @@ final class DisbursementService
             // repayment (DR BANK + CR LR; CUBGL stays unchanged on
             // the repayment side since schedules drive outstanding-
             // balance display, not CUBGL).
-            $lrGl = $this->glRepo->findByCode('LR');
+            $lrGl = $this->glMapping->resolveByCode('LR');
             if ($lrGl === null) {
                 throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
             }

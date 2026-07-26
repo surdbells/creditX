@@ -54,6 +54,7 @@ final class LoanPayoffService
         private readonly SettingsCacheService $settings,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly GlMappingService $glMapping,
         private readonly ?NotificationDispatchService $notifService = null,
     ) {}
 
@@ -98,10 +99,12 @@ final class LoanPayoffService
         $customerLedger = $this->clRepo->findByLoan($loanId);
         if ($customerLedger === null) throw new DomainException('Customer ledger not found for this loan');
 
-        $bankGl = $this->glRepo->findByCode($payoffGlCode !== null && $payoffGlCode !== '' ? $payoffGlCode : 'BANK');
+        // An explicit payoff code is used verbatim; the default 'BANK' resolves
+        // through the Default Ledgers mapping (settlement override, else BANK).
+        $bankGl = $this->glMapping->resolveByCode($payoffGlCode !== null && $payoffGlCode !== '' ? $payoffGlCode : 'BANK');
         if ($bankGl === null) throw new DomainException('Payoff bank GL not found');
-        $lrGl = $this->glRepo->findByCode('LR');
-        $iiGl = $this->glRepo->findByCode('II');
+        $lrGl = $this->glMapping->resolveByCode('LR');
+        $iiGl = $this->glMapping->resolveByCode('II');
         if ($lrGl === null || $iiGl === null) throw new DomainException('LR / II GL not found. Run seeder.');
 
         $total = $q['total'];

@@ -27,6 +27,7 @@ final class LoanLifecycleService
         private readonly LoanCalculationService $calcService,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly GlMappingService $glMapping,
         private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
@@ -44,8 +45,8 @@ final class LoanLifecycleService
         $this->periodGuard->assertDateOpen(date('Y-m-d'));
 
         $customerLedger = $this->clRepo->findByLoan($loan->getId());
-        $badDebtGl = $this->glRepo->findByCode('BDE');
-        $lrGl = $this->glRepo->findByCode('LR');
+        $badDebtGl = $this->glMapping->resolveByCode('BDE');
+        $lrGl = $this->glMapping->resolveByCode('LR');
         if ($customerLedger === null || $badDebtGl === null || $lrGl === null) {
             throw new DomainException('Required GL accounts not found (CUBGL, BDE, and LR must all be seeded)');
         }

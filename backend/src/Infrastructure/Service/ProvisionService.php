@@ -70,6 +70,7 @@ final class ProvisionService
         private readonly EntityManagerInterface $em,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
+        private readonly GlMappingService $glMapping,
     ) {}
 
     /**
@@ -520,8 +521,8 @@ final class ProvisionService
      */
     private function resolveGl(string $code, string $friendlyName): GeneralLedger
     {
-        $gl = $this->em->getRepository(GeneralLedger::class)
-            ->findOneBy(['accountCode' => $code]);
+        // Honour a Default Ledgers override for this role, else the seeded code.
+        $gl = $this->glMapping->resolveByCode($code);
         if ($gl !== null) return $gl;
 
         throw new DomainException(

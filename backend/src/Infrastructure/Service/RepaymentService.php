@@ -33,6 +33,7 @@ final class RepaymentService
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
         private readonly LedgerTransactionRepository $ledgerTxnRepo,
+        private readonly GlMappingService $glMapping,
         private readonly ?NotificationDispatchService $notifService = null,
     ) {
     }
@@ -63,14 +64,16 @@ final class RepaymentService
             throw new DomainException('Customer ledger not found for this loan');
         }
 
-        $bankGl = $this->glRepo->findByCode('BANK');
+        // GL resolution via the Default Ledgers mapping — an operator override
+        // if set, otherwise the historic default code (identical to before).
+        $bankGl = $this->glMapping->resolveByCode('BANK');
         if ($bankGl === null) {
             throw new DomainException('Bank GL account not found');
         }
 
         // Loan Receivable — the aggregate asset. Repayments reduce it.
         // See DisbursementService for the paired DR at disbursement time.
-        $lrGl = $this->glRepo->findByCode('LR');
+        $lrGl = $this->glMapping->resolveByCode('LR');
         if ($lrGl === null) {
             throw new DomainException('Loan Receivable GL (LR) not found. Run seeder.');
         }
@@ -80,7 +83,7 @@ final class RepaymentService
         // accrued. Required: without crediting II, loan interest income
         // never reaches the GL and LR drifts negative by the interest
         // collected over the life of the loan.
-        $iiGl = $this->glRepo->findByCode('II');
+        $iiGl = $this->glMapping->resolveByCode('II');
         if ($iiGl === null) {
             throw new DomainException('Interest Income GL (II) not found. Run seeder.');
         }
@@ -93,8 +96,8 @@ final class RepaymentService
         // income. Both GLs are nullable — if a tenant hasn't seeded them,
         // we fall back to pure cash-basis recognition (CR II for all
         // interest), which is still correct, just not time-apportioned.
-        $intRecvGl = $this->glRepo->findByCode('INTRECV');
-        $intSuspGl = $this->glRepo->findByCode('INTSUSP');
+        $intRecvGl = $this->glMapping->resolveByCode('INTRECV');
+        $intSuspGl = $this->glMapping->resolveByCode('INTSUSP');
 
         $this->em->beginTransaction();
 

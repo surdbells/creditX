@@ -52,6 +52,7 @@ final class InterestAccrualService
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledgerService,
         private readonly \App\Domain\Repository\LedgerTransactionRepository $ledgerTxnRepo,
+        private readonly GlMappingService $glMapping,
     ) {}
 
     /**
@@ -423,7 +424,8 @@ final class InterestAccrualService
 
     private function resolveGl(string $code, string $friendlyName): GeneralLedger
     {
-        $gl = $this->em->getRepository(GeneralLedger::class)->findOneBy(['accountCode' => $code]);
+        // Honour a Default Ledgers override for this role, else the seeded code.
+        $gl = $this->glMapping->resolveByCode($code);
         if ($gl !== null) return $gl;
         throw new DomainException(
             "{$friendlyName} GL not found. Seed a GL with accountCode='{$code}' "

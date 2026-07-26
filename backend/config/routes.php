@@ -402,6 +402,13 @@ return function (App $app): void {
         // Entries page (sub-phase F) calls these endpoints; the
         // legacy /journal-entries flat list stays for backward
         // compatibility with consumers that haven't migrated yet.
+        // Default Ledgers — the GL account each loan-lifecycle operation posts
+        // to. View with accounting.view, change with accounting.edit.
+        $api->get('/accounting/gl-mappings', Accounting\ListGlMappingsAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->put('/accounting/gl-mappings/{key}', Accounting\UpdateGlMappingAction::class)
+            ->add(new RbacMiddleware('accounting.edit'));
+
         $api->get('/accounting/journals', Accounting\ListJournalsAction::class)
             ->add(new RbacMiddleware('accounting.view'));
         // Accountant-authored manual journal (opex, capital, corrections).
