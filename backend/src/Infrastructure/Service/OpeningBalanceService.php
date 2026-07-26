@@ -47,6 +47,7 @@ final class OpeningBalanceService
         private readonly GeneralLedgerRepository $glRepo,
         private readonly PeriodGuardService $periodGuard,
         private readonly LedgerService $ledger,
+        private readonly GlMappingService $glMapping,
     ) {}
 
     /**
@@ -78,7 +79,8 @@ final class OpeningBalanceService
             throw new DomainException('At least one opening balance is required.');
         }
 
-        $obe = $this->glRepo->findByCode(self::OBE_CODE);
+        // Default Ledgers override for Opening Balance Equity, else seeded OBE.
+        $obe = $this->glMapping->resolveByCode(self::OBE_CODE);
         if ($obe === null) {
             throw new DomainException(
                 'Opening Balance Equity GL (OBE) not found. Run bin/migrate-expand-chart-of-accounts.php.'

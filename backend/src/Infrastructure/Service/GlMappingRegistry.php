@@ -36,6 +36,8 @@ final class GlMappingRegistry
     public const BAD_DEBT_EXPENSE      = 'loan.bad_debt_expense';
     public const LOSS_PROVISION        = 'loan.loss_provision';
     public const LOSS_ALLOWANCE        = 'loan.loss_allowance';
+    public const OPENING_BALANCE_EQUITY = 'accounting.opening_balance_equity';
+    public const RETAINED_EARNINGS      = 'accounting.retained_earnings';
 
     /**
      * Ordered role definitions. Each: key, label, category, default_code,
@@ -123,6 +125,22 @@ final class GlMappingRegistry
             'default_code' => 'ALLOW',
             'stage' => 'Provisioning',
             'description' => 'Contra-asset accumulating loan loss provisions against the portfolio.',
+        ],
+        [
+            'key' => self::OPENING_BALANCE_EQUITY,
+            'label' => 'Opening Balance Equity',
+            'category' => 'Setup & Close',
+            'default_code' => 'OBE',
+            'stage' => 'Opening balances',
+            'description' => 'Equity counterpart used when opening balances are posted to bring accounts onto the system.',
+        ],
+        [
+            'key' => self::RETAINED_EARNINGS,
+            'label' => 'Retained Earnings',
+            'category' => 'Setup & Close',
+            'default_code' => 'RETEARN',
+            'stage' => 'Period close',
+            'description' => 'Equity account net income is closed into at period end.',
         ],
     ];
 

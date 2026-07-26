@@ -176,6 +176,7 @@ return [
         return new GlMappingService(
             $c->get(GlAccountMappingRepository::class),
             $c->get(GeneralLedgerRepository::class),
+            $c->get(FeeTypeRepository::class),
         );
     },
     CustomerLedgerRepository::class => function (ContainerInterface $c): CustomerLedgerRepository {
@@ -300,6 +301,7 @@ return [
             $c->get(GeneralLedgerRepository::class),
             $c->get(PeriodGuardService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     \App\Infrastructure\Service\DepositService::class => function (ContainerInterface $c): \App\Infrastructure\Service\DepositService {
@@ -490,6 +492,7 @@ return [
             $c->get(EntityManagerInterface::class),
             $c->get(JournalReversalService::class),
             $c->get(LedgerService::class),
+            $c->get(GlMappingService::class),
         );
     },
     MakerCheckerExecutionService::class => function (ContainerInterface $c): MakerCheckerExecutionService {

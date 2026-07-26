@@ -49,6 +49,7 @@ final class PeriodCloseService
         private readonly EntityManagerInterface $em,
         private readonly JournalReversalService $reversalService,
         private readonly LedgerService $ledgerService,
+        private readonly GlMappingService $glMapping,
     ) {}
 
     /**
@@ -68,8 +69,8 @@ final class PeriodCloseService
         // before closing a period. We don't auto-create because
         // posting account codes + types is a chart-of-accounts
         // decision, not a service-level decision.
-        $retEarn = $this->em->getRepository(GeneralLedger::class)
-            ->findOneBy(['accountCode' => 'RETEARN']);
+        // Default Ledgers override for Retained Earnings, else seeded RETEARN.
+        $retEarn = $this->glMapping->resolveByCode('RETEARN');
         if ($retEarn === null) {
             // Fallback: any EQUITY account whose name contains
             // 'retained' (case-insensitive) — more forgiving, but

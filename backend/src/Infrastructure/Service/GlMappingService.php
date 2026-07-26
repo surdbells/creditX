@@ -7,6 +7,7 @@ namespace App\Infrastructure\Service;
 use App\Domain\Entity\GeneralLedger;
 use App\Domain\Entity\GlAccountMapping;
 use App\Domain\Exception\DomainException;
+use App\Domain\Repository\FeeTypeRepository;
 use App\Domain\Repository\GeneralLedgerRepository;
 use App\Domain\Repository\GlAccountMappingRepository;
 
@@ -36,9 +37,13 @@ final class GlMappingService
     /** @var array<string, GlAccountMapping>|null role key => override row */
     private ?array $overrides = null;
 
+    /** Synthetic role-key prefix for fee-income entries (key = "fee:<feeTypeId>"). */
+    public const FEE_KEY_PREFIX = 'fee:';
+
     public function __construct(
         private readonly GlAccountMappingRepository $mappingRepo,
         private readonly GeneralLedgerRepository $glRepo,
+        private readonly FeeTypeRepository $feeTypeRepo,
     ) {}
 
     /**
@@ -126,7 +131,42 @@ final class GlMappingService
                 'updated_at'     => $override?->getUpdatedAt()->format('Y-m-d H:i:s'),
             ];
         }
+
+        // Fee income accounts are per-fee-type (FeeType.glAccountId), not role
+        // rows — surface each active fee here so every income GL a loan touches
+        // is visible and editable in one place. Key = "fee:<feeTypeId>".
+        foreach ($this->feeTypeRepo->findActive() as $ft) {
+            $out[] = $this->feeRow($ft);
+        }
+
         return $out;
+    }
+
+    /**
+     * Build a Default-Ledgers row for a fee type. A fee resolves to its own
+     * glAccountId if set, else a GL matching its code — exactly what
+     * DisbursementService uses to post the fee's income credit.
+     *
+     * @return array<string, mixed>
+     */
+    public function feeRow(\App\Domain\Entity\FeeType $ft): array
+    {
+        $overrideGl = $ft->getGlAccountId() ? $this->glRepo->find($ft->getGlAccountId()) : null;
+        $resolved = $overrideGl ?? $this->glRepo->findByCode($ft->getCode());
+
+        return [
+            'key'           => self::FEE_KEY_PREFIX . $ft->getId(),
+            'label'         => $ft->getName(),
+            'category'      => 'Fee Income',
+            'stage'         => 'Disbursement',
+            'description'   => 'Income account credited when the ' . $ft->getName() . ' is charged at disbursement.',
+            'default_code'  => $ft->getCode(),
+            'gl_account_id' => $overrideGl?->getId(),
+            'is_overridden' => $overrideGl !== null,
+            'resolved'      => $resolved?->toArray(),
+            'is_configured' => $resolved !== null,
+            'updated_at'    => $ft->getUpdatedAt()->format('Y-m-d H:i:s'),
+        ];
     }
 
     /** @return array<string, GlAccountMapping> */

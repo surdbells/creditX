@@ -228,19 +228,31 @@ final class DisbursementService
                     'amount' => $fb->getAmount(),
                     'narration' => strtoupper($fb->getFeeType()->getName())];
 
-                // CR to fee type's GL (recognises income)
+                // CR to fee type's income GL (recognises income). Configured on
+                // the Default Ledgers page (FeeType.glAccountId), falling back to
+                // a GL whose code matches the fee code.
+                $feeType = $fb->getFeeType();
                 $feeGl = null;
-                if ($fb->getFeeType()->getGlAccountId()) {
-                    $feeGl = $this->glRepo->find($fb->getFeeType()->getGlAccountId());
+                if ($feeType->getGlAccountId()) {
+                    $feeGl = $this->glRepo->find($feeType->getGlAccountId());
                 }
                 if ($feeGl === null) {
-                    $feeGl = $this->glRepo->findByCode($fb->getFeeType()->getCode());
+                    $feeGl = $this->glRepo->findByCode($feeType->getCode());
                 }
-                if ($feeGl !== null) {
-                    $lines[] = ['gl' => $feeGl, 'type' => TransactionType::CR,
-                        'amount' => $fb->getAmount(),
-                        'narration' => $customerName . ' - ' . $fb->getFeeType()->getName()];
+                // A charged fee with no income GL used to be silently dropped —
+                // which unbalanced the batch and failed disbursement with an
+                // opaque "unbalanced batch" error. Fail loudly and specifically
+                // instead: the operator must map the fee's income account.
+                if ($feeGl === null) {
+                    throw new DomainException(sprintf(
+                        "Fee '%s' (%s) has no income GL account configured. Set it on the Default Ledgers page before disbursing this loan.",
+                        $feeType->getName(),
+                        $feeType->getCode(),
+                    ));
                 }
+                $lines[] = ['gl' => $feeGl, 'type' => TransactionType::CR,
+                    'amount' => $fb->getAmount(),
+                    'narration' => $customerName . ' - ' . $feeType->getName()];
             }
 
             // Step 4: top-up balance handling. See full comment below
