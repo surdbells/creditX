@@ -175,6 +175,9 @@ return [
     \App\Domain\Repository\AccountingCalendarRepository::class => function (ContainerInterface $c): \App\Domain\Repository\AccountingCalendarRepository {
         return new \App\Domain\Repository\AccountingCalendarRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\PostingAuditRepository::class => function (ContainerInterface $c): \App\Domain\Repository\PostingAuditRepository {
+        return new \App\Domain\Repository\PostingAuditRepository($c->get(EntityManagerInterface::class));
+    },
     \App\Infrastructure\Service\AccountingDateService::class => function (ContainerInterface $c): \App\Infrastructure\Service\AccountingDateService {
         return new \App\Infrastructure\Service\AccountingDateService(
             $c->get(\App\Domain\Repository\AccountingCalendarRepository::class),
@@ -362,6 +365,7 @@ return [
         return new LedgerService(
             $c->get(EntityManagerInterface::class),
             $c->get(SettingsCacheService::class),
+            $c->get(\App\Infrastructure\Service\AccountingDateService::class),
         );
     },
     \App\Infrastructure\Service\ManualJournalService::class => function (ContainerInterface $c): \App\Infrastructure\Service\ManualJournalService {

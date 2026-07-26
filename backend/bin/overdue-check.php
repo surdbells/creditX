@@ -16,6 +16,11 @@ $builder = new \DI\ContainerBuilder();
 $builder->addDefinitions($container);
 $dic = $builder->build();
 
+// Scheduled job: declare a trusted system actor so accounting-date rules
+// allow the dates this job computes for itself (period ends, maturity dates)
+// rather than treating them as an unauthenticated backdating attempt.
+\App\Infrastructure\Service\PostingContextRegistry::setSystem(basename(__FILE__));
+
 $overdueService = $dic->get(\App\Infrastructure\Service\OverdueService::class);
 
 echo "[" . date('Y-m-d H:i:s') . "] Running overdue detection...\n";

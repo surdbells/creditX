@@ -238,6 +238,92 @@ final class AccountingDateService
         $this->assertWeekendAllowed($date);
     }
 
+    /**
+     * The ledger choke point's entry into the rule engine.
+     *
+     * Called by LedgerService::postJournal for EVERY posting in the system.
+     * Returns the date the entry should actually carry, or throws if it is not
+     * allowed.
+     *
+     * The one interpretive rule, and why it is not a guess: most services pass
+     * date('Y-m-d') meaning "now". Under an accounting-date regime "now" IS the
+     * current accounting date, so when the requested date equals the SERVER
+     * date and runs ahead of the accounting date, it is substituted rather than
+     * rejected. There is no competing reading — future posting is never
+     * permitted, so a caller passing today while the books sit on an earlier
+     * date cannot have meant anything else. A date that is ahead of the
+     * accounting date but is NOT today is a deliberate future date, and is
+     * refused.
+     */
+    public function resolveForLedger(string $requestedDate): string
+    {
+        if (!$this->isEnforced()) {
+            // Legacy behaviour, byte for byte: the caller's date stands and
+            // only the monthly period guard applies.
+            $this->periodGuard->assertDateOpen($requestedDate);
+            return $requestedDate;
+        }
+
+        $this->assertValidDate($requestedDate);
+        $current = $this->currentAccountingDate();
+
+        if ($requestedDate > $current) {
+            if ($requestedDate === $this->serverDate()) {
+                $requestedDate = $current;   // "now" means the accounting now
+            } else {
+                throw new DomainException('Future posting is not permitted.');
+            }
+        }
+
+        $this->assertPostable($requestedDate);
+        return $requestedDate;
+    }
+
+    /**
+     * Write the §9 forensic record for a posting that did not land on the
+     * current accounting date. Same-day postings are not recorded — they are
+     * the norm, and logging every one would bury the exceptions that matter.
+     *
+     * Persist only; the caller's transaction owns the flush, so an audit row
+     * can never outlive a posting that was rolled back.
+     */
+    public function recordPostingAudit(
+        \App\Domain\Entity\JournalEntry $header,
+        string $effectiveDate,
+        string $requestedDate,
+        ?string $postedBy,
+        ?string $reason = null,
+    ): void {
+        if (!$this->isEnforced()) {
+            return;
+        }
+        $current = $this->currentAccountingDate();
+        if ($effectiveDate === $current) {
+            return;
+        }
+
+        $ctx = PostingContextRegistry::get();
+
+        $audit = new \App\Domain\Entity\PostingAudit();
+        $audit->setJournalEntryId($header->getId());
+        $audit->setPostingDate(new \DateTimeImmutable($effectiveDate));
+        $audit->setAccountingDate(new \DateTimeImmutable($current));
+        $audit->setUserId($postedBy ?? $ctx->userId);
+        $audit->setReason($reason);
+        // Only meaningful when the ledger changed the caller's date.
+        if ($requestedDate !== $effectiveDate) {
+            $audit->setPreviousPostingDate(new \DateTimeImmutable($requestedDate));
+        }
+        $audit->setIpAddress($ctx->ipAddress);
+        $audit->setDevice($ctx->device());
+        $audit->setBrowser($ctx->browser());
+        $audit->setBackdatedDays($this->daysBetween($effectiveDate, $current));
+        $audit->setEntryType($header->getEntryType()->value);
+        $audit->setNarration(mb_substr((string) $header->getNarration(), 0, 500));
+
+        $this->em->persist($audit);
+    }
+
     /** True when the date differs from the current accounting date. */
     public function isBackdated(string $date): bool
     {

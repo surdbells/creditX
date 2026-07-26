@@ -34,6 +34,7 @@ final class LedgerService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SettingsCacheService $settings,
+        private readonly AccountingDateService $accountingDate,
     ) {}
 
     /**
@@ -301,7 +302,21 @@ final class LedgerService
         ?string $reference = null,
         bool $isReversal = false,
         ?string $reversalOfId = null,
+        ?string $backdateReason = null,
     ): \App\Domain\Entity\JournalEntry {
+        // ─── Accounting-date control ────────────────────────────────
+        // THE choke point. Every posting service in the system reaches the
+        // ledger through this method and nothing constructs a
+        // LedgerTransaction directly, so validating here covers every module
+        // that exists and every module added later — which is exactly what the
+        // requirement asks for, without touching sixteen services.
+        //
+        // No-op while accounting.enforce_accounting_date is off, so this is
+        // inert until an operator switches the framework on.
+        $requestedDate = $postingDate;
+        $postingDate = $this->accountingDate->resolveForLedger($postingDate);
+        // ────────────────────────────────────────────────────────────
+
         // ─── Pre-flight validation ──────────────────────────────────
         if (count($lines) === 0) {
             throw new DomainException('postJournal requires at least one line');
@@ -400,6 +415,18 @@ final class LedgerService
         // to the DB connection.
         $this->em->flush();
         $this->validateBatchBalanceByHeader($header);
+
+        // Record the forensic trail for anything that did NOT land on the
+        // current accounting date. Written after the flush so the journal id
+        // is real, and inside the caller's transaction so an audit row can
+        // never survive a rolled-back posting.
+        $this->accountingDate->recordPostingAudit(
+            $header,
+            $postingDate,
+            $requestedDate,
+            $postedBy,
+            $backdateReason,
+        );
 
         return $header;
     }
