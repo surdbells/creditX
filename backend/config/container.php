@@ -188,6 +188,18 @@ return [
             $c->get(FeeTypeRepository::class),
         );
     },
+    \App\Infrastructure\Service\InvestmentService::class => function (ContainerInterface $c): \App\Infrastructure\Service\InvestmentService {
+        return new \App\Infrastructure\Service\InvestmentService(
+            $c->get(EntityManagerInterface::class),
+            $c->get(\App\Domain\Repository\InvestmentRepository::class),
+            $c->get(\App\Domain\Repository\InvestmentTransactionRepository::class),
+            $c->get(CustomerRepository::class),
+            $c->get(GeneralLedgerRepository::class),
+            $c->get(GlMappingService::class),
+            $c->get(PeriodGuardService::class),
+            $c->get(LedgerService::class),
+        );
+    },
     CustomerLedgerRepository::class => function (ContainerInterface $c): CustomerLedgerRepository {
         return new CustomerLedgerRepository($c->get(EntityManagerInterface::class));
     },

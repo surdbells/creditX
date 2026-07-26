@@ -36,4 +36,10 @@ enum JournalEntryType: string
     case REVERSAL     = 'REVERSAL';
     case MANUAL       = 'MANUAL';
     case INTEREST_ACCRUAL = 'INTEREST_ACCRUAL';
+    // Investment module — distinct types so the Journal Entries page and
+    // reports can isolate investor-money movements from loan/deposit activity.
+    case INVESTMENT_PLACEMENT  = 'INVESTMENT_PLACEMENT';
+    case INVESTMENT_INTEREST   = 'INVESTMENT_INTEREST';
+    case INVESTMENT_PAYOUT     = 'INVESTMENT_PAYOUT';
+    case INVESTMENT_WITHDRAWAL = 'INVESTMENT_WITHDRAWAL';
 }
