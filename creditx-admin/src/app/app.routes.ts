@@ -68,6 +68,7 @@ export const routes: Routes = [
       { path: 'investment-accrual', loadComponent: () => import('./features/investment-accrual/investment-accrual.component').then(m => m.InvestmentAccrualComponent) },
       { path: 'accounting', loadComponent: () => import('./features/accounting/accounting.component').then(m => m.AccountingComponent) },
       { path: 'gl-mappings', loadComponent: () => import('./features/gl-mappings/gl-mappings.component').then(m => m.GlMappingsComponent) },
+      { path: 'accounting-period', loadComponent: () => import('./features/accounting-period/accounting-period.component').then(m => m.AccountingPeriodComponent) },
       { path: 'reports', redirectTo: 'reports/portfolio', pathMatch: 'full' },
       // Dedicated routes per report — replaces the old tab-driven /reports?tab=X
       // pattern. Each route loads ReportsComponent with a tab key in route.data,

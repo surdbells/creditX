@@ -114,6 +114,7 @@ export class LayoutComponent {
       { label: 'Balance Sheet', icon: 'file-text', route: '/reports/balance-sheet', permission: 'accounting.view' },
       { label: 'Cash Flow Statement', icon: 'arrow-left-right', route: '/reports/cash-flow', permission: 'accounting.view' },
       { label: 'Aged Receivables', icon: 'clock', route: '/reports/aged-receivables', permission: 'accounting.view' },
+      { label: 'Accounting Period', icon: 'calendar', route: '/accounting-period', permission: 'accounting.view' },
       { label: 'Period Close', icon: 'lock', route: '/period-close', permission: 'accounting.close' },
       { label: 'Budgets', icon: 'dollar-sign', route: '/budgets', permission: 'accounting.view' },
       { label: 'Budget vs Actual', icon: 'bar-chart-3', route: '/reports/budget-vs-actual', permission: 'accounting.view' },

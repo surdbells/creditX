@@ -413,6 +413,21 @@ return function (App $app): void {
         $api->put('/accounting/gl-mappings/{key}', Accounting\UpdateGlMappingAction::class)
             ->add(new RbacMiddleware('accounting.edit'));
 
+        // ─── Accounting date / End-of-Day (§6, §7, §12, §16) ───
+        // Reading the accounting date is not privileged — every posting screen
+        // needs it (§13). Acting on it is: running EOD and reopening a closed
+        // date each have their own permission.
+        $api->get('/accounting/period/status', Accounting\AccountingPeriodStatusAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->get('/accounting/calendar', Accounting\AccountingCalendarAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->get('/accounting/posting-audit', Accounting\PostingAuditLogAction::class)
+            ->add(new RbacMiddleware('accounting.view'));
+        $api->post('/accounting/eod/run', Accounting\RunEndOfDayAction::class)
+            ->add(new RbacMiddleware('accounting.run_eod'));
+        $api->post('/accounting/period/reopen', Accounting\ReopenBusinessDateAction::class)
+            ->add(new RbacMiddleware('accounting.reopen_period'));
+
         $api->get('/accounting/journals', Accounting\ListJournalsAction::class)
             ->add(new RbacMiddleware('accounting.view'));
         // Accountant-authored manual journal (opex, capital, corrections).
