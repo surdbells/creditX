@@ -9,6 +9,7 @@ import { LucideAngularModule,
   Eye, EyeOff, Loader2, CheckCircle, XCircle, AlertTriangle, AlertCircle, Info,
   ArrowLeft, ArrowRight, Calendar, Banknote, ClipboardList, ShieldCheck,
   ChevronRight, Clock, Menu, X, RefreshCw, Phone, KeyRound, Calculator, BadgeCheck,
+  TrendingUp,
 } from 'lucide-angular';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
@@ -30,6 +31,7 @@ export const appConfig: ApplicationConfig = {
         Eye, EyeOff, Loader2, CheckCircle, XCircle, AlertTriangle, AlertCircle, Info,
         ArrowLeft, ArrowRight, Calendar, Banknote, ClipboardList, ShieldCheck,
         ChevronRight, Clock, Menu, X, RefreshCw, Phone, KeyRound, Calculator, BadgeCheck,
+  TrendingUp,
       }),
     ),
   ],
