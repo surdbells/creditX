@@ -57,6 +57,10 @@ final class PublicSettingsAction
         'brand.primary_color',
         'brand.accent_color',
         'brand.logo_url',
+        // Whether the contextual page guides (Walkthrough / Overview) are
+        // offered at all. Presentation-only, and needed before any guided page
+        // renders, so it belongs in the same boot payload as branding.
+        'ui.page_guides_enabled',
     ];
 
     public function __construct(

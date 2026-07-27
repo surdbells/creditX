@@ -19,6 +19,7 @@ interface PublicSettingsMap {
   'brand.primary_color'?: string;
   'brand.accent_color'?: string;
   'brand.logo_url'?: string;
+  'ui.page_guides_enabled'?: string;
 }
 
 /**
@@ -65,6 +66,9 @@ export class SettingsService {
     'brand.primary_color': '#0A4F2A',
     'brand.accent_color': '#C9A227',
     'brand.logo_url': '',
+    // Guides are ON unless an admin turns them off. A tenant that never
+    // touches the setting still gets the help, which is the point of it.
+    'ui.page_guides_enabled': 'true',
   };
 
   /**
@@ -130,6 +134,18 @@ export class SettingsService {
   readonly accentColor = computed(() => this.settings()['brand.accent_color'] || '#C9A227');
   /** Org logo URL, or null to fall back to the bundled CreditX mark. */
   readonly logoUrl = computed(() => this.settings()['brand.logo_url'] || null);
+
+  /**
+   * Whether contextual page guides (Walkthrough / Overview) are offered.
+   *
+   * Defaults to ON: a tenant that never touches the setting still gets the
+   * help. Only an explicit 'false' / '0' / 'no' turns it off, so a malformed
+   * value fails towards showing help rather than silently hiding it.
+   */
+  readonly pageGuidesEnabled = computed(() => {
+    const v = (this.settings()['ui.page_guides_enabled'] ?? 'true').toString().trim().toLowerCase();
+    return !['false', '0', 'no', 'off'].includes(v);
+  });
 
   /** Push the org's brand colours + favicon into the DOM. Called on load(). */
   private applyBrand(): void {

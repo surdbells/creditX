@@ -4,6 +4,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { GUIDE_TEXT, PageGuide } from './page-guide.model';
 import { TourManagerService } from './tour-manager.service';
 import { TourOverlayComponent } from './tour-overlay.component';
+import { SettingsService } from '../../core/services/settings.service';
 
 /**
  * Drop-in page guide: the Walkthrough / Overview buttons, the expandable
@@ -21,6 +22,7 @@ import { TourOverlayComponent } from './tour-overlay.component';
   standalone: true,
   imports: [CommonModule, LucideAngularModule, TourOverlayComponent],
   template: `
+    @if (enabled()) {
     <div class="cx-pg">
       <div class="cx-pg-bar">
         <button class="cx-btn cx-btn-outline cx-btn-sm" (click)="startTour()">
@@ -150,6 +152,7 @@ import { TourOverlayComponent } from './tour-overlay.component';
     @if (guide && tour.activeGuideId() === guide.id) {
       <cx-tour-overlay></cx-tour-overlay>
     }
+    }
   `,
   styles: [`
     .cx-pg { margin:-0.75rem 0 1.25rem; }
@@ -191,23 +194,33 @@ export class PageGuideComponent implements OnInit {
   @Input({ required: true }) guide!: PageGuide;
 
   readonly tour = inject(TourManagerService);
+  private readonly settings = inject(SettingsService);
   readonly T = GUIDE_TEXT;
   readonly A = GUIDE_TEXT.about_;
+
+  /**
+   * Admin kill-switch (ui.page_guides_enabled). When off, the whole module
+   * renders nothing and never auto-starts — a page that embeds a guide simply
+   * shows no help affordance, with no other change to its layout.
+   */
+  readonly enabled = this.settings.pageGuidesEnabled;
 
   showAbout = signal(false);
 
   ngOnInit(): void {
-    if (!this.guide || this.tour.hasCompleted(this.guide.id)) return;
+    if (!this.enabled() || !this.guide || this.tour.hasCompleted(this.guide.id)) return;
     // Brief delay so the page's own content has rendered and any spotlight
     // target exists before the first step tries to measure it.
     setTimeout(() => {
-      if (this.guide && !this.tour.hasCompleted(this.guide.id) && !this.tour.isActive()) {
+      // Re-check on fire: the setting could not realistically change in 700ms,
+      // but the guard costs nothing and keeps the kill-switch absolute.
+      if (this.enabled() && this.guide && !this.tour.hasCompleted(this.guide.id) && !this.tour.isActive()) {
         this.tour.start(this.guide);
       }
     }, 700);
   }
 
   startTour(): void {
-    if (this.guide) this.tour.start(this.guide);
+    if (this.enabled() && this.guide) this.tour.start(this.guide);
   }
 }

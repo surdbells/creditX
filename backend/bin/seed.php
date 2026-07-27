@@ -305,6 +305,7 @@ $settingsDef = [
     ['general.max_customer_age', '57', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum customer age for eligibility'],
     ['general.max_service_years', '33', SettingType::INTEGER, SettingCategory::GENERAL, 'Maximum years of service for eligibility'],
     ['agent.monthly_target', '1000000', SettingType::INTEGER, SettingCategory::GENERAL, 'Default monthly disbursement target (naira) for agents without an individual target set'],
+    ['ui.page_guides_enabled', 'true', SettingType::BOOLEAN, SettingCategory::GENERAL, 'Show the contextual page guides (Walkthrough tour and Overview panel) across the admin app. Turn off to hide them everywhere.'],
 
     // Accounting settings
     ['accounting.batch_validation_cutoff_at', '', SettingType::STRING, SettingCategory::ACCOUNTING, 'ISO timestamp; ledger batches whose oldest row predates this cutoff are exempt from balance validation. Set to NOW() after running the Phase-1 hotfix migrations on tenants with historical data.'],

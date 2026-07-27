@@ -8,10 +8,60 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const ROLES_GUIDE: PageGuide = {
+  id: 'roles',
+  titleKey: 'Roles & Permissions',
+  purposeKey: 'Controls what each kind of staff member is allowed to see and do.',
+  descriptionKey:
+    'Permissions are never granted to people directly — they are granted to roles, and people are '
+    + 'given a role. That keeps access consistent as staff join, move between branches or change '
+    + 'jobs, and it means one change here applies to everyone holding that role.',
+  actionKeys: [
+    'Create a role for a job function',
+    'Grant or revoke individual permissions on a role',
+    'See which permissions a role currently holds before changing it',
+  ],
+  sections: [
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The role list',
+      bodyKey:
+        'Each row is a role staff can be assigned. Open one to see and edit exactly which permissions '
+        + 'it carries.',
+    },
+  ],
+  workflowKeys: ['Define roles here', 'Assign a role to a user', 'User signs in', 'Access enforced'],
+  usedByKeys: ['Users', 'Every permission-gated screen and action'],
+  businessRuleKeys: [
+    'Super Admin bypasses permission checks entirely — grant it sparingly.',
+    'A permission change takes effect when the user next signs in, because rights are carried in their session.',
+    'Removing a permission from a role removes it from everyone holding that role.',
+    'Financial actions carry their own permissions, separate from the ability to view the same data.',
+  ],
+  tipKeys: [
+    'Model roles on real job functions rather than individuals — "Branch Accountant", not "Ada\'s access".',
+    'Grant the view permission and the action permission separately; plenty of staff should see figures they cannot change.',
+    'After adding a new module, revisit the roles that need it — new permissions are not granted automatically.',
+  ],
+  permissionKeys: ['roles.view', 'roles.create', 'roles.edit'],
+  faq: [
+    {
+      questionKey: 'I changed a role but the user still cannot do it — why?',
+      answerKey: 'Their session still carries the old rights. Ask them to sign out and back in.',
+    },
+    {
+      questionKey: 'Can one user hold two roles?',
+      answerKey: 'Yes — their effective permissions are the union of every role they hold.',
+    },
+  ],
+};
 
 @Component({
   selector: 'app-roles', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -25,6 +75,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search roles..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
@@ -161,6 +213,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   `],
 })
 export class RolesComponent implements OnInit {
+  readonly guide = ROLES_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Role Name'},{key:'slug',label:'Slug'},{key:'description',label:'Description'},{key:'is_system',label:'System'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

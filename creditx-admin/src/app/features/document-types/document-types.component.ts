@@ -8,6 +8,58 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const DOCUMENT_TYPES_GUIDE: PageGuide = {
+  id: 'document-types',
+  titleKey: 'Document Types',
+  purposeKey: 'Defines which documents agents upload against a loan, and which of them block submission.',
+  descriptionKey:
+    'Rather than hard-coding a fixed list, the documents a loan needs are configured here. The agent '
+    + 'app builds its upload list from whatever is active, so adding a document or making one '
+    + 'mandatory takes effect without shipping a new app version.',
+  actionKeys: [
+    'Add a new document type agents can upload',
+    'Mark a document required, so no loan can be submitted without it',
+    'Deactivate a document type to retire it without touching existing loans',
+    'Set the accepted file types and the order documents appear in',
+  ],
+  sections: [
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The document list',
+      bodyKey:
+        'Requirement shows whether a document blocks submission. Status controls whether agents see '
+        + 'it at all. Types marked "system" ship with the product — you can relabel or retire them, '
+        + 'but their code is fixed because uploaded documents reference it.',
+    },
+  ],
+  workflowKeys: ['Define types here', 'Agent captures loan', 'Uploads documents', 'Submit for approval'],
+  usedByKeys: ['Agent app capture wizard', 'Loan submission checks', 'Approval review'],
+  businessRuleKeys: [
+    'Required is global — a required document is needed on every loan, regardless of product.',
+    'Deactivating is the safe way to retire a type; it is hidden from capture and no longer enforced.',
+    'A system type\'s code cannot be changed, because uploaded documents are stored against it.',
+    'Making a type required affects loans not yet submitted, not those already in the workflow.',
+  ],
+  tipKeys: [
+    'Deactivate rather than delete — deleting a type that existing loans reference loses the link.',
+    'Agents need to reopen the app to pick up a newly added document type.',
+    'Keep the required list short; every extra mandatory document is another reason a loan stalls.',
+  ],
+  permissionKeys: ['products.view', 'products.create', 'products.edit', 'products.delete'],
+  faq: [
+    {
+      questionKey: 'I made a document required — what happens to loans already submitted?',
+      answerKey: 'Nothing. The check runs at submission, so loans already through it are unaffected.',
+    },
+    {
+      questionKey: 'Why can I not change this type\'s code?',
+      answerKey: 'It is a system type. Uploaded documents are stored against that code, so changing it would orphan them.',
+    },
+  ],
+};
 
 /**
  * Document Types — the documents agents can upload against a loan, and which of
@@ -20,7 +72,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 @Component({
   selector: 'app-document-types',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -34,6 +86,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [searchPlaceholder]="''" [hasActions]="true" trackBy="id">
@@ -143,6 +197,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   `],
 })
 export class DocumentTypesComponent implements OnInit {
+  readonly guide = DOCUMENT_TYPES_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'label', label: 'Document' },
     { key: 'code', label: 'Code', type: 'custom' },
