@@ -46,6 +46,17 @@ class CreditCheck
     #[ORM\Column(type: 'string', length: 200, nullable: true)]
     private ?string $identifier = null;
 
+    /**
+     * The subject the bureau actually matched, as the bureau names them.
+     *
+     * Distinct from the linked Customer: a standalone enquiry normally has no
+     * customer record behind it, and without this the only human-readable
+     * identity of the subject would live inside the raw report — which the
+     * history list does not load.
+     */
+    #[ORM\Column(name: 'subject_name', type: 'string', length: 200, nullable: true)]
+    private ?string $subjectName = null;
+
     /** hit | no_hit | error | not_configured */
     #[ORM\Column(type: 'string', length: 20)]
     private string $status;
@@ -96,6 +107,22 @@ class CreditCheck
     public function getIdentifier(): ?string { return $this->identifier; }
     public function setIdentifier(?string $v): void { $this->identifier = $v; }
 
+    public function getSubjectName(): ?string { return $this->subjectName; }
+    public function setSubjectName(?string $v): void
+    {
+        $v = $v !== null ? trim($v) : null;
+        $this->subjectName = ($v === null || $v === '') ? null : mb_substr($v, 0, 200);
+    }
+
+    /**
+     * Who the enquiry was about, for display. Prefers the linked CreditX
+     * customer; falls back to the name the bureau matched.
+     */
+    public function getDisplayName(): ?string
+    {
+        return $this->customer?->getFullName() ?? $this->subjectName;
+    }
+
     public function getStatus(): string { return $this->status; }
     public function setStatus(string $v): void { $this->status = $v; }
 
@@ -130,6 +157,10 @@ class CreditCheck
             'id'            => $this->id,
             'customer_id'   => $this->customer?->getId(),
             'customer_name' => $this->customer?->getFullName(),
+            'subject_name'  => $this->subjectName,
+            // What the UI should show in a "who was this about" column: the
+            // linked customer if there is one, otherwise the bureau's own name.
+            'display_name'  => $this->getDisplayName(),
             'loan_id'       => $this->loan?->getId(),
             'application_id'=> $this->loan?->getApplicationId(),
             'provider'      => $this->provider,

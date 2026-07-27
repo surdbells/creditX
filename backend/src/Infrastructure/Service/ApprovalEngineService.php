@@ -164,6 +164,7 @@ final class ApprovalEngineService
             $check->setCustomer($customer);
             $check->setSubjectType('consumer');
             $check->setIdentifier($bvn ?: $customer->getFullName());
+            $check->setSubjectName($result['subject_name'] ?? null);
             $check->setStatus($result['status']);
             $check->setScore($score);
             $check->setRiskBand($result['risk_band']);

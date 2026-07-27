@@ -71,6 +71,9 @@ class CreditCheckRepository extends BaseRepository
         if ($search !== null && $search !== '') {
             $qb->andWhere($qb->expr()->orX(
                 $qb->expr()->like('LOWER(c.identifier)', ':q'),
+                // The bureau's own name for the subject — for a standalone
+                // enquiry this is the only name there is to search on.
+                $qb->expr()->like('LOWER(c.subjectName)', ':q'),
                 $qb->expr()->like('LOWER(cu.fullName)', ':q'),
                 $qb->expr()->like('LOWER(l.applicationId)', ':q'),
                 $qb->expr()->like('LOWER(c.providerRef)', ':q'),

@@ -255,7 +255,10 @@ export class CreditBureauComponent implements OnInit {
       commercial: { label: 'Commercial', class: 'cx-badge-info' },
     } },
     { key: 'identifier', label: 'Subject' },
-    { key: 'customer_name', label: 'Customer', sortable: false },
+    // display_name = the linked CreditX customer if there is one, else the name
+    // the bureau matched. A standalone enquiry has no customer, so keying this
+    // column on customer_name alone left it permanently blank.
+    { key: 'display_name', label: 'Subject name', sortable: false },
     { key: 'application_id', label: 'Loan', sortable: false },
     { key: 'score', label: 'Score', align: 'right' },
     { key: 'risk_band', label: 'Band' },

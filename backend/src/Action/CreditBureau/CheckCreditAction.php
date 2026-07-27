@@ -63,6 +63,9 @@ final class CheckCreditAction
         $check = new CreditCheck();
         $check->setSubjectType($subjectType);
         $check->setIdentifier($identifier);
+        // Who the bureau matched. A standalone enquiry usually has no linked
+        // customer, so without this the history has nothing to show for "who".
+        $check->setSubjectName($result['subject_name'] ?? null);
         $check->setStatus($result['status']);
         $check->setScore($result['score']);
         $check->setRiskBand($result['risk_band']);

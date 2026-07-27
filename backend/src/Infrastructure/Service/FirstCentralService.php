@@ -119,6 +119,7 @@ final class FirstCentralService
                 $consumerId,
                 $report,
                 $score === null ? 'Report returned but no numeric score present.' : null,
+                $this->consumerName($scoring, $report),
             );
         } catch (\Throwable $e) {
             $this->logger?->error('FirstCentral consumer check failed', ['error' => $e->getMessage(), 'bvn' => $bvn]);
@@ -174,7 +175,11 @@ final class FirstCentralService
                 'productid'                 => (int) $productId,
             ]);
 
-            return $this->result('hit', null, null, [], $commercialId, $report, 'Commercial report attached — manual review (no numeric score).');
+            return $this->result(
+                'hit', null, null, [], $commercialId, $report,
+                'Commercial report attached — manual review (no numeric score).',
+                $this->commercialName($first, $report),
+            );
         } catch (\Throwable $e) {
             $this->logger?->error('FirstCentral commercial check failed', ['error' => $e->getMessage(), 'business' => $businessName, 'rc' => $rcNumber]);
             return $this->result('error', null, null, [], null, [], $e->getMessage());
@@ -296,7 +301,7 @@ final class FirstCentralService
         return $out;
     }
 
-    private function result(string $status, ?int $score, ?string $band, array $summary, ?string $ref, array $raw, ?string $error): array
+    private function result(string $status, ?int $score, ?string $band, array $summary, ?string $ref, array $raw, ?string $error, ?string $subjectName = null): array
     {
         return [
             'status'       => $status,
@@ -306,6 +311,59 @@ final class FirstCentralService
             'provider_ref' => $ref,
             'raw'          => $raw,
             'error'        => $error,
+            'subject_name' => $subjectName,
         ];
+    }
+
+    /**
+     * The person the bureau actually matched, e.g. "UMORU MUHAMMED".
+     *
+     * Worth capturing separately from the CreditX customer: a standalone
+     * enquiry usually has no customer record behind it, so without this the
+     * only human-readable identity of the subject lives inside the raw report —
+     * which the history list deliberately does not load.
+     *
+     * @param array<string,mixed> $scoring the report's Scoring block
+     * @param array<mixed> $report the full report, for the SearchOutput fallback
+     */
+    private function consumerName(array $scoring, array $report): ?string
+    {
+        $parts = array_filter([
+            trim((string) ($scoring['Surname'] ?? '')),
+            trim((string) ($scoring['FirstName'] ?? '')),
+            trim((string) ($scoring['OtherNames'] ?? '')),
+        ], static fn(string $p) => $p !== '');
+
+        if ($parts !== []) {
+            return implode(' ', $parts);
+        }
+
+        // Fallback: SubjectList carries "SURNAME, FIRSTNAME, , <address>" —
+        // take the name portion only.
+        $subject = $this->firstBlock($report, 'SubjectList');
+        $search = trim((string) ($subject['SearchOutput'] ?? ''));
+        if ($search === '') {
+            return null;
+        }
+        $names = array_filter(
+            array_map('trim', array_slice(explode(',', $search), 0, 3)),
+            static fn(string $p) => $p !== '',
+        );
+        return $names === [] ? null : implode(' ', $names);
+    }
+
+    /** Business name as the bureau holds it, for a commercial match. */
+    private function commercialName(array $matched, array $report): ?string
+    {
+        foreach (['BusinessName', 'CommercialName', 'CompanyName', 'Name'] as $k) {
+            $v = trim((string) ($matched[$k] ?? ''));
+            if ($v !== '') return $v;
+        }
+        $details = $this->firstBlock($report, 'CompanyDetails');
+        foreach (['BusinessName', 'CompanyName', 'Name'] as $k) {
+            $v = trim((string) ($details[$k] ?? ''));
+            if ($v !== '') return $v;
+        }
+        return null;
     }
 }
