@@ -8,6 +8,8 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
@@ -31,15 +33,90 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * The queue stays in place with its pagination/search state intact.
  */
+const APPROVAL_QUEUE_GUIDE: PageGuide = {
+  id: 'approval-queue',
+  titleKey: 'Approval Queue',
+  purposeKey: 'The loans waiting on a decision from you, at your step of the approval chain.',
+  descriptionKey:
+    'This is a worklist, not a register — it shows only what is currently sitting with you. A loan '
+    + 'reaches an approval step because the workflow configured for its product and amount routed it '
+    + 'there, and it leaves the moment a decision is recorded. Deciding here is the control that '
+    + 'stands between an application and the institution\'s money.',
+  actionKeys: [
+    'Review an application against the customer\'s history and documents',
+    'Approve, decline, or send it back for more information',
+    'Narrow the queue by location while working a particular branch',
+  ],
+  sections: [
+    {
+      selector: '.cx-aq-toolbar',
+      titleKey: 'Queue filters',
+      bodyKey:
+        'Filter the worklist while you work through it. This changes what you are looking at, not who '
+        + 'the loans are assigned to.',
+    },
+    {
+      selector: 'cx-data-table',
+      titleKey: 'Loans awaiting you',
+      bodyKey:
+        'Open a row to see the full application — terms, affordability, documents and anything earlier '
+        + 'approvers recorded — before deciding.',
+    },
+  ],
+  workflowKeys: [
+    'Application captured and submitted',
+    'Workflow routes it to the first approval step',
+    'Decision recorded here; it moves to the next step or ends',
+    'Fully approved loans pass to the Disbursement Queue',
+  ],
+  dependsOnKeys: ['Approval Workflows', 'Loan Products', 'Roles & Permissions'],
+  usedByKeys: ['Disbursement Queue', 'Audit Logs'],
+  businessRuleKeys: [
+    'Approving does not release money. It moves the loan to the disbursement stage, where funds are a separate, separately-permissioned act.',
+    'Every decision is recorded against the person who made it, with a timestamp. That record is permanent.',
+    'A multi-step workflow needs each step in turn — the last approver is not the only one who matters.',
+    'Declining is a decision, not a deletion; the application stays in the register with its reason.',
+    'An empty queue means nothing is waiting on YOU. Other approvers may still have work.',
+  ],
+  tipKeys: [
+    'Read the affordability figures before the amount. A loan that is affordable at a lower amount is a counter-offer, not a decline.',
+    'Put the real reason in the notes when declining — the customer may reapply, and the next reviewer needs to know what you saw.',
+    'If the same weak applications keep reaching you, the product\'s rules or the workflow thresholds are the fix, not repeated declines.',
+  ],
+  permissionKeys: ['loans.approve'],
+  faq: [
+    {
+      questionKey: 'A loan I expected is not in my queue.',
+      answerKey:
+        'Either it has not reached your step yet, or it routed elsewhere — check the workflow '
+        + 'configured for that product and amount. The Loans register shows where it actually sits.',
+    },
+    {
+      questionKey: 'Can I undo an approval?',
+      answerKey:
+        'No. Decisions are permanent by design. If it was wrong, the loan can be cancelled before '
+        + 'disbursement — and that cancellation is itself recorded.',
+    },
+    {
+      questionKey: 'I approved it — why has the customer not been paid?',
+      answerKey:
+        'Approval and disbursement are deliberately separate. It is now waiting in the Disbursement '
+        + 'Queue for someone with the disbursement permission.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-approval-queue', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Approval Queue"
         subtitle="Loans awaiting your decision at this approval step"
         eyebrow="Workflow"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-aq-toolbar">
         <label class="cx-aq-toolbar-label">Location</label>
@@ -1191,6 +1268,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class ApprovalQueueComponent implements OnInit {
+  readonly guide = APPROVAL_QUEUE_GUIDE;
+
   // Only Step and Role are sortable, and only for admin/super_admin (the queue
   // supports server-side sort on those two). Built in the constructor so the
   // sortable flags reflect the current user's role.

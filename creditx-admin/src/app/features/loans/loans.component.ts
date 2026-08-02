@@ -7,14 +7,93 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
+const LOANS_GUIDE: PageGuide = {
+  id: 'loans',
+  titleKey: 'Loan Portfolio',
+  purposeKey: 'The single register of every loan the institution holds, at every stage of its life.',
+  descriptionKey:
+    'Every application ever captured appears here — whether it is still being reviewed, has been '
+    + 'rejected, is being repaid, or closed years ago. Other screens act on loans at one particular '
+    + 'moment; this one is the record of all of them, and it is where you come to answer "what is '
+    + 'the position of this loan?" rather than "what should I do next?".',
+  actionKeys: [
+    'Find a loan by application ID, customer name or staff ID',
+    'Narrow the register by status, product or branch',
+    'Open a loan to see its schedule, repayments, documents and approval history',
+    'Export the filtered register for reporting or reconciliation',
+  ],
+  sections: [
+    {
+      selector: '.cx-loans-filters',
+      titleKey: 'Filters',
+      bodyKey:
+        'Search and filters combine, so you can hold one branch and one status at the same time. The '
+        + 'export takes whatever is currently filtered, not the whole book — check the filters before '
+        + 'exporting figures someone will rely on.',
+    },
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The register',
+      bodyKey:
+        'One row per loan. The status badge tells you where it sits in its life; open a row for the '
+        + 'full history, repayment schedule and attached documents.',
+    },
+  ],
+  workflowKeys: [
+    'Agent or back office captures an application',
+    'Approval Queue — reviewed and approved',
+    'Disbursement Queue — funds released',
+    'Repayments collected against the schedule',
+    'Loan closes, or ages into overdue',
+  ],
+  dependsOnKeys: ['Loan Products', 'Customers', 'Approval Workflows'],
+  usedByKeys: ['Approval Queue', 'Disbursement Queue', 'Payments', 'Portfolio at Risk', 'CBN returns'],
+  businessRuleKeys: [
+    'A loan moves through fixed statuses — draft, submitted, under review, approved, disbursed, active, then closed, overdue or written off. It cannot skip a step.',
+    'Rejecting an application does not delete it; it stays in the register with a rejected status, because the attempt is part of the customer\'s history.',
+    'Money is only committed at disbursement. An approved loan has cost nothing yet.',
+    'Overdue is derived from the repayment schedule, not set by hand — it appears the day an instalment passes its due date unpaid.',
+  ],
+  tipKeys: [
+    'A customer chasing "my loan" is usually asking about one application — search their name and read the status badge before anything else.',
+    'Filter to Approved when reconciling what is owed to customers but not yet paid out; those loans are commitments the institution has made.',
+    'Figures here are application-level. For accounting positions use the ledger reports, which are posted from journals rather than derived from loan rows.',
+  ],
+  permissionKeys: ['loans.view'],
+  faq: [
+    {
+      questionKey: 'A loan shows Disbursed but the customer says they have not been paid.',
+      answerKey:
+        'Disbursed means the disbursement was recorded and journals posted. Confirm the settlement '
+        + 'actually left the bank on the Settlements screen — recording and paying are two steps.',
+    },
+    {
+      questionKey: 'Why can I not edit a loan\'s amount here?',
+      answerKey:
+        'Terms are fixed once an application is submitted, because approvals and journals reference '
+        + 'them. A change of terms is a restructure, not an edit.',
+    },
+    {
+      questionKey: 'The totals here do not match my accounting reports.',
+      answerKey:
+        'They measure different things. This register counts applications and requested amounts; the '
+        + 'accounting reports total what was actually posted to the ledger.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-loans', standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, SearchableSelectDirective],
+  imports: [CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, StatusBadgeComponent, SearchableSelectDirective, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -45,6 +124,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filters -->
       <div class="cx-loans-filters">
@@ -171,6 +252,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class LoansComponent implements OnInit {
+  readonly guide = LOANS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'application_id', label: 'App ID' },
     { key: 'customer_name', label: 'Customer' },

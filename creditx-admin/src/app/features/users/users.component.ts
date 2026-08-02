@@ -8,6 +8,8 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -15,9 +17,72 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
+const USERS_GUIDE: PageGuide = {
+  id: 'users',
+  titleKey: 'Users',
+  purposeKey: 'The staff who can sign in, and what each of them is allowed to do.',
+  descriptionKey:
+    'A user is a member of staff with an account. What they can do is not set here directly — it comes '
+    + 'from the role they hold, and from the branch and department they belong to. This page is where '
+    + 'people are given accounts, moved, and switched off when they leave.',
+  actionKeys: [
+    'Create an account for a new staff member',
+    'Assign or change a user\'s role, branch and department',
+    'Deactivate someone who has left, or is suspended',
+    'Flag a user as a field agent so the agent app scopes their work to them',
+  ],
+  sections: [
+    {
+      selector: '.cx-users-filters',
+      titleKey: 'Filters',
+      bodyKey:
+        'Narrow by role, department, location or status. Filtering to inactive users is the quickest '
+        + 'way to review leavers whose accounts should already be off.',
+    },
+    {
+      selector: '.cx-users-table-wrap',
+      titleKey: 'The staff list',
+      bodyKey: 'One row per account. The role column is what actually governs their access.',
+    },
+  ],
+  workflowKeys: [
+    'Roles & Permissions — define what each job function may do',
+    'Create the user here and give them that role',
+    'User signs in and their rights are applied',
+    'Deactivate on the day they leave',
+  ],
+  dependsOnKeys: ['Roles & Permissions', 'Locations', 'Departments'],
+  usedByKeys: ['Approval Workflows', 'Agent app sign-in', 'Audit Logs', 'Maker-checker'],
+  businessRuleKeys: [
+    'Access comes from the role, never from the person. To change what someone can do, change their role — or change the role itself if the whole job function should change.',
+    'Deactivating a user blocks sign-in but keeps every record they created, because the audit trail must stay intact.',
+    'Users flagged as field agents only ever see their own loans, whatever else their role permits.',
+    'A permission change takes effect at next sign-in, because rights are carried in the session.',
+  ],
+  tipKeys: [
+    'Deactivate on the leaving date, not at the next review. A live account for a departed staff member is the most common audit finding there is.',
+    'Give the narrowest role that lets someone do their job; widening it later is easy, and easier to justify than the reverse.',
+    'Set branch and department even when they seem cosmetic — approval routing and reporting both read them.',
+  ],
+  permissionKeys: ['users.view', 'users.create', 'users.edit'],
+  faq: [
+    {
+      questionKey: 'A user says they cannot see a screen they need.',
+      answerKey:
+        'Check the role they hold and what that role carries under Roles & Permissions. If you have '
+        + 'just changed it, they must sign out and back in.',
+    },
+    {
+      questionKey: 'Should I delete a user who has left?',
+      answerKey:
+        'No — deactivate them. Deleting would orphan every approval, capture and posting they made.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-users', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, SearchableSelectComponent, ConfirmDialogComponent, EmptyStateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -56,6 +121,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filters -->
       <div class="cx-users-filters">
@@ -697,6 +764,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class UsersComponent implements OnInit {
+  readonly guide = USERS_GUIDE;
+
   rows = signal<any[]>([]); loading = signal(true);
   totalRecords = signal(0);
   roles = signal<any[]>([]); locs = signal<any[]>([]); departments = signal<any[]>([]); teams = signal<any[]>([]);

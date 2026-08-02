@@ -7,6 +7,8 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
@@ -31,16 +33,92 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  * knew it, but the backend would refuse the list fetch with 403 and
  * the page would just show an empty state.
  */
+const DISBURSEMENT_QUEUE_GUIDE: PageGuide = {
+  id: 'disbursement-queue',
+  titleKey: 'Disbursement Queue',
+  purposeKey: 'Fully approved loans waiting for the money to actually go out.',
+  descriptionKey:
+    'This is the point where an approved application becomes real money leaving the institution. '
+    + 'Disbursing posts the accounting entries, creates the repayment schedule and starts the loan\'s '
+    + 'life — which is why it is deliberately separate from approval, and separately permissioned. '
+    + 'Everything before this step is reversible; this step is not.',
+  actionKeys: [
+    'Disburse a single approved loan',
+    'Select several and disburse them together',
+    'Check the net amount a customer will receive after fees, before releasing it',
+  ],
+  sections: [
+    {
+      selector: 'cx-data-table',
+      titleKey: 'Awaiting disbursement',
+      bodyKey:
+        'Every loan here has cleared approval. Tick rows to act on more than one at a time — the '
+        + 'action bar appears once something is selected.',
+    },
+    {
+      selector: 'cx-bulk-action-bar',
+      titleKey: 'Bulk actions',
+      bodyKey:
+        'Acts on everything currently ticked. Read the count before confirming; a bulk disbursement '
+        + 'commits every loan in it.',
+    },
+  ],
+  workflowKeys: [
+    'Loan fully approved',
+    'Appears here awaiting funds',
+    'Disbursed — journals posted, schedule created',
+    'Settlement actually pays the customer',
+    'Repayments begin',
+  ],
+  dependsOnKeys: ['Approval Queue', 'GL Mappings', 'Accounting period being open'],
+  usedByKeys: ['Settlements', 'Journal Entries', 'Repayment schedules', 'Portfolio at Risk'],
+  businessRuleKeys: [
+    'Disbursement posts to the general ledger. It cannot be undone by editing — only reversed by a further posting, which is itself recorded.',
+    'The net amount can be less than the amount approved, where fees are deducted at disbursement. What the customer receives is the net figure.',
+    'Disbursing requires the accounting period to be open. If it is closed, the posting is refused rather than silently dated elsewhere.',
+    'Recording a disbursement is not the same as paying it — the actual transfer is tracked under Settlements.',
+    'The repayment schedule is generated at disbursement, so the first due date follows from the date you disburse.',
+  ],
+  tipKeys: [
+    'Disburse on the day the money genuinely leaves. Back-dating to tidy a report distorts interest accrual and the schedule.',
+    'For bulk runs, filter first and check the selected count — it is easy to carry a selection across a filter change.',
+    'If a loan should no longer go out, cancel it before disbursing. Undoing afterwards means a reversal in the ledger.',
+  ],
+  permissionKeys: ['loans.disburse'],
+  faq: [
+    {
+      questionKey: 'The disbursement was refused because the period is closed.',
+      answerKey:
+        'Postings must fall in an open accounting period. Either disburse into the current period, or '
+        + 'have the period reopened by someone with that right — do not work around the date.',
+    },
+    {
+      questionKey: 'I disbursed the wrong loan.',
+      answerKey:
+        'It cannot be deleted. It must be reversed through the accounting entries, which leaves both '
+        + 'the original and the reversal visible. Raise it with your accountant rather than retrying.',
+    },
+    {
+      questionKey: 'Why is the customer receiving less than the approved amount?',
+      answerKey:
+        'Fees configured on the product as deducted-at-disbursement come out of the gross. The net '
+        + 'column shows what actually reaches them.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-disbursement-queue',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Disbursement Queue"
         subtitle="Approved loans awaiting fund disbursement"
         eyebrow="Finance"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [pagination]="pagination()"
@@ -500,6 +578,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class DisbursementQueueComponent implements OnInit {
+  readonly guide = DISBURSEMENT_QUEUE_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'application_id', label: 'App ID' },
     { key: 'customer_name', label: 'Customer' },

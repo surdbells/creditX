@@ -6,15 +6,82 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
+const SETTINGS_GUIDE: PageGuide = {
+  id: 'settings',
+  titleKey: 'System Settings',
+  purposeKey: 'The switches that change how the whole institution\'s system behaves.',
+  descriptionKey:
+    'Settings are read by the software as it runs rather than by any one screen, so a change here can '
+    + 'alter behaviour everywhere at once — what agents may capture, how approvals route, what '
+    + 'customers see, how interest accrues. They are grouped by category because most staff only ever '
+    + 'need one or two of them.',
+  actionKeys: [
+    'Find a setting by category and change its value',
+    'Open or pause loan intake from the agent app',
+    'Adjust branding, so the portal and emails carry your own name and colours',
+    'Turn optional modules on or off across the app',
+  ],
+  sections: [
+    {
+      selector: '.cx-settings-cats',
+      titleKey: 'Categories',
+      bodyKey:
+        'Settings are grouped by what they affect. Start from the category rather than scrolling — '
+        + 'there are more settings than anyone reads at once.',
+    },
+    {
+      selector: '.cx-settings-rows',
+      titleKey: 'The settings themselves',
+      bodyKey:
+        'Each row carries a description of what it does. Read it before changing the value; several '
+        + 'of these take effect immediately, for everyone.',
+    },
+  ],
+  usedByKeys: ['Agent app', 'Customer portal', 'Approval routing', 'Accounting and interest accrual', 'Notifications'],
+  businessRuleKeys: [
+    'Changes apply system-wide and take effect immediately — there is no staging or preview.',
+    'Some settings are read at sign-in, so staff already signed in may not see the change until they sign in again.',
+    'Financial settings — accrual, provisioning, tax — alter what is posted going forward. They do not restate what has already been posted.',
+    'A handful of settings are public by design, because the portal and agent app need them before anyone has signed in. Never put anything sensitive in those.',
+    'Every change is recorded in the audit log against the person who made it.',
+  ],
+  tipKeys: [
+    'Change one setting at a time when you are unsure. If behaviour changes unexpectedly, you know exactly which switch did it.',
+    'Pausing agent loan intake is the clean way to stop new captures during a month-end or a system issue — it is reversible and visible on the dashboard.',
+    'Read the description in full before changing anything under accounting. Those settings shape what gets posted, not just what gets shown.',
+  ],
+  permissionKeys: ['settings.view', 'settings.create', 'settings.edit'],
+  faq: [
+    {
+      questionKey: 'I changed a setting and nothing happened.',
+      answerKey:
+        'Some values are read when a user signs in. Sign out and back in; if it still has not applied, '
+        + 'check whether the change actually saved.',
+    },
+    {
+      questionKey: 'Which settings are safe to change without help?',
+      answerKey:
+        'Branding and display settings are low risk. Anything under accounting, approvals or interest '
+        + 'changes financial behaviour — agree those with your accountant first.',
+    },
+    {
+      questionKey: 'Can I see who changed a setting?',
+      answerKey: 'Yes. Every change is written to the audit log with the user and the time.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-settings', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, LoadingSpinnerComponent, EmptyStateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -28,6 +95,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Category Pills -->
       <div class="cx-settings-cats">
@@ -281,6 +350,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class SettingsComponent implements OnInit {
+  readonly guide = SETTINGS_GUIDE;
+
   rows = signal<any[]>([]); loading = signal(true);
   activeCategory = '';
   allCategories = ['', 'general', 'security', 'notification', 'approval', 'penalty', 'payment', 'accounting'];

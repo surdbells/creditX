@@ -6,6 +6,8 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { PostingDateComponent } from '../../shared/components/posting-date/posting-date.component';
@@ -47,16 +49,99 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by accounting.view permission at both menu + backend layers.
  */
+const JOURNAL_ENTRIES_GUIDE: PageGuide = {
+  id: 'journal-entries',
+  titleKey: 'Journal Entries',
+  purposeKey: 'Every accounting posting the institution has made, and the audit trail behind it.',
+  descriptionKey:
+    'A journal is a balanced posting — debits equal credits — recording something that happened '
+    + 'financially. Most are created automatically as loans disburse, repayments land and interest '
+    + 'accrues; a few are raised by hand for corrections and adjustments. Every figure in the '
+    + 'financial statements is built from what is here, so this is the source of truth the reports '
+    + 'merely summarise.',
+  actionKeys: [
+    'Trace how a transaction hit the ledger',
+    'Filter by date, type or account to investigate a balance',
+    'Raise a manual journal for an adjustment or correction',
+    'Reverse a posting that was wrong',
+  ],
+  sections: [
+    {
+      selector: '.cx-je-filters',
+      titleKey: 'Filters',
+      bodyKey:
+        'Narrow by date range, entry type or account. Starting from the account is usually the '
+        + 'fastest way to explain a balance you do not recognise.',
+    },
+    {
+      selector: 'cx-posting-date',
+      titleKey: 'Posting date',
+      bodyKey:
+        'The accounting date a manual entry will post under. It must fall in an open period — this is '
+        + 'what stops a posting quietly landing in a month that has already been reported.',
+    },
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The journal list',
+      bodyKey: 'One row per journal. Open it to see the individual debit and credit lines.',
+    },
+  ],
+  workflowKeys: [
+    'A business event occurs — disbursement, repayment, accrual, fee',
+    'The system posts a balanced journal for it',
+    'Journals roll into account balances',
+    'Balances produce the trial balance and financial statements',
+    'The period is closed and locked',
+  ],
+  dependsOnKeys: ['Chart of Accounts', 'GL Mappings', 'Accounting periods'],
+  usedByKeys: ['Trial Balance', 'Balance Sheet', 'Income Statement', 'Cash Flow', 'CBN returns'],
+  businessRuleKeys: [
+    'Debits must equal credits. An unbalanced journal is rejected outright, never saved as a draft.',
+    'A posted journal is never edited or deleted. A mistake is corrected by a reversing entry, so both the error and the correction stay visible.',
+    'Postings must fall in an OPEN accounting period. Once a period is closed, entries dated into it are refused until it is formally reopened.',
+    'Automatic journals come from GL Mappings. If a posting hit the wrong account, the mapping is the cause — fixing one journal by hand leaves the next one just as wrong.',
+    'Every entry records who posted it and when.',
+  ],
+  tipKeys: [
+    'Investigate a strange balance from the account, not the date — filtering by account shows every movement that produced it.',
+    'Write manual journal narrations for someone reading them in a year\'s time. "Adjustment" explains nothing at audit.',
+    'If the same manual correction recurs every month, the real fix is a GL mapping or a product setting.',
+  ],
+  permissionKeys: ['accounting.view', 'accounting.journal'],
+  faq: [
+    {
+      questionKey: 'My entry was refused because the period is closed.',
+      answerKey:
+        'Closed periods are locked deliberately, because they have been reported. Either post into the '
+        + 'current period, or have the period reopened by someone with that right.',
+    },
+    {
+      questionKey: 'I posted a journal with the wrong amount.',
+      answerKey:
+        'Reverse it and post the correct one. Both remain visible — that is the intended behaviour, '
+        + 'not a shortcoming.',
+    },
+    {
+      questionKey: 'A disbursement posted to the wrong account.',
+      answerKey:
+        'Correct the GL mapping first, otherwise every future disbursement repeats it. Then reverse '
+        + 'and repost the entries already made.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-journal-entries',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe, PostingDateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, MoneyPipe, PostingDateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Journal Entries"
         subtitle="Each journal is a balanced posting — disbursement, repayment, write-off, etc."
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filter bar -->
       <div class="cx-je-filters">
@@ -821,6 +906,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class JournalEntriesComponent implements OnInit {
+  readonly guide = JOURNAL_ENTRIES_GUIDE;
+
   // Header-rooted columns. 'narration_with_status' is a custom cell
   // that overlays the type pills (REVERSAL/REVERSED/CLOSING) on top
   // of the narration text — saves a column and keeps the table dense.

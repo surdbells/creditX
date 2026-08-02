@@ -6,13 +6,83 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+const LOAN_PRODUCTS_GUIDE: PageGuide = {
+  id: 'loan-products',
+  titleKey: 'Loan Products',
+  purposeKey: 'The lending products on offer — their limits, pricing, fees and where they can be sold.',
+  descriptionKey:
+    'A product is the template every loan is cut from. It fixes the amount and tenure range, how '
+    + 'interest is calculated, which fees apply, which documents are required and which channels may '
+    + 'offer it. Because loans copy their terms from the product at capture, a change here shapes new '
+    + 'lending only — it never rewrites loans already written.',
+  actionKeys: [
+    'Create a product, or adjust an existing one\'s limits and pricing',
+    'Attach fees and choose whether each is deducted or added to the loan',
+    'Set which documents this product requires, and which are mandatory',
+    'Choose which channels may offer it — agent app, customer portal, back office',
+    'Retire a product by making it inactive',
+  ],
+  sections: [
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The product list',
+      bodyKey:
+        'One row per product, showing its interest method, rate and limits at a glance. Open one to '
+        + 'edit its terms, fees, documents and availability.',
+    },
+  ],
+  workflowKeys: [
+    'Define the product here',
+    'Make it available on the channels that should sell it',
+    'Loans are captured against it, copying its terms',
+    'Its fees and interest method drive what the customer pays',
+  ],
+  dependsOnKeys: ['Fee Types', 'Document Types', 'GL Mappings'],
+  usedByKeys: ['Loans', 'Loan calculator', 'Agent app', 'Customer portal', 'Product performance reports'],
+  businessRuleKeys: [
+    'Loans copy their terms at capture. Changing a rate or limit affects new loans only — existing ones keep what they were written on, which is the correct behaviour.',
+    'Making a product inactive stops new lending against it; loans already running continue untouched.',
+    'Channel availability is enforced on the server, not just hidden in the interface — a product switched off for the portal cannot be applied for there even by a direct request.',
+    'Turning every channel off leaves a product that exists but cannot be sold anywhere.',
+    'Document requirements set here are what submission actually enforces. Leaving them all unticked falls back to the global document defaults.',
+    'The interest method changes what the customer repays. Flat and reducing balance produce materially different totals on the same rate.',
+  ],
+  tipKeys: [
+    'Prefer creating a new product over re-pricing a live one when terms change materially — it keeps reporting on the old book clean.',
+    'Check the calculator after changing pricing; it is what customers see, and it exercises the same engine as capture.',
+    'Deactivate rather than delete. A product with history behind it should stay visible in reports.',
+  ],
+  permissionKeys: ['products.view', 'products.create', 'products.edit'],
+  faq: [
+    {
+      questionKey: 'I changed the rate but existing loans still show the old one.',
+      answerKey:
+        'That is intended. A loan is a contract at the terms agreed on the day; repricing it retrospectively '
+        + 'would change what the customer owes.',
+    },
+    {
+      questionKey: 'A product is not showing in the agent app or the portal.',
+      answerKey:
+        'Check Availability on the product, and that it is active. Both must be true for that channel.',
+    },
+    {
+      questionKey: 'Why is the customer receiving less than they asked for?',
+      answerKey:
+        'Fees attached as deducted-at-disbursement come out of the amount. The effect of each fee is '
+        + 'set where it is attached here.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-loan-products', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -24,6 +94,7 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Add Product</span>
         </button>
       </cx-page-header>
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search products..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -373,6 +444,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class LoanProductsComponent implements OnInit {
+  readonly guide = LOAN_PRODUCTS_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Product Name'},{key:'code',label:'Code'},{key:'interest_calculation_method',label:'Method'},{key:'interest_rate',label:'Rate'},{key:'min_amount',label:'Min',type:'currency'},{key:'max_amount',label:'Max',type:'currency'},{key:'is_active',label:'Active'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; fees: any[] = []; q: any = {};

@@ -7,15 +7,76 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { NIGERIA_STATES } from '../../core/data/nigeria-states';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
+const CUSTOMERS_GUIDE: PageGuide = {
+  id: 'customers',
+  titleKey: 'Customers',
+  purposeKey: 'The master record of everyone the institution does business with.',
+  descriptionKey:
+    'A customer record exists once and is reused by every loan, deposit and investment that person '
+    + 'ever holds. That is what makes it possible to see a customer\'s total exposure, meet know-your-'
+    + 'customer obligations, and report to the CBN — so the quality of what is captured here sets a '
+    + 'ceiling on the quality of everything downstream.',
+  actionKeys: [
+    'Search the directory by name, phone or BVN',
+    'Onboard a new customer',
+    'Correct or complete an existing customer\'s details',
+    'Open a customer to see their loans and history',
+  ],
+  sections: [
+    {
+      selector: 'cx-data-table',
+      titleKey: 'The directory',
+      bodyKey:
+        'One row per customer, not per loan — a customer with four loans appears once. Open a row to '
+        + 'see everything they hold.',
+    },
+  ],
+  workflowKeys: [
+    'Customer is onboarded here, by an agent, or self-registers on the portal',
+    'Identity and documents captured',
+    'Loan application raised against the record',
+    'Exposure and reporting roll up from it',
+  ],
+  usedByKeys: ['Loans', 'Deposit Accounts', 'Investments', 'Credit Bureau checks', 'CBN returns'],
+  businessRuleKeys: [
+    'BVN and NIN identify a person uniquely — a duplicate customer splits their history in two and understates their real exposure.',
+    'Customers onboarded by agents are matched against a government record; portal self-registrations are not, so their details carry less assurance until verified.',
+    'A customer with any loan, deposit or investment cannot be deleted, because the financial history must survive.',
+    'Insiders — staff and related parties — must be flagged as such. Insider lending is reported separately to the regulator.',
+  ],
+  tipKeys: [
+    'Search by BVN before creating anyone new. Duplicates are far easier to avoid than to merge.',
+    'Complete the employment and income fields even when a loan is not being raised today — affordability checks read them later.',
+    'A phone number is how collections reach this person. Treat it as required in practice, whatever the form allows.',
+  ],
+  permissionKeys: ['customers.view', 'customers.create', 'customers.edit'],
+  faq: [
+    {
+      questionKey: 'Two records exist for the same person — what now?',
+      answerKey:
+        'Keep the one carrying the financial history and correct it; retire the other. Do not raise new '
+        + 'business against the duplicate, or the split gets worse.',
+    },
+    {
+      questionKey: 'Can I delete a customer created by mistake?',
+      answerKey:
+        'Only if nothing financial is attached. Once a loan, deposit or investment exists the record '
+        + 'must be kept — that is an audit requirement, not a system limitation.',
+    },
+  ],
+};
+
 @Component({
   selector: 'app-customers', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [SearchableSelectDirective, CommonModule, RouterLink, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -29,6 +90,7 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search customers by name, phone, BVN..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
@@ -166,6 +228,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `,
 })
 export class CustomersComponent implements OnInit {
+  readonly guide = CUSTOMERS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'full_name', label: 'Customer Name' },
     { key: 'phone', label: 'Phone' },
