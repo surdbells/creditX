@@ -103,7 +103,7 @@ export class LayoutComponent {
       { label: 'Penalty Rules', icon: 'gavel', route: '/penalty-rules', permission: 'products.view' },
       { label: 'Approval Workflows', icon: 'check-circle', route: '/approval-workflows', permission: 'products.view' },
       { label: 'Record Types', icon: 'database', route: '/record-types', permission: 'record_types.view' },
-      { label: 'Gov. Records', icon: 'building-2', route: '/government-records', permission: 'records.view' },
+      { label: 'Institutions', icon: 'building-2', route: '/government-records', permission: 'records.view' },
     ]},
     { label: 'Accounting', items: [
       { label: 'Chart of Accounts', icon: 'landmark', route: '/accounting', permission: 'accounting.view' },
