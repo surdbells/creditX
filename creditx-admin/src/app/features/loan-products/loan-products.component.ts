@@ -323,16 +323,12 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
       }
     }
 
-    /* Mobile — stack everything into two columns. Fee Type spans full
-       width; the others flow two-per-row. Delete button sits in the
-       top-right corner. */
-    @media (max-width: 640px) {
-      .cx-lp-fee-row {
-        grid-template-columns: 1fr 1fr 32px;
-      }
-      /* Fee Type spans all three columns on its own row */
-      .cx-lp-fee-row > .cx-lp-fee-field:first-child { grid-column: 1 / 4; }
-    .cx-lp-channels { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px; }
+    /* ── Availability channels ───────────────────────────────────────────
+       These and the document rules below MUST stay outside the mobile media
+       query. They were nested inside it, so on any viewport wider than 640px
+       the checkboxes and their labels rendered completely unstyled — running
+       inline as raw text with no cards, spacing or hierarchy. */
+    .cx-lp-channels { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px; margin-top:10px; }
     .cx-lp-check { display:flex; gap:9px; align-items:flex-start; padding:10px 12px; cursor:pointer;
       border:1px solid var(--cx-border); border-radius:var(--cx-radius-md); }
     .cx-lp-check input { margin-top:3px; }
@@ -354,12 +350,25 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
     .cx-lp-doc-note { font-size:10px; text-transform:uppercase; letter-spacing:.04em; padding:2px 7px;
       border-radius:999px; background:color-mix(in srgb, var(--cx-warning) 14%, transparent); color:var(--cx-warning); }
 
+    /* Mobile — stack everything into two columns. Fee Type spans full
+       width; the others flow two-per-row. Delete button sits in the
+       top-right corner. */
+    @media (max-width: 640px) {
+      .cx-lp-fee-row {
+        grid-template-columns: 1fr 1fr 32px;
+      }
+      /* Fee Type spans all three columns on its own row */
+      .cx-lp-fee-row > .cx-lp-fee-field:first-child { grid-column: 1 / 4; }
+
       /* Delete sits floated in the corner */
       .cx-lp-fee-row > .cx-lp-fee-remove {
         grid-column: 3 / 4;
         grid-row: 1 / 2;
         align-self: center;
       }
+
+      /* The "Required" toggle wraps under the document name on narrow screens. */
+      .cx-lp-doc-row { flex-wrap: wrap; gap: 6px 10px; }
     }
   `],
 })
