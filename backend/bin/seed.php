@@ -77,6 +77,7 @@ $permissionsDef = [
     'loans' => [
         ['loans.view', 'View Loans'],
         ['loans.create', 'Create Loans'],
+        ['loans.originate', 'Originate Loans from the Back Office'],
         ['loans.edit', 'Edit Loans'],
         ['loans.approve', 'Approve Loans'],
         ['loans.reject', 'Reject Loans'],

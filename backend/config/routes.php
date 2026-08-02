@@ -263,8 +263,11 @@ return function (App $app): void {
         $api->group('/documents', function (RouteCollectorProxy $group) {
             $group->get('', Document\ListDocumentsAction::class)
                 ->add(new RbacMiddleware('customers.view'));
+            // loans.originate accepted too: a back-office originator must be
+            // able to attach a loan's documents without being granted blanket
+            // customer-creation rights.
             $group->post('/upload', Document\UploadDocumentAction::class)
-                ->add(new RbacMiddleware('customers.create'));
+                ->add(new RbacMiddleware(['customers.create', 'loans.originate']));
             $group->put('/{id}/verify', Document\VerifyDocumentAction::class)
                 ->add(new RbacMiddleware('customers.edit'));
             $group->delete('/{id}', Document\DeleteDocumentAction::class)
@@ -321,14 +324,20 @@ return function (App $app): void {
         $api->group('/loans', function (RouteCollectorProxy $group) {
             $group->get('', Loan\ListLoansAction::class)
                 ->add(new RbacMiddleware('loans.view'));
+            // Either permission suffices (RbacMiddleware defaults to ANY):
+            // loans.create is what field agents carry, loans.originate is the
+            // back-office equivalent. Sharing the endpoint keeps origination on
+            // ONE path, so a back-office loan enters the same approval
+            // workflow, posts the same journals and audits identically to an
+            // agent-captured one.
             $group->post('', Loan\CreateLoanAction::class)
-                ->add(new RbacMiddleware('loans.create'));
+                ->add(new RbacMiddleware(['loans.create', 'loans.originate']));
             $group->get('/{id}', Loan\GetLoanAction::class)
                 ->add(new RbacMiddleware('loans.view'));
             $group->put('/{id}', Loan\UpdateLoanAction::class)
                 ->add(new RbacMiddleware('loans.edit'));
             $group->post('/{id}/submit', Loan\SubmitLoanAction::class)
-                ->add(new RbacMiddleware('loans.create'));
+                ->add(new RbacMiddleware(['loans.create', 'loans.originate']));
             $group->post('/{id}/cancel', Loan\CancelLoanAction::class)
                 ->add(new RbacMiddleware('loans.edit'));
             // Used by the underwriter approval form to auto-prefill the

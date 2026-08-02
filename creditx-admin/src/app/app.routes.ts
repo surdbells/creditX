@@ -35,6 +35,9 @@ export const routes: Routes = [
       { path: 'penalty-rules', loadComponent: () => import('./features/penalty-rules/penalty-rules.component').then(m => m.PenaltyRulesComponent) },
       { path: 'approval-workflows', loadComponent: () => import('./features/approval-workflows/approval-workflows.component').then(m => m.ApprovalWorkflowsComponent) },
       { path: 'loans', loadComponent: () => import('./features/loans/loans.component').then(m => m.LoansComponent) },
+      // MUST precede 'loans/:id', or Angular matches /loans/new as a loan whose
+      // id is the literal string "new" and opens the detail page instead.
+      { path: 'loans/new', loadComponent: () => import('./features/loan-origination/loan-origination.component').then(m => m.LoanOriginationComponent) },
       { path: 'loans/:id', loadComponent: () => import('./features/loans/loan-detail.component').then(m => m.LoanDetailComponent) },
       { path: 'approval-queue', loadComponent: () => import('./features/approval-queue/approval-queue.component').then(m => m.ApprovalQueueComponent) },
       { path: 'disbursement-queue', loadComponent: () => import('./features/disbursement-queue/disbursement-queue.component').then(m => m.DisbursementQueueComponent) },
