@@ -418,7 +418,7 @@ export class CalculatorPage implements OnInit {
   constructor(private api: ApiService) { addIcons({ calculatorOutline }); }
 
   ngOnInit(): void {
-    this.api.get('/loan-products', { per_page: 50, is_active: true }).subscribe({
+    this.api.get('/loan-products', { per_page: 50, is_active: true, channel: 'agent_app' }).subscribe({
       next: res => this.products.set(res.data || []),
     });
   }

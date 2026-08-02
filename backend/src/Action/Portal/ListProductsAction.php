@@ -23,7 +23,13 @@ final class ListProductsAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $products = $this->productRepo->findActive();
-        return $this->success(array_map(fn($p) => $p->toArray(true), $products));
+        // Only products the institution has chosen to offer for self-service.
+        // This endpoint also backs the PUBLIC calculator, so a product hidden
+        // from the portal must not leak through it either.
+        $products = array_filter(
+            $this->productRepo->findActive(),
+            fn($p) => $p->isAvailableOn('portal'),
+        );
+        return $this->success(array_map(fn($p) => $p->toArray(true), array_values($products)));
     }
 }

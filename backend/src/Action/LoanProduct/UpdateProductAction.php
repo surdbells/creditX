@@ -40,6 +40,11 @@ final class UpdateProductAction
         if (isset($data['max_customer_age'])) $p->setMaxCustomerAge((int) $data['max_customer_age']);
         if (isset($data['max_service_years'])) $p->setMaxServiceYears((int) $data['max_service_years']);
         if (isset($data['allows_top_up'])) $p->setAllowsTopUp(filter_var($data['allows_top_up'], FILTER_VALIDATE_BOOLEAN));
+        // array_key_exists, not isset: these are booleans, and isset() would
+        // silently ignore an explicit `false` sent to switch a channel off.
+        if (array_key_exists('available_agent_app', $data)) $p->setAvailableAgentApp(filter_var($data['available_agent_app'], FILTER_VALIDATE_BOOLEAN));
+        if (array_key_exists('available_portal', $data)) $p->setAvailablePortal(filter_var($data['available_portal'], FILTER_VALIDATE_BOOLEAN));
+        if (array_key_exists('available_back_office', $data)) $p->setAvailableBackOffice(filter_var($data['available_back_office'], FILTER_VALIDATE_BOOLEAN));
         if (isset($data['is_active'])) $p->setIsActive(filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN));
 
         // Replace fees if provided

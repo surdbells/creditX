@@ -62,6 +62,26 @@ class LoanProduct
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isActive = true;
 
+    /**
+     * Which channels may ORIGINATE a loan against this product.
+     *
+     * All default true so nothing disappears when the feature ships — a
+     * product is offered everywhere until someone narrows it. These gate the
+     * origination product lists only; admin product management always shows
+     * every product regardless, or a product switched off everywhere would
+     * become uneditable.
+     *
+     * isActive still trumps all three: an inactive product is offered nowhere.
+     */
+    #[ORM\Column(name: 'available_agent_app', type: 'boolean', options: ['default' => true])]
+    private bool $availableAgentApp = true;
+
+    #[ORM\Column(name: 'available_portal', type: 'boolean', options: ['default' => true])]
+    private bool $availablePortal = true;
+
+    #[ORM\Column(name: 'available_back_office', type: 'boolean', options: ['default' => true])]
+    private bool $availableBackOffice = true;
+
     /** @var Collection<int, ProductFee> */
     #[ORM\OneToMany(targetEntity: ProductFee::class, mappedBy: 'product', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $fees;
@@ -87,6 +107,21 @@ class LoanProduct
     public function getMaxServiceYears(): ?int { return $this->maxServiceYears; }
     public function allowsTopUp(): bool { return $this->allowsTopUp; }
     public function isActive(): bool { return $this->isActive; }
+    public function isAvailableAgentApp(): bool { return $this->availableAgentApp; }
+    public function isAvailablePortal(): bool { return $this->availablePortal; }
+    public function isAvailableBackOffice(): bool { return $this->availableBackOffice; }
+
+    /** Is this product offerable on a given channel right now? */
+    public function isAvailableOn(string $channel): bool
+    {
+        if (!$this->isActive) return false;
+        return match ($channel) {
+            'agent_app'   => $this->availableAgentApp,
+            'portal'      => $this->availablePortal,
+            'back_office' => $this->availableBackOffice,
+            default       => true,
+        };
+    }
     /** @return Collection<int, ProductFee> */
     public function getFees(): Collection { return $this->fees; }
 
@@ -104,6 +139,9 @@ class LoanProduct
     public function setMaxServiceYears(?int $v): void { $this->maxServiceYears = $v; }
     public function setAllowsTopUp(bool $v): void { $this->allowsTopUp = $v; }
     public function setIsActive(bool $v): void { $this->isActive = $v; }
+    public function setAvailableAgentApp(bool $v): void { $this->availableAgentApp = $v; }
+    public function setAvailablePortal(bool $v): void { $this->availablePortal = $v; }
+    public function setAvailableBackOffice(bool $v): void { $this->availableBackOffice = $v; }
 
     public function addFee(ProductFee $fee): void
     {
@@ -140,6 +178,9 @@ class LoanProduct
             'max_service_years'           => $this->maxServiceYears,
             'allows_top_up'               => $this->allowsTopUp,
             'is_active'                   => $this->isActive,
+            'available_agent_app'         => $this->availableAgentApp,
+            'available_portal'            => $this->availablePortal,
+            'available_back_office'       => $this->availableBackOffice,
             'created_at'                  => $this->createdAt->format('Y-m-d H:i:s'),
             'updated_at'                  => $this->updatedAt->format('Y-m-d H:i:s'),
         ];

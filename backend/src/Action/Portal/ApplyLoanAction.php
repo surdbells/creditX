@@ -106,7 +106,10 @@ final class ApplyLoanAction
         if ($product === null) {
             return $this->notFound('Loan product not found');
         }
-        if (!$product->isActive()) {
+        // isAvailableOn covers isActive AND the portal channel flag. Checking
+        // it here and not only when listing matters: hiding a product from the
+        // list is cosmetic if the apply endpoint still accepts its id.
+        if (!$product->isAvailableOn('portal')) {
             return $this->error('This loan product is not currently available.', 400);
         }
         if ((float) $c['amount'] < (float) $product->getMinAmount() || (float) $c['amount'] > (float) $product->getMaxAmount()) {

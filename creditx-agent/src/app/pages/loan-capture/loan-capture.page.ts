@@ -2204,7 +2204,7 @@ export class LoanCapturePage implements OnInit, OnDestroy {
       document.addEventListener('visibilitychange', this.onFocusListener);
     }
 
-    this.api.get('/loan-products', { per_page: 50, is_active: true }).subscribe({
+    this.api.get('/loan-products', { per_page: 50, is_active: true, channel: 'agent_app' }).subscribe({
       next: res => { this.products.set(res.data || []); this.productsLoading.set(false); },
       error: () => this.productsLoading.set(false),
     });

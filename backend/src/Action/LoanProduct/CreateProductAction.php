@@ -33,6 +33,11 @@ final class CreateProductAction
             'max_customer_age' => ['required' => false, 'type' => 'int'],
             'max_service_years' => ['required' => false, 'type' => 'int'],
             'allows_top_up' => ['required' => false, 'type' => 'bool', 'default' => true],
+            // Channel availability — default true so a product created without
+            // specifying them is offered everywhere, matching prior behaviour.
+            'available_agent_app'   => ['required' => false, 'type' => 'bool', 'default' => true],
+            'available_portal'      => ['required' => false, 'type' => 'bool', 'default' => true],
+            'available_back_office' => ['required' => false, 'type' => 'bool', 'default' => true],
         ]);
         if (!empty($v['errors'])) return $this->validationError($v['errors']);
 
@@ -53,6 +58,9 @@ final class CreateProductAction
         $p->setMaxCustomerAge($v['clean']['max_customer_age'] ?? null);
         $p->setMaxServiceYears($v['clean']['max_service_years'] ?? null);
         $p->setAllowsTopUp($v['clean']['allows_top_up']);
+        $p->setAvailableAgentApp($v['clean']['available_agent_app']);
+        $p->setAvailablePortal($v['clean']['available_portal']);
+        $p->setAvailableBackOffice($v['clean']['available_back_office']);
 
         // Attach fees
         if (isset($data['fees']) && is_array($data['fees'])) {
