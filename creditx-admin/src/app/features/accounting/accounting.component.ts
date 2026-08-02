@@ -13,10 +13,47 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const ACCOUNTING_GUIDE: PageGuide = {
+  id: 'accounting',
+  titleKey: 'Accounting',
+  purposeKey: 'The chart of accounts and the trial balance the financial statements are built from.',
+  descriptionKey:
+    'Every account the institution posts to lives here, arranged into assets, liabilities, equity, '
+    + 'income and expenses. The trial balance is simply every account\'s net position at a point in '
+    + 'time — if it balances, the books are internally consistent, and every statement downstream is '
+    + 'a rearrangement of these same figures.',
+  actionKeys: [
+    'Browse the chart of accounts',
+    'Add an account, or retire one no longer used',
+    'Run the trial balance and check it balances',
+    'Drill from an account into the journals that moved it',
+  ],
+  workflowKeys: [
+    'Chart of accounts defined here',
+    'GL Mappings point each business event at an account',
+    'Journals post as loans, deposits and fees move',
+    'Trial balance, then the financial statements',
+  ],
+  usedByKeys: ['Journal Entries', 'GL Mappings', 'Balance Sheet', 'Income Statement', 'CBN returns'],
+  businessRuleKeys: [
+    'An account with postings against it can never be deleted — retire it instead, or the history it carries becomes unreadable.',
+    'Account type decides which statement an account appears in. Setting it wrongly puts a real balance in the wrong report.',
+    'The trial balance must balance. If it does not, stop and investigate rather than reporting from it.',
+    'Balances here are derived from journals — they are never edited directly.',
+  ],
+  tipKeys: [
+    'Add accounts sparingly. A chart that grows a line per special case becomes impossible to report from.',
+    'Before creating an account, check whether an existing one plus a clearer narration would do.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
 
 @Component({
   selector: 'app-accounting', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -30,6 +67,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Tabs -->
       <div class="cx-acc-tabs-row">
@@ -455,6 +494,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class AccountingComponent implements OnInit {
+  readonly guide = ACCOUNTING_GUIDE;
+
   tabs = [
     { key: 'coa', label: 'Chart of Accounts', icon: 'landmark' },
     { key: 'trial', label: 'Trial Balance', icon: 'bar-chart-3' },

@@ -10,6 +10,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Deposit Account detail + statement. Shows the account header (customer,
@@ -19,10 +21,35 @@ import { SettingsService } from '../../core/services/settings.service';
  *
  * Gated by deposits.view (read) + deposits.transact (movements).
  */
+const DEPOSIT_ACCOUNT_DETAIL_GUIDE: PageGuide = {
+  id: 'deposit-account-detail',
+  titleKey: 'Deposit Account Detail',
+  purposeKey: 'One savings account — its balance, its movements and its terms.',
+  descriptionKey:
+    'The full statement of a single deposit account: every deposit, withdrawal and interest posting '
+    + 'that produced the current balance. It is what you use to answer a customer asking how their '
+    + 'balance got to where it is.',
+  actionKeys: [
+    'Review the balance and the movements behind it',
+    'Record a deposit or withdrawal',
+    'Check the product terms applying to this account',
+  ],
+  dependsOnKeys: ['Deposit Accounts', 'Deposit Products'],
+  businessRuleKeys: [
+    'The balance is the sum of movements, never edited directly. A wrong balance means a wrong movement.',
+    'Withdrawal limits and notice periods come from the product and are enforced when a withdrawal is attempted.',
+    'Interest postings appear as movements like any other, so the statement explains itself.',
+  ],
+  tipKeys: [
+    'Walk a disputed balance through the movements with the customer. The explanation is almost always a withdrawal or a fee they had forgotten.',
+  ],
+  permissionKeys: ['deposits.view'],
+};
+
 @Component({
   selector: 'app-deposit-account-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, FormDialogComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, FormDialogComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -44,6 +71,8 @@ import { SettingsService } from '../../core/services/settings.service';
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       @if (account()) {
         <!-- Summary cards -->
@@ -246,6 +275,8 @@ import { SettingsService } from '../../core/services/settings.service';
   `],
 })
 export class DepositAccountDetailComponent implements OnInit {
+  readonly guide = DEPOSIT_ACCOUNT_DETAIL_GUIDE;
+
   @Input() id!: string;
 
   account = signal<any>(null);

@@ -5,22 +5,60 @@ import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Registration Approvals — 2-level approval queue for self-service portal
  * sign-ups. Each registration needs two distinct staff approvals before the
  * customer's account is activated. Gated by customers.edit (approve/reject).
  */
+const REGISTRATION_APPROVALS_GUIDE: PageGuide = {
+  id: 'registration-approvals',
+  titleKey: 'Registration Approvals',
+  purposeKey: 'Reviews customers who signed themselves up on the portal, before they can transact.',
+  descriptionKey:
+    'A self-service sign-up is unverified — nobody has met the person or checked their identity '
+    + 'against a record. These registrations are held for a two-level review so that a portal '
+    + 'account cannot become a transacting customer without a human being satisfied first.',
+  actionKeys: [
+    'Review a self-registered applicant\'s details',
+    'Approve, or reject with a reason',
+    'See what stage of review a registration is at',
+  ],
+  workflowKeys: [
+    'Customer registers on the portal',
+    'First-level review',
+    'Second-level approval',
+    'Customer becomes a full customer record',
+  ],
+  dependsOnKeys: ['Customer portal'],
+  usedByKeys: ['Customers', 'Loans'],
+  businessRuleKeys: [
+    'Portal sign-ups are NOT matched against a government record, unlike agent onboarding. Their details carry less assurance and this review is what compensates.',
+    'Two levels are required — one approver cannot complete the process alone.',
+    'Rejecting does not delete the registration; it closes it with a reason the applicant can be told.',
+    'Until approved, the person cannot transact.',
+  ],
+  tipKeys: [
+    'Check for an existing customer record before approving. Self-registration is a common source of duplicates.',
+    'Verify identity documents against the details entered, not just that a file was uploaded.',
+  ],
+  permissionKeys: ['customers.view'],
+};
+
 @Component({
   selector: 'app-registration-approvals',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, LucideAngularModule, PageHeaderComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Registration Approvals"
         subtitle="Two-level approval of self-service portal sign-ups"
         eyebrow="Portal"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-ra-table-wrap">
         <table class="cx-ra-table">
@@ -75,6 +113,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
   `],
 })
 export class RegistrationApprovalsComponent {
+  readonly guide = REGISTRATION_APPROVALS_GUIDE;
+
   rows = signal<any[]>([]);
   loading = signal(true);
   busyId = signal<string | null>(null);

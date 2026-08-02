@@ -11,10 +11,47 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const PAYMENTS_GUIDE: PageGuide = {
+  id: 'payments',
+  titleKey: 'Payments & Repayments',
+  purposeKey: 'Every repayment received against a loan, and how it was applied.',
+  descriptionKey:
+    'Recording a payment is what clears a customer\'s arrears, posts the collection to the ledger '
+    + 'and moves the loan towards closure. A payment is applied against the repayment schedule in '
+    + 'order, which is why the split between principal, interest and penalty is decided by the '
+    + 'schedule rather than chosen by hand.',
+  actionKeys: [
+    'Record a repayment against a loan',
+    'Find a payment by loan, customer or reference',
+    'Reverse a payment recorded in error',
+  ],
+  workflowKeys: [
+    'Customer pays',
+    'Payment recorded here',
+    'Schedule updated and arrears cleared',
+    'Journals posted',
+  ],
+  dependsOnKeys: ['Loans', 'Repayment schedules', 'GL Mappings'],
+  usedByKeys: ['Aged Receivables', 'Portfolio at Risk', 'Journal Entries', 'Collection reports'],
+  businessRuleKeys: [
+    'Payments apply against the schedule in due order — the oldest outstanding instalment first.',
+    'Recording a payment posts to the ledger, so it obeys the accounting period like any other posting.',
+    'A payment entered in error is reversed, not deleted, and both entries remain visible.',
+    'The value date matters: it decides which month the collection falls in and whether arrears clear.',
+  ],
+  tipKeys: [
+    'Record on the date the money was actually received, not the date you keyed it. Arrears and PAR both read that date.',
+    'When a customer disputes arrears, check here first — an unrecorded receipt is the usual explanation.',
+  ],
+  permissionKeys: ['payments.view', 'payments.create'],
+};
 
 @Component({
   selector: 'app-payments', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -57,6 +94,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search payments by reference, customer, loan..." [hasActions]="false" (query)="onQuery($event)">
       </cx-data-table>
@@ -239,6 +278,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class PaymentsComponent implements OnInit {
+  readonly guide = PAYMENTS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'reference', label: 'Reference' },
     { key: 'customer_name', label: 'Customer' },

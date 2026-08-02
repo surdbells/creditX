@@ -10,10 +10,46 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const APPROVAL_WORKFLOWS_GUIDE: PageGuide = {
+  id: 'approval-workflows',
+  titleKey: 'Approval Workflows',
+  purposeKey: 'Defines who must approve a loan, in what order, and at what amounts.',
+  descriptionKey:
+    'A workflow is the institution\'s delegated authority written down: a small loan might need one '
+    + 'officer, a large one three, ending with a director. Configuring it here is what routes '
+    + 'applications into the right people\'s Approval Queue — nobody assigns loans by hand.',
+  actionKeys: [
+    'Define the steps a product\'s loans must pass through',
+    'Set which role approves at each step',
+    'Set the amount thresholds that trigger extra steps',
+  ],
+  workflowKeys: [
+    'Workflow defined here',
+    'Application submitted',
+    'Routed to step one',
+    'Each step decides in turn until approved or declined',
+  ],
+  dependsOnKeys: ['Roles & Permissions', 'Loan Products'],
+  usedByKeys: ['Approval Queue', 'Loans'],
+  businessRuleKeys: [
+    'Steps run in order. Every step must decide — the last approver is not the only one that counts.',
+    'Routing is by role, not by person, so staff changes do not break a workflow.',
+    'Changing a workflow affects applications submitted afterwards; loans already in flight keep the path they entered on.',
+    'A product with no workflow has nothing routing its loans — check this before wondering why an approval queue is empty.',
+  ],
+  tipKeys: [
+    'Mirror your actual delegated authority. A workflow that does not match the credit policy is a finding waiting to happen.',
+    'Keep the chain as short as the policy allows; every extra step is real delay for the customer.',
+  ],
+  permissionKeys: ['workflows.view', 'workflows.edit'],
+};
 
 @Component({
   selector: 'app-approval-workflows', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -27,6 +63,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search workflows..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
@@ -254,6 +292,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class ApprovalWorkflowsComponent implements OnInit {
+  readonly guide = APPROVAL_WORKFLOWS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'name', label: 'Workflow Name' },
     { key: 'product_name', label: 'Product' },

@@ -9,9 +9,33 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+const TEAMS_GUIDE: PageGuide = {
+  id: 'teams',
+  titleKey: 'Teams',
+  purposeKey: 'Smaller working groups within a department.',
+  descriptionKey:
+    'Where a department is the broad function, a team is the group that actually works together — a '
+    + 'collections team, a field team under one supervisor. Teams are used for messaging, targets '
+    + 'and grouped reporting.',
+  actionKeys: [
+    'Create a team within a department',
+    'Add or remove members',
+    'Use a team as a messaging or reporting group',
+  ],
+  dependsOnKeys: ['Departments', 'Users'],
+  usedByKeys: ['Messaging', 'Agent Targets', 'Reporting'],
+  businessRuleKeys: [
+    'Team membership grants no access. Permissions come from the role alone.',
+    'A user can sit in more than one team.',
+  ],
+  permissionKeys: ['teams.view'],
+};
+
 @Component({
   selector: 'app-teams', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -23,6 +47,8 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
           <span>Add Team</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search teams..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -57,6 +83,8 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
   `,
 })
 export class TeamsComponent implements OnInit {
+  readonly guide = TEAMS_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Team Name'},{key:'code',label:'Code'},{key:'department_name',label:'Department'},{key:'lead_name',label:'Team Lead'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

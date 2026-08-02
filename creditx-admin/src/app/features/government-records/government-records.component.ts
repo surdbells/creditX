@@ -11,10 +11,39 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const INSTITUTIONS_GUIDE: PageGuide = {
+  id: 'government-records',
+  titleKey: 'Institutions',
+  purposeKey: 'The employer and payroll records field agents check customers against.',
+  descriptionKey:
+    'When an agent onboards a customer, their details are matched against a record held here — an '
+    + 'IPPIS or GIFMIS payroll listing, or an employer schedule. That match is what gives an '
+    + 'agent-onboarded customer more assurance than a self-registration, and it underpins salary-'
+    + 'backed lending.',
+  actionKeys: [
+    'Load or maintain an institution\'s employee records',
+    'Search a record by staff ID or name',
+    'Review what agents are matching against',
+  ],
+  dependsOnKeys: ['Record Types'],
+  usedByKeys: ['Agent onboarding', 'Customers', 'Loans'],
+  businessRuleKeys: [
+    'Agent onboarding requires a match here. Without a record, the agent cannot complete the customer.',
+    'The portal does NOT check against these records — self-registered customers are verified through Registration Approvals instead.',
+    'Stale records block legitimate customers; a new employee not yet loaded simply cannot be onboarded by an agent.',
+  ],
+  tipKeys: [
+    'Refresh records on the employer\'s own cycle. Most onboarding failures in the field are a record that was never loaded.',
+  ],
+  permissionKeys: ['government_records.view'],
+};
 
 @Component({
   selector: 'app-government-records', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, EmptyStateComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -53,6 +82,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filters Bar -->
       <div class="cx-gr-filters">
@@ -415,6 +446,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class GovernmentRecordsComponent implements OnInit {
+  readonly guide = INSTITUTIONS_GUIDE;
+
   visibleColumns = [
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'employee_name', label: 'Employee' },

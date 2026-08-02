@@ -9,9 +9,36 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from "../../shared/components/form-dialog/form-dialog.component";
 import { SearchableSelectComponent, SelectOption } from "../../shared/components/searchable-select/searchable-select.component";
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+const DEPARTMENTS_GUIDE: PageGuide = {
+  id: 'departments',
+  titleKey: 'Departments',
+  purposeKey: 'The functional units staff belong to, and who heads each.',
+  descriptionKey:
+    'Departments group staff by what they do — credit, operations, finance — independently of where '
+    + 'they sit. They are used for reporting and routing, and the department head is who escalations '
+    + 'and approvals can be directed to.',
+  actionKeys: [
+    'Create a department and name its head',
+    'Assign staff to it',
+    'Retire a department no longer used',
+  ],
+  dependsOnKeys: ['Users'],
+  usedByKeys: ['Users', 'Teams', 'Reporting'],
+  businessRuleKeys: [
+    'A department is not a permission. What someone can do comes from their role, never from the department they sit in.',
+    'A department with staff attached should be emptied before it is retired.',
+  ],
+  tipKeys: [
+    'Keep departments few and stable. They are a reporting dimension, and a changing one makes trends unreadable.',
+  ],
+  permissionKeys: ['departments.view'],
+};
+
 @Component({
   selector: 'app-departments', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -23,6 +50,8 @@ import { SearchableSelectComponent, SelectOption } from "../../shared/components
           <span>Add Department</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search departments..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -51,6 +80,8 @@ import { SearchableSelectComponent, SelectOption } from "../../shared/components
   `,
 })
 export class DepartmentsComponent implements OnInit {
+  readonly guide = DEPARTMENTS_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Department Name'},{key:'code',label:'Code'},{key:'head_name',label:'Head'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

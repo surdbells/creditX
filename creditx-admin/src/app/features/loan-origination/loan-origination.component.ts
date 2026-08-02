@@ -10,6 +10,8 @@ import { SettingsService } from '../../core/services/settings.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Back-office loan origination — capture a complete application from the admin
@@ -29,16 +31,55 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  * creates the loan and step 3 attaches to it, rather than collecting everything
  * and posting once.
  */
+const LOAN_ORIGINATION_GUIDE: PageGuide = {
+  id: 'loan-origination',
+  titleKey: 'New Loan',
+  purposeKey: 'Captures a complete loan application from the back office, on a customer\'s behalf.',
+  descriptionKey:
+    'The same journey a field agent makes, done from the admin app — for walk-ins, phone '
+    + 'applications, or anything an agent cannot capture. The loan it produces is an ordinary loan: '
+    + 'it enters the same approval workflow, posts the same journals and is audited identically. '
+    + 'Where it was originated changes nothing downstream.',
+  actionKeys: [
+    'Find an existing customer, or onboard a walk-in inline',
+    'Choose a product and enter the terms, with a live quote',
+    'Upload the documents the product requires',
+    'Submit for approval, or save and finish later',
+  ],
+  workflowKeys: [
+    'Capture the customer',
+    'Capture terms — this creates the application',
+    'Attach documents',
+    'Submit into the approval workflow',
+  ],
+  dependsOnKeys: ['Loan Products', 'Customers', 'Document Types', 'Approval Workflows'],
+  usedByKeys: ['Approval Queue', 'Loans'],
+  businessRuleKeys: [
+    'Documents attach to a loan, so the application must exist before they can be uploaded — that is why terms come before documents.',
+    'Only products available to the back office appear here; a product can be switched off for this channel on the product itself.',
+    'The required documents are the product\'s own list, and submission enforces them on the server regardless of what the screen allows.',
+    'Leaving before submitting keeps a draft. Nothing is lost, and it can be resumed from the Loans page.',
+    'Submitting commits nothing financially — it enters the loan into approval, where the real decision is made.',
+  ],
+  tipKeys: [
+    'Search for the customer before creating one. Walk-ins are often already on file from an earlier loan.',
+    'Check the quote with the customer before submitting; fees can make the net they receive lower than the amount they asked for.',
+  ],
+  permissionKeys: ['loans.originate'],
+};
+
 @Component({
   selector: 'app-loan-origination',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="New Loan"
         subtitle="Capture a loan application on behalf of a customer"
         eyebrow="Loans"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       @if (!auth.hasPermission('loans.originate')) {
         <div class="cx-card cx-lo-denied">
@@ -302,6 +343,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class LoanOriginationComponent implements OnInit {
+  readonly guide = LOAN_ORIGINATION_GUIDE;
+
   private api = inject(ApiService);
   private toast = inject(ToastService);
   private router = inject(Router);

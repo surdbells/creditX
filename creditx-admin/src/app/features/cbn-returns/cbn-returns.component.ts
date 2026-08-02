@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * CBN Regulatory Returns — tabbed page exposing four production-grade
@@ -27,10 +29,44 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by reports.cbn.
  */
+const CBN_RETURNS_GUIDE: PageGuide = {
+  id: 'cbn-returns',
+  titleKey: 'CBN Regulatory Returns',
+  purposeKey: 'The statutory returns submitted to the Central Bank of Nigeria.',
+  descriptionKey:
+    'Returns are produced from the same posted ledger the financial statements come from, in the '
+    + 'formats the CBN prescribes. Because they are a regulatory filing rather than internal '
+    + 'reporting, they must be produced from closed, reconciled periods — a return built on figures '
+    + 'that later move is a correction you have to file.',
+  actionKeys: [
+    'Generate a return for a period',
+    'Review the figures before filing',
+    'Export in the prescribed format',
+  ],
+  workflowKeys: [
+    'Month\'s postings complete',
+    'Accruals, provisions and reconciliations done',
+    'Period closed',
+    'Return generated and filed',
+  ],
+  dependsOnKeys: ['Period Close', 'Provisions', 'Portfolio at Risk', 'GL Reconciliation'],
+  businessRuleKeys: [
+    'Generate from CLOSED periods. An open period can still receive postings, which would change a figure you have already filed.',
+    'Returns are derived, never typed. If a figure looks wrong the cause is in the ledger, and that is what must be corrected.',
+    'Filing deadlines and formats are set by the regulator, and late or incorrect filing carries penalties.',
+    'Provisioning and classification must follow prudential guidelines for the return to be right.',
+  ],
+  tipKeys: [
+    'Reconcile control accounts and complete provisioning before generating. Both feed the return directly.',
+    'Keep the exported file you actually filed. Regenerating later can give a different figure if anything was reopened.',
+  ],
+  permissionKeys: ['reports.cbn'],
+};
+
 @Component({
   selector: 'app-cbn-returns',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -38,6 +74,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
         subtitle="Production-grade returns for Central Bank of Nigeria submission"
         eyebrow="Compliance">
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Tab strip -->
       <div class="cx-cbn-tabs" role="tablist">
@@ -568,6 +606,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class CbnReturnsComponent implements OnInit {
+  readonly guide = CBN_RETURNS_GUIDE;
+
   // Tab + control state
   activeTab = signal<'crms' | 'npl' | 'insider' | 'monthly'>('crms');
   asOf = '';

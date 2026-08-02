@@ -8,6 +8,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Aged Receivables — buckets overdue installments by days past due.
@@ -18,10 +20,37 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by accounting.view.
  */
+const AGED_RECEIVABLES_GUIDE: PageGuide = {
+  id: 'aged-receivables',
+  titleKey: 'Aged Receivables',
+  purposeKey: 'Every unpaid instalment, sorted by how long it has been outstanding.',
+  descriptionKey:
+    'Where Portfolio at Risk gives the headline ratio, this is the working list behind it — the '
+    + 'individual instalments that are late and by how much. It is what collections work from, and '
+    + 'what you use to explain a PAR movement rather than merely observe it.',
+  actionKeys: [
+    'See outstanding instalments bucketed by days past due',
+    'Work the oldest arrears first',
+    'Export a collections worklist',
+  ],
+  dependsOnKeys: ['Repayment schedules', 'Payments'],
+  usedByKeys: ['Collections', 'Provisions', 'Portfolio at Risk'],
+  businessRuleKeys: [
+    'Buckets are measured from each instalment\'s due date, so one loan can appear in several bands.',
+    'A part-paid instalment stays outstanding for its remaining balance.',
+    'It reflects what has been recorded. Payments taken but not yet posted will still show as arrears.',
+  ],
+  tipKeys: [
+    'Chase the 1–30 bucket hardest. Arrears are far more recoverable before they age.',
+    'If a customer insists they paid, check Payments before treating it as arrears — the gap is usually an unposted receipt.',
+  ],
+  permissionKeys: ['reports.portfolio'],
+};
+
 @Component({
   selector: 'app-aged-receivables',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -37,6 +66,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-ar-controls">
         <label>
@@ -287,6 +318,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class AgedReceivablesComponent implements OnInit {
+  readonly guide = AGED_RECEIVABLES_GUIDE;
+
   data = signal<any>(null);
   loading = signal(true);
   asOf = '';

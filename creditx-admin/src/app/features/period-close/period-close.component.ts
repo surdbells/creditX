@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Period Close admin page — list of months with status (Open/Closed)
@@ -27,10 +29,49 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.close.
  */
+const PERIOD_CLOSE_GUIDE: PageGuide = {
+  id: 'period-close',
+  titleKey: 'Period Close',
+  purposeKey: 'Locks a month once its figures are final, so reported numbers cannot move afterwards.',
+  descriptionKey:
+    'An open period still accepts postings, which means any report from it can change. Closing a '
+    + 'period refuses further entries dated into it, fixing the figures that have been reported. It '
+    + 'is the control that makes a monthly number mean something — and reopening one is deliberately '
+    + 'a privileged, recorded act.',
+  actionKeys: [
+    'Close a month once its figures are final',
+    'Reopen a closed month when a genuine correction is required',
+    'See which periods are open, closed or locked',
+  ],
+  workflowKeys: [
+    'Month\'s activity posted',
+    'Accruals, provisions and reconciliations completed',
+    'Period closed here',
+    'Statements produced and reported',
+  ],
+  dependsOnKeys: ['Interest Accrual', 'Provisions', 'Bank Reconciliation'],
+  usedByKeys: ['Journal Entries', 'Disbursement', 'Every financial statement'],
+  businessRuleKeys: [
+    'A closed period refuses new postings dated into it. This is enforced at the point of posting, not merely warned about.',
+    'Reopening is recorded — who did it, when and why — because it changes figures that have already been reported.',
+    'Close in order. Leaving an old month open while closing a newer one undermines both.',
+    'Run accruals and provisions BEFORE closing; they cannot be posted into the period afterwards without reopening it.',
+  ],
+  tipKeys: [
+    'Treat closing as the last step of month-end, not the first. Anything you forgot becomes a reopen.',
+    'If a correction is found after close, weigh reopening against posting it in the current month — for small amounts the current month is usually cleaner.',
+  ],
+  permissionKeys: ['accounting.period.close'],
+  faq: [
+    { questionKey: 'Someone cannot post and says the period is closed.',
+      answerKey: 'That is the control working. Either post into the current period, or reopen deliberately — do not change the date to get around it.' },
+  ],
+};
+
 @Component({
   selector: 'app-period-close',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -42,6 +83,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           <span>{{ loading() ? 'Loading…' : 'Refresh' }}</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-pc-intro">
         <lucide-icon name="info" [size]="16"></lucide-icon>
@@ -352,6 +395,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class PeriodCloseComponent implements OnInit {
+  readonly guide = PERIOD_CLOSE_GUIDE;
+
   periods = signal<any[]>([]);
   loading = signal(true);
   busy = signal(false);

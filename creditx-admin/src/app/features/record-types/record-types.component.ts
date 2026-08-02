@@ -8,9 +8,28 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+const RECORD_TYPES_GUIDE: PageGuide = {
+  id: 'record-types',
+  titleKey: 'Record Types',
+  purposeKey: 'The categories of employee record the institutions list is organised into.',
+  descriptionKey:
+    'Different payroll sources — IPPIS, GIFMIS, a state scheme, a private employer — carry '
+    + 'different fields and different levels of assurance. Defining them as types keeps each source '
+    + 'identifiable, so a match can be understood in terms of where it came from.',
+  actionKeys: ['Define a record type', 'Retire one no longer in use'],
+  usedByKeys: ['Institutions', 'Agent onboarding'],
+  businessRuleKeys: [
+    'A type in use by loaded records should not be removed — the records would lose their provenance.',
+    'The type does not change how matching works; it identifies the source of the data.',
+  ],
+  permissionKeys: ['government_records.view'],
+};
+
 @Component({
   selector: 'app-record-types', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -22,6 +41,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
           <span>Add Type</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search record types..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -46,6 +67,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
   `,
 })
 export class RecordTypesComponent implements OnInit {
+  readonly guide = RECORD_TYPES_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Name'},{key:'code',label:'Code'},{key:'description',label:'Description'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

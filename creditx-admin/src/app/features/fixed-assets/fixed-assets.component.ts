@@ -7,21 +7,52 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Fixed Assets — register, depreciate, and dispose fixed assets.
  * Reads gated by accounting.view; writes by accounting.journal.
  */
+const FIXED_ASSETS_GUIDE: PageGuide = {
+  id: 'fixed-assets',
+  titleKey: 'Fixed Assets',
+  purposeKey: 'The register of what the institution owns, and the depreciation charged against it.',
+  descriptionKey:
+    'Items expected to be used for more than a year — vehicles, generators, fit-out, equipment — are '
+    + 'capitalised rather than expensed, then written down over their useful life. This register '
+    + 'holds each asset, its cost and its accumulated depreciation, and posts the monthly charge.',
+  actionKeys: [
+    'Register an asset with its cost and useful life',
+    'Run the monthly depreciation charge',
+    'Record a disposal, with the gain or loss on it',
+  ],
+  dependsOnKeys: ['Chart of accounts', 'GL Mappings'],
+  usedByKeys: ['Balance Sheet', 'Income Statement'],
+  businessRuleKeys: [
+    'Depreciation is an expense but not a cash movement — nothing leaves the bank when it is charged.',
+    'Useful life decides the charge. Setting it wrongly misstates profit every month until the asset is fully written down.',
+    'Disposal compares proceeds against the written-down value; the difference is a gain or a loss, not income.',
+    'An asset that is fully depreciated but still in use stays on the register at nil value — it is not removed.',
+  ],
+  tipKeys: [
+    'Set a sensible capitalisation threshold and keep to it. Registering low-value items creates a register nobody maintains.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
+
 @Component({
   selector: 'app-fixed-assets',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Fixed Assets"
         subtitle="Asset register, straight-line depreciation, and disposals"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Depreciation run -->
       <div class="cx-fa-dep">
@@ -106,6 +137,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class FixedAssetsComponent {
+  readonly guide = FIXED_ASSETS_GUIDE;
+
   period = new Date().toISOString().slice(0, 7);
   form: any = { name: '', category: '', acquisition_date: new Date().toISOString().slice(0, 10), cost: 0, salvage_value: 0, useful_life_months: 36, funding_gl_code: '' };
   assets = signal<any[]>([]);

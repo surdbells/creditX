@@ -6,6 +6,8 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Bulk Disburse — three-step flow:
@@ -57,10 +59,37 @@ type ResultRow = {
   error?: string;
 };
 
+const BULK_DISBURSE_GUIDE: PageGuide = {
+  id: 'bulk-disburse',
+  titleKey: 'Bulk Disburse',
+  purposeKey: 'Releases many approved loans in a single batch.',
+  descriptionKey:
+    'Same act as disbursing one loan, at volume — journals are posted and repayment schedules '
+    + 'created for every loan in the batch. That makes it efficient and unforgiving in equal '
+    + 'measure: a batch confirmed by mistake commits every loan in it, and each has to be reversed '
+    + 'individually.',
+  actionKeys: [
+    'Select approved loans and disburse them together',
+    'Review the batch and its total before committing',
+  ],
+  dependsOnKeys: ['Approval Queue', 'GL Mappings', 'Accounting period being open'],
+  usedByKeys: ['Settlements', 'Journal Entries'],
+  businessRuleKeys: [
+    'Every loan in the batch is disbursed for real. There is no draft or trial mode.',
+    'The batch obeys the accounting period — if it is closed, the whole run is refused.',
+    'A wrong batch is undone loan by loan, through reversals. There is no bulk undo.',
+  ],
+  tipKeys: [
+    'Read the count and the total before confirming. Both are shown precisely so you can check them.',
+    'Filter first, then select. Carrying a stale selection across a filter change is the usual way a wrong loan gets into a batch.',
+  ],
+  permissionKeys: ['loans.disburse'],
+};
+
 @Component({
   selector: 'app-bulk-disburse',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -74,6 +103,8 @@ type ResultRow = {
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Step indicator -->
       <div class="cx-bd-steps">
@@ -746,6 +777,8 @@ type ResultRow = {
   `],
 })
 export class BulkDisburseComponent implements OnInit {
+  readonly guide = BULK_DISBURSE_GUIDE;
+
   // ─── Step state ───
   mode = signal<'input' | 'preview' | 'confirm' | 'result'>('input');
 

@@ -10,10 +10,37 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { CxViewDialogComponent } from '../../shared/components/view-dialog/view-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { LoanDetailComponent } from '../loans/loan-detail.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const MESSAGING_GUIDE: PageGuide = {
+  id: 'messaging',
+  titleKey: 'Messaging',
+  purposeKey: 'Internal conversation between staff — direct messages, channels and team groups.',
+  descriptionKey:
+    'Keeps operational conversation inside the system, next to the records it concerns, rather than '
+    + 'scattered across personal phones. That matters for continuity when staff change, and for '
+    + 'being able to show how a decision was discussed.',
+  actionKeys: [
+    'Message a colleague directly',
+    'Post in a channel or team group',
+    'Search earlier conversation',
+  ],
+  dependsOnKeys: ['Users', 'Teams'],
+  businessRuleKeys: [
+    'Messages are internal. Nothing here reaches customers.',
+    'Conversation is retained and is visible to administrators — treat it as a business record, not a private channel.',
+    'Discussing a decision here does not record it. Approvals and decisions still have to be made on the screens that own them.',
+  ],
+  tipKeys: [
+    'Put the outcome of a discussion where the record lives — the loan note, the approval reason — not only in chat.',
+  ],
+  permissionKeys: ['messaging.view'],
+};
 
 @Component({
   selector: 'app-messaging', standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxViewDialogComponent, SearchableSelectComponent, LoanDetailComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, FormDialogComponent, CxViewDialogComponent, SearchableSelectComponent, LoanDetailComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -25,6 +52,8 @@ import { LoanDetailComponent } from '../loans/loan-detail.component';
           <span>New Channel</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-msg-shell">
         <!-- Left panel — list -->
@@ -852,6 +881,8 @@ import { LoanDetailComponent } from '../loans/loan-detail.component';
   `],
 })
 export class MessagingComponent implements OnInit, OnDestroy {
+  readonly guide = MESSAGING_GUIDE;
+
   panel: 'conversations' | 'channels' = 'conversations';
   conversations = signal<any[]>([]); channels = signal<any[]>([]);
   messages = signal<any[]>([]);

@@ -7,6 +7,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 interface Col { key: string; label: string; money?: boolean; }
 
@@ -15,13 +17,35 @@ interface Col { key: string; label: string; money?: boolean; }
  * Mirrors the legacy MONTHLY LOAN SUMMARY RECORD columns. Table scrolls inside
  * its own container; rows can be exported to CSV.
  */
+const MONTHLY_LOAN_SUMMARY_GUIDE: PageGuide = {
+  id: 'monthly-loan-summary',
+  titleKey: 'Monthly Loan Summary',
+  purposeKey: 'What was captured and what was disbursed in a given month.',
+  descriptionKey:
+    'A month-at-a-glance view of origination: how many applications came in, how many turned into '
+    + 'money out, and the gap between the two. That gap is the useful part — it is conversion, and '
+    + 'it says more about the pipeline than either figure alone.',
+  actionKeys: ['Pick a month and review captures against disbursements', 'Export the summary'],
+  dependsOnKeys: ['Loans'],
+  businessRuleKeys: [
+    'Captured and disbursed are counted on different dates, so a loan can be captured in one month and disbursed in the next. The two columns are not meant to tie.',
+    'Applications that were declined or abandoned still count as captured.',
+  ],
+  tipKeys: [
+    'A widening gap between captured and disbursed usually means approvals are slowing, not that demand has fallen.',
+  ],
+  permissionKeys: ['reports.general_loans'],
+};
+
 @Component({
   selector: 'app-monthly-loan-summary',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Monthly Loan Summary" subtitle="Loans captured/disbursed in a month" eyebrow="Reports"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-mls-filters">
         <div>
@@ -137,6 +161,8 @@ interface Col { key: string; label: string; money?: boolean; }
   `],
 })
 export class MonthlyLoanSummaryComponent implements OnInit {
+  readonly guide = MONTHLY_LOAN_SUMMARY_GUIDE;
+
   private readonly nowYear = new Date().getFullYear();
   years = Array.from({ length: 6 }, (_, i) => this.nowYear - i);
   months = [

@@ -12,6 +12,8 @@ import { FormDialogComponent } from '../../shared/components/form-dialog/form-di
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Deposit Accounts — the subsidiary ledger behind the CUSTDEP control GL.
@@ -20,10 +22,46 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by deposits.view (menu) + deposits.transact (open account).
  */
+const DEPOSIT_ACCOUNTS_GUIDE: PageGuide = {
+  id: 'deposit-accounts',
+  titleKey: 'Deposit Accounts',
+  purposeKey: 'Every customer savings account — the subsidiary ledger behind Customer Deposits.',
+  descriptionKey:
+    'Each account here is money the institution owes a customer, which makes deposits a liability '
+    + 'rather than income. The total of every account on this page must agree with the Customer '
+    + 'Deposits control account in the general ledger; when it does not, one of the two is wrong and '
+    + 'the difference has to be found.',
+  actionKeys: [
+    'Open a deposit account for a customer',
+    'Record a deposit or a withdrawal',
+    'Check a balance or a statement of movements',
+    'Freeze or close an account',
+  ],
+  workflowKeys: [
+    'Deposit product configured',
+    'Account opened for a customer',
+    'Deposits and withdrawals recorded',
+    'Interest accrued monthly',
+  ],
+  dependsOnKeys: ['Deposit Products', 'Customers', 'GL Mappings'],
+  usedByKeys: ['Deposit Interest Run', 'GL Reconciliation', 'CBN returns'],
+  businessRuleKeys: [
+    'Deposits are a LIABILITY. Taking a deposit increases what the institution owes, it is not income.',
+    'Withdrawal rules — notice periods, minimum balances — come from the product, not the account.',
+    'An account with a balance cannot be closed. Withdraw or transfer the balance first.',
+    'Every movement posts to the ledger, so the sum of accounts must reconcile to the control account.',
+  ],
+  tipKeys: [
+    'Reconcile the total against the Customer Deposits GL monthly — that is what GL Reconciliation is for.',
+    'Freeze rather than close where there is a dispute; closing loses the working relationship and the balance history is harder to read.',
+  ],
+  permissionKeys: ['deposits.view', 'deposits.create'],
+};
+
 @Component({
   selector: 'app-deposit-accounts',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -37,6 +75,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filter bar -->
       <div class="cx-da-filters">
@@ -176,6 +216,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class DepositAccountsComponent implements OnInit {
+  readonly guide = DEPOSIT_ACCOUNTS_GUIDE;
+
   private router = inject(Router);
 
   columns: TableColumn[] = [

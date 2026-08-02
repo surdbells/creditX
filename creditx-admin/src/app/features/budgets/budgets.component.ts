@@ -8,6 +8,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Budgets admin page.
@@ -21,10 +23,35 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  * create/update/delete (the backend enforces this, so unauthorised
  * users see the table but action buttons fail with a 403).
  */
+const BUDGETS_GUIDE: PageGuide = {
+  id: 'budgets',
+  titleKey: 'Budgets',
+  purposeKey: 'The monthly target for each ledger account, to measure actual performance against.',
+  descriptionKey:
+    'A budget is what you expected to earn or spend on an account in a month. On its own it posts '
+    + 'nothing and changes nothing — its whole value is the comparison against what actually '
+    + 'happened, which is what Budget vs Actual reports.',
+  actionKeys: [
+    'Set monthly targets per account',
+    'Revise a budget as the year develops',
+    'Copy a prior period as a starting point',
+  ],
+  usedByKeys: ['Budget vs Actual'],
+  businessRuleKeys: [
+    'Budgets never post to the ledger. They are targets, not transactions.',
+    'They are set per account per month, so an annual figure has to be spread before it is useful.',
+    'Revising a budget mid-year changes the comparison from that point; agree it before doing so.',
+  ],
+  tipKeys: [
+    'Budget the accounts that are actually managed. A target on every line produces variance reports nobody reads.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
+
 @Component({
   selector: 'app-budgets',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -40,6 +67,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Rollover</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-bg-controls">
         <label>
@@ -440,6 +469,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class BudgetsComponent implements OnInit {
+  readonly guide = BUDGETS_GUIDE;
+
   budgets = signal<any[]>([]);
   glAccounts = signal<any[]>([]);
   loading = signal(true);

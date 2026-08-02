@@ -16,10 +16,41 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 import { SettingsService } from '../../core/services/settings.service';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const LOAN_DETAIL_GUIDE: PageGuide = {
+  id: 'loan-detail',
+  titleKey: 'Loan Detail',
+  purposeKey: 'Everything about one loan — its terms, schedule, repayments, documents and history.',
+  descriptionKey:
+    'This is the complete picture of a single loan, and where most questions about it are actually '
+    + 'answered. The repayment schedule shows what is owed and when; the history shows every '
+    + 'decision made and by whom. Between them they explain the loan\'s status without anyone having '
+    + 'to interpret it.',
+  actionKeys: [
+    'Review the terms and the repayment schedule',
+    'See what has been paid and what remains outstanding',
+    'Open the attached documents',
+    'Read the approval and status history',
+  ],
+  dependsOnKeys: ['Loans', 'Payments', 'Loan Products'],
+  businessRuleKeys: [
+    'Terms were fixed when the application was submitted and are not editable here — changing them is a restructure.',
+    'The schedule is generated at disbursement, so it exists only once the loan has been disbursed.',
+    'Arrears are derived from the schedule against today\'s date; they are not set by anyone.',
+    'Outstanding is what remains on the schedule, which is not the same as the amount originally borrowed.',
+  ],
+  tipKeys: [
+    'Answer "how much do they owe" from the schedule, not the loan amount — fees, interest and payments all change it.',
+    'When a customer disputes a payment, the schedule and the payment history together will show what was applied where.',
+  ],
+  permissionKeys: ['loans.view'],
+};
 
 @Component({
   selector: 'app-loan-detail', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, FormDialogComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       @if (!embedded) {
@@ -58,6 +89,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
             </a>
           </div>
         </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       }
 
       @if (loading()) {
@@ -1267,6 +1300,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class LoanDetailComponent implements OnInit {
+  readonly guide = LOAN_DETAIL_GUIDE;
+
   @Input() id = '';
   /**
    * When true, hides the page-header chrome (title / eyebrow / back link /

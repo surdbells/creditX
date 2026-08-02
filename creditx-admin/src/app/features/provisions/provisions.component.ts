@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Loan Loss Provisioning admin page.
@@ -22,10 +24,46 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.provision.
  */
+const PROVISIONS_GUIDE: PageGuide = {
+  id: 'provisions',
+  titleKey: 'Loan Loss Provisioning',
+  purposeKey: 'Recognises the expected loss on loans that are unlikely to be repaid in full.',
+  descriptionKey:
+    'Prudence requires that a loan going bad is recognised as it deteriorates, not at the moment it '
+    + 'is finally written off. CBN prudential guidelines set a provision rate per arrears band; this '
+    + 'run applies them and posts the difference from what is already provided, so the charge to '
+    + 'profit each month is the change rather than the whole balance again.',
+  actionKeys: [
+    'Preview the provision required at a date',
+    'Post the movement to the ledger',
+    'See the provision held per arrears band',
+  ],
+  workflowKeys: [
+    'Loans age into arrears bands',
+    'Provision computed against prudential rates',
+    'Delta posted to the ledger',
+    'Period closed',
+  ],
+  dependsOnKeys: ['Repayment schedules', 'GL Mappings', 'Portfolio at Risk'],
+  usedByKeys: ['Income Statement', 'Balance Sheet', 'CBN returns'],
+  businessRuleKeys: [
+    'Only the CHANGE since the last run is posted. Posting the full requirement again each month would overstate the charge many times over.',
+    'A provision is a charge against profit, not a cash movement. Nothing leaves the bank.',
+    'Provisioning is not writing off. The loan is still owed and still collected against; a write-off is a separate, later decision.',
+    'Recoveries on provided loans release the provision back to income.',
+    'Rates follow prudential guidelines — changing them is a policy decision, not an operational one.',
+  ],
+  tipKeys: [
+    'Run provisioning after accrual and before close, every month, in that order.',
+    'A jump in the charge is usually a jump in arrears. Read it alongside Portfolio at Risk rather than as an accounting surprise.',
+  ],
+  permissionKeys: ['accounting.journal'],
+};
+
 @Component({
   selector: 'app-provisions',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -37,6 +75,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           <span>{{ loading() ? 'Loading…' : 'Refresh' }}</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-pv-intro">
         <lucide-icon name="info" [size]="16"></lucide-icon>
@@ -685,6 +725,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class ProvisionsComponent implements OnInit {
+  readonly guide = PROVISIONS_GUIDE;
+
   tab = signal<'preview' | 'history'>('preview');
   loading = signal(false);
   busy = signal(false);

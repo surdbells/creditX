@@ -10,9 +10,40 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+const PENALTY_RULES_GUIDE: PageGuide = {
+  id: 'penalty-rules',
+  titleKey: 'Penalty Rules',
+  purposeKey: 'What a customer is charged when a repayment is late, per product.',
+  descriptionKey:
+    'A penalty rule turns lateness into a charge automatically — after a grace period, at a set '
+    + 'rate or flat amount. Because it applies without anyone deciding case by case, the rule must '
+    + 'match what the customer agreed to; a penalty that cannot be justified from the loan agreement '
+    + 'is a complaint, and potentially a regulatory one.',
+  actionKeys: [
+    'Define the penalty for a product',
+    'Set the grace period before it applies',
+    'Deactivate a rule that should no longer charge',
+  ],
+  dependsOnKeys: ['Loan Products', 'GL Mappings'],
+  usedByKeys: ['Repayment schedules', 'Payments', 'Aged Receivables'],
+  businessRuleKeys: [
+    'Penalties apply automatically once the grace period passes — nobody triggers them per loan.',
+    'A penalty is income to the institution and posts to the ledger like any other charge.',
+    'Changing a rule affects future charges; penalties already charged stand until reversed deliberately.',
+    'Grace periods are counted from the instalment due date.',
+  ],
+  tipKeys: [
+    'Keep the rule identical to what the loan agreement says. That document is what a customer will quote back at you.',
+    'A grace period of a day or two absorbs bank clearing delays and prevents a lot of unnecessary disputes.',
+  ],
+  permissionKeys: ['products.edit'],
+};
+
 @Component({
   selector: 'app-penalty-rules', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -24,6 +55,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Add Rule</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search penalty rules..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -82,6 +115,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `,
 })
 export class PenaltyRulesComponent implements OnInit {
+  readonly guide = PENALTY_RULES_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Rule Name'},{key:'product_name',label:'Product'},{key:'calculation_type',label:'Type'},{key:'value',label:'Value'},{key:'grace_period_days',label:'Grace Days'},{key:'max_amount',label:'Max',type:'currency'},{key:'is_active',label:'Active'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

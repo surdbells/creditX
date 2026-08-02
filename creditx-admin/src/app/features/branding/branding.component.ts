@@ -7,19 +7,49 @@ import { ToastService } from '../../core/services/toast.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { applyBrandColors, applyFavicon } from '../../core/util/brand-color';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Branding — org admins set the company name, brand colours, and logo. Colours
  * preview live (the whole app recolours as you pick); Save persists them and
  * reloads settings so the change propagates everywhere. Gated by settings.edit.
  */
+const BRANDING_GUIDE: PageGuide = {
+  id: 'branding',
+  titleKey: 'Branding',
+  purposeKey: 'Puts your own name, logo and colours across the admin app and customer portal.',
+  descriptionKey:
+    'The platform is white-labelled: what customers see should be your institution, not the '
+    + 'software. Set here, the name and colours flow through the portal, the sign-in screens, the '
+    + 'browser tab and outgoing messages.',
+  actionKeys: [
+    'Set the institution name shown to customers',
+    'Upload a logo',
+    'Set the primary and accent colours',
+  ],
+  usedByKeys: ['Customer portal', 'Admin app', 'Notification emails'],
+  businessRuleKeys: [
+    'Branding is public by necessity — the portal reads it before anyone signs in. Never put anything sensitive in these fields.',
+    'Changes apply immediately for everyone; there is no preview or staging.',
+    'The logo is used at small sizes. A wide wordmark will be unreadable where a compact mark would not.',
+  ],
+  tipKeys: [
+    'Check the customer portal after changing colours, not just the admin app — that is where customers meet your brand.',
+    'Pick a primary colour with enough contrast for text on it, or buttons become hard to read.',
+  ],
+  permissionKeys: ['settings.edit'],
+};
+
 @Component({
   selector: 'app-branding',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Branding" subtitle="Make the admin & customer portal your own" eyebrow="System"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-brand-grid">
         <div class="cx-brand-card">
@@ -104,6 +134,8 @@ import { applyBrandColors, applyFavicon } from '../../core/util/brand-color';
   `],
 })
 export class BrandingComponent {
+  readonly guide = BRANDING_GUIDE;
+
   form: any = { company_name: '', primary_color: '#0A4F2A', accent_color: '#C9A227', logo_url: '' };
   saving = signal(false);
   uploading = signal(false);

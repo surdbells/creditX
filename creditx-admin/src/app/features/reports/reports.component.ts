@@ -11,18 +11,48 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 interface DrillLevel { label: string; key: string; value?: string; }
 
+const REPORTS_GUIDE: PageGuide = {
+  id: 'reports',
+  titleKey: 'Reports & Analytics',
+  purposeKey: 'Portfolio reporting with drill-down, across products, branches, agents and time.',
+  descriptionKey:
+    'These are operational reports — how the book is performing, who is originating it, how it is '
+    + 'behaving — as distinct from the financial statements, which report the ledger. Both are '
+    + 'correct and they will not agree line for line, because they measure different things.',
+  actionKeys: [
+    'Run a report over a period and set of filters',
+    'Drill from a summary into the underlying loans',
+    'Export for circulation',
+  ],
+  dependsOnKeys: ['Loans', 'Payments', 'Loan Products'],
+  businessRuleKeys: [
+    'Operational reports count loans and applications; financial statements total what was posted to the ledger. Expect them to differ.',
+    'Every figure is filter-dependent — an exported report means nothing without the filters that produced it.',
+    'Reports read live data, so the same report run twice on an active day can differ.',
+  ],
+  tipKeys: [
+    'Note the filters and the run date on anything you circulate. It is the first question you will be asked.',
+    'Drill into a surprising number before escalating it; the explanation is usually a filter.',
+  ],
+  permissionKeys: ['reports.portfolio'],
+};
+
 @Component({
   selector: 'app-reports', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Reports & Analytics"
         subtitle="Portfolio insights with drill-down analytics"
         eyebrow="Intelligence"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Phase 4.1: tab strip removed. Each report has its own
            dedicated route in the sidebar; ReportsComponent reads
@@ -511,6 +541,8 @@ interface DrillLevel { label: string; key: string; value?: string; }
   `],
 })
 export class ReportsComponent implements OnInit {
+  readonly guide = REPORTS_GUIDE;
+
   // Performance tab keys — used by permission gating, filter visibility,
   // and drill/export routing. Keep the list here as the canonical source
   // so adding a new performance report later is a single-line change.

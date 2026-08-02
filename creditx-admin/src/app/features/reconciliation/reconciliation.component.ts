@@ -10,6 +10,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { environment } from '../../../environments/environment';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Bank Reconciliation — list + detail workflow.
@@ -24,10 +26,37 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by reports.reconciliation.
  */
+const RECONCILIATION_GUIDE: PageGuide = {
+  id: 'reconciliation',
+  titleKey: 'Reconciliation',
+  purposeKey: 'Matches recorded transactions against an external source and explains the differences.',
+  descriptionKey:
+    'Reconciliation is the discipline of proving that what the books say happened is what actually '
+    + 'happened elsewhere. Every difference is either timing or an error, and the work is deciding '
+    + 'which — never adjusting one side to agree with the other because it is quicker.',
+  actionKeys: [
+    'Start a reconciliation for a period',
+    'Match records against the external source',
+    'Explain or post the remaining differences',
+    'Complete it for the period',
+  ],
+  dependsOnKeys: ['Journal Entries'],
+  usedByKeys: ['Period Close', 'Audit'],
+  businessRuleKeys: [
+    'Reconcile before closing the period, or a difference found later means reopening it.',
+    'Differences are explained and resolved, never forced. A forced match hides the very thing reconciliation exists to find.',
+    'A completed reconciliation is a record, and it is what an auditor will ask to see.',
+  ],
+  tipKeys: [
+    'Do it on a rhythm rather than when a problem appears. Reconciliation only catches things early if it is routine.',
+  ],
+  permissionKeys: ['accounting.reconcile'],
+};
+
 @Component({
   selector: 'app-reconciliation',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -56,6 +85,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- ═══ LIST MODE ═══ -->
       @if (mode() === 'list') {
@@ -821,6 +852,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class ReconciliationComponent implements OnInit {
+  readonly guide = RECONCILIATION_GUIDE;
+
   mode = signal<'list' | 'detail'>('list');
   loading = signal(false);
   busy = signal(false);

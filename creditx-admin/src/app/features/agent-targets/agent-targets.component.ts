@@ -12,6 +12,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SettingsService } from '../../core/services/settings.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Agent Targets
@@ -43,13 +45,40 @@ import { SettingsService } from '../../core/services/settings.service';
  * Bulk operations use PATCH /users/bulk-agent-targets which is atomic
  * (all-or-nothing) — see BulkUpdateAgentTargetsAction for semantics.
  */
+const AGENT_TARGETS_GUIDE: PageGuide = {
+  id: 'agent-targets',
+  titleKey: 'Agent Targets',
+  purposeKey: 'The monthly disbursement target set for each field agent, and progress against it.',
+  descriptionKey:
+    'A target turns an expectation into something measurable. Agents see their own progress in the '
+    + 'agent app, and supervisors see the whole field force here — which makes it a management tool '
+    + 'as much as a reporting one.',
+  actionKeys: [
+    'Set or revise an agent\'s monthly target',
+    'See progress against target across the field force',
+    'Identify agents ahead of or behind plan',
+  ],
+  dependsOnKeys: ['Users', 'Loans'],
+  usedByKeys: ['Agent app', 'Agent performance reports'],
+  businessRuleKeys: [
+    'Progress is measured on DISBURSED loans, not captured ones — an application that never disburses does not count.',
+    'Targets are per agent per month; revising one mid-month changes what progress is measured against.',
+    'A target is a measure, not a control. It does not stop an agent capturing more or less.',
+  ],
+  tipKeys: [
+    'Set targets that reflect the agent\'s territory. A uniform target across very different catchments measures geography, not effort.',
+    'Read targets next to portfolio quality. Volume bought with bad loans costs more than it earns.',
+  ],
+  permissionKeys: ['agents.view'],
+};
+
 @Component({
   selector: 'app-agent-targets',
   standalone: true,
   imports: [
     CommonModule, FormsModule, RouterLink, LucideAngularModule,
     PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent,
-    FormDialogComponent, ConfirmDialogComponent,
+    FormDialogComponent, ConfirmDialogComponent, PageGuideComponent,
   ],
   template: `
     <div class="cx-animate-in">
@@ -58,6 +87,8 @@ import { SettingsService } from '../../core/services/settings.service';
         subtitle="Manage field agents and their monthly disbursement targets"
         eyebrow="Configuration">
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Global fallback banner -->
       <div class="cx-at-banner">
@@ -414,6 +445,8 @@ import { SettingsService } from '../../core/services/settings.service';
   styleUrls: ['./agent-targets.component.scss'],
 })
 export class AgentTargetsComponent implements OnInit {
+  readonly guide = AGENT_TARGETS_GUIDE;
+
   // ─── Data state ───────────────────────────────────────────────────────
   rows = signal<any[]>([]);
   total = signal(0);

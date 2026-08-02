@@ -10,6 +10,8 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Deposit Products — CRUD for the templates a deposit account is opened
@@ -20,10 +22,39 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by deposits.view (menu) + deposits.create (write) at the backend.
  */
+const DEPOSIT_PRODUCTS_GUIDE: PageGuide = {
+  id: 'deposit-products',
+  titleKey: 'Deposit Products',
+  purposeKey: 'The savings products on offer — how they pay interest and what customers may withdraw.',
+  descriptionKey:
+    'A deposit product is the template every savings account is opened against. It fixes the '
+    + 'interest method and rate, the withdrawal policy and any minimum balance. Accounts copy those '
+    + 'rules, so a change here shapes new accounts and future interest rather than rewriting what '
+    + 'has already been paid.',
+  actionKeys: [
+    'Create or amend a savings product',
+    'Set the interest method and rate',
+    'Set withdrawal policy and minimum balance',
+    'Retire a product by deactivating it',
+  ],
+  dependsOnKeys: ['GL Mappings'],
+  usedByKeys: ['Deposit Accounts', 'Deposit Interest Run'],
+  businessRuleKeys: [
+    'Interest paid on deposits is an EXPENSE — it is what the institution pays for funding.',
+    'The interest method decides what is actually paid. Daily balance and minimum monthly balance give materially different results on the same rate.',
+    'Deactivating stops new accounts; existing accounts continue on their terms.',
+    'Withdrawal policy is enforced when a withdrawal is attempted, not merely displayed.',
+  ],
+  tipKeys: [
+    'Model the interest cost before launching a rate. Deposits are funding, and the rate is the price of it.',
+  ],
+  permissionKeys: ['deposits.view'],
+};
+
 @Component({
   selector: 'app-deposit-products',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -37,6 +68,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
                      searchPlaceholder="Search products..." [hasActions]="true" (query)="onQuery($event)">
@@ -148,6 +181,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `,
 })
 export class DepositProductsComponent implements OnInit {
+  readonly guide = DEPOSIT_PRODUCTS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'name', label: 'Product Name' },
     { key: 'code', label: 'Code' },

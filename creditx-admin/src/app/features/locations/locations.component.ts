@@ -9,9 +9,36 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+const LOCATIONS_GUIDE: PageGuide = {
+  id: 'locations',
+  titleKey: 'Locations',
+  purposeKey: 'The head office, branches and satellite offices the institution operates from.',
+  descriptionKey:
+    'Locations are more than an address list. Staff, customers and loans are attached to one, which '
+    + 'is what makes branch-level reporting and branch-scoped access possible. Getting the structure '
+    + 'right early matters, because moving history between branches later is painful.',
+  actionKeys: [
+    'Add a branch or satellite office',
+    'Set which location a user or customer belongs to',
+    'Deactivate a location that has closed',
+  ],
+  usedByKeys: ['Users', 'Customers', 'Loans', 'Branch performance reports'],
+  businessRuleKeys: [
+    'A location with staff, customers or loans attached cannot be deleted — deactivate it, so its history stays readable.',
+    'Branch reporting is driven entirely by this attachment. A loan on the wrong branch is reported on the wrong branch.',
+    'Deactivating stops new attachments; existing records keep their location.',
+  ],
+  tipKeys: [
+    'Match the real operating structure, not the org chart aspiration. Reports are only as useful as this reflects reality.',
+  ],
+  permissionKeys: ['locations.view', 'locations.create'],
+};
+
 @Component({
   selector: 'app-locations', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -23,6 +50,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Add Location</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()" searchPlaceholder="Search locations..." [hasActions]="true" (query)="onQuery($event)">
         <ng-template #rowActions let-row>
           <button class="cx-btn cx-btn-ghost cx-btn-sm cx-btn-icon" (click)="openForm(row)" title="Edit">
@@ -65,6 +94,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `,
 })
 export class LocationsComponent implements OnInit {
+  readonly guide = LOCATIONS_GUIDE;
+
   columns: TableColumn[] = [{key:'name',label:'Name'},{key:'code',label:'Code'},{key:'state',label:'State'},{key:'type',label:'Type'},{key:'is_active',label:'Active'},{key:'created_at',label:'Created',type:'date'}];
   rows = signal<any[]>([]); loading = signal(true); pagination = signal<TablePagination|null>(null);
   showForm = signal(false); saving = signal(false); editId: string|null = null; form: any = {}; q: any = {};

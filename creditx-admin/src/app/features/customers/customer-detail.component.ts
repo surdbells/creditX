@@ -11,10 +11,39 @@ import { CxTabsComponent, CxTab } from '../../shared/components/tabs/tabs.compon
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const CUSTOMER_DETAIL_GUIDE: PageGuide = {
+  id: 'customer-detail',
+  titleKey: 'Customer Detail',
+  purposeKey: 'One customer\'s full profile and everything they hold with the institution.',
+  descriptionKey:
+    'Brings a customer\'s identity, employment, documents and financial relationships together in '
+    + 'one place. It is where total exposure becomes visible — which is the question that matters '
+    + 'before lending again, and the one a list of loans alone cannot answer.',
+  actionKeys: [
+    'Review and correct the customer\'s details',
+    'See every loan, deposit and investment they hold',
+    'Open their documents',
+    'Judge total exposure before lending again',
+  ],
+  dependsOnKeys: ['Customers'],
+  usedByKeys: ['Loans', 'Approval Queue', 'Credit Bureau checks'],
+  businessRuleKeys: [
+    'One record, all relationships. If a customer appears twice their exposure is split, and neither record tells the truth.',
+    'Correcting details here affects future business; it does not restate loans already written on the old details.',
+    'A customer with financial history cannot be deleted.',
+  ],
+  tipKeys: [
+    'Check total exposure here before approving another loan. The approval screen shows one application; this shows everything.',
+  ],
+  permissionKeys: ['customers.view'],
+};
 
 @Component({
   selector: 'app-customer-detail', standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe],
+  imports: [CommonModule, RouterLink, LucideAngularModule, PageHeaderComponent, StatusBadgeComponent, CxTabsComponent, LoadingSpinnerComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -34,6 +63,8 @@ import { SettingsService } from '../../core/services/settings.service';
           </a>
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       @if (loading()) {
         <cx-loading message="Loading customer..."></cx-loading>
@@ -485,6 +516,8 @@ import { SettingsService } from '../../core/services/settings.service';
   `],
 })
 export class CustomerDetailComponent implements OnInit {
+  readonly guide = CUSTOMER_DETAIL_GUIDE;
+
   @Input() id = '';
   customer = signal<any>(null);
   loading = signal(true);

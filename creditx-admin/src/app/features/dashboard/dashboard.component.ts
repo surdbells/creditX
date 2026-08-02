@@ -13,6 +13,8 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Home dashboard with five SVG chart visualisations.
@@ -49,6 +51,72 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  * components stay independent. If a third chart-heavy view ever lands,
  * the patterns will get extracted into a shared service.
  */
+const DASHBOARD_GUIDE: PageGuide = {
+  id: 'dashboard',
+  titleKey: 'Dashboard',
+  purposeKey: 'The state of the portfolio for a chosen period, at a glance.',
+  descriptionKey:
+    'A summary built from the same data as the detailed screens, scoped to whatever period is '
+    + 'selected above. It is a starting point rather than a source: every figure here has a screen '
+    + 'behind it that can explain and evidence it, and that is where you go when something looks '
+    + 'wrong.',
+  actionKeys: [
+    'Change the period — this month, 30, 60 or 90 days, or a custom range',
+    'Read the headline position: active loans, disbursed, collected, collection rate',
+    'See how the portfolio splits by status and by product',
+    'Open or pause loan intake from the agent app',
+  ],
+  sections: [
+    {
+      selector: '.cx-dash-filter',
+      titleKey: 'The period',
+      bodyKey:
+        'Governs every figure on this page. It opens on the current month; the presets cover 30, 60 '
+        + 'and 90 days, and the date boxes take any range you need.',
+    },
+    {
+      selector: '.cx-dash-stats',
+      titleKey: 'Headline figures',
+      bodyKey:
+        'Active loans, amount disbursed, amount collected, and collection rate for the period. Each '
+        + 'has a screen behind it with the detail.',
+    },
+    {
+      selector: '.cx-dash-charts',
+      titleKey: 'Charts',
+      bodyKey:
+        'Portfolio by status and by product cover the same applications, cut two ways. The trends '
+        + 'follow the period — daily for short ranges, weekly or monthly for longer ones.',
+    },
+  ],
+  businessRuleKeys: [
+    'Everything here follows the selected period, with ONE exception: Overdue Aging is always as of today, because aging is measured against today by definition.',
+    'Figures are read live, so they move as the day\'s work is recorded.',
+    'These are operational counts, not ledger balances. They will not tie exactly to the financial statements, which total what was posted.',
+    'Collection rate compares what was collected against what was disbursed in the period — it is not a measure of arrears. Read Portfolio at Risk for that.',
+  ],
+  tipKeys: [
+    'Check the period before reacting to a number. A quiet-looking month is often just the first week of it.',
+    'Pair the collection rate with Portfolio at Risk. Collections can look healthy while arrears build underneath.',
+    'Drill into the screen behind a figure before escalating it — the explanation is usually there.',
+  ],
+  permissionKeys: ['reports.portfolio'],
+  faq: [
+    {
+      questionKey: 'The dashboard and my accounting reports disagree.',
+      answerKey:
+        'They measure different things. This counts loans and applications; the financial statements '
+        + 'total what was posted to the ledger. Both can be right at once.',
+    },
+    {
+      questionKey: 'Why does Overdue Aging not change when I change the period?',
+      answerKey:
+        'Aging is measured against today. Scoping it to a past window would report bucket ages that '
+        + 'are no longer true, so it is deliberately left as a live snapshot.',
+    },
+  ],
+};
+
 type PresetKey = 'month' | '30d' | '60d' | '90d' | 'custom';
 type StatusChartItem = { label: string; value: number; amount: number };
 type AgingChartItem = { label: string; value: number; count: number };
@@ -58,7 +126,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-dash cx-animate-in">
       <!-- ─── Hero greeting + agent-accepting toggle ─── -->
@@ -95,6 +163,8 @@ type ProductChartItem = { label: string; value: number; amount: number };
         </div>
         }
       </div>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- ─── Period filter — governs every figure on this page ─── -->
       <div class="cx-dash-filter">
@@ -592,6 +662,8 @@ type ProductChartItem = { label: string; value: number; amount: number };
   `],
 })
 export class DashboardComponent implements OnInit {
+  readonly guide = DASHBOARD_GUIDE;
+
   loading = signal(true);
   chartsLoading = signal(true);
   agentAccepting = signal(true);

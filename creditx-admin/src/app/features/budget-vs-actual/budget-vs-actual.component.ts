@@ -8,6 +8,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Budget vs Actual report.
@@ -25,10 +27,36 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by accounting.view.
  */
+const BUDGET_VS_ACTUAL_GUIDE: PageGuide = {
+  id: 'budget-vs-actual',
+  titleKey: 'Budget vs Actual',
+  purposeKey: 'Compares what was budgeted against what was actually posted, and shows the variance.',
+  descriptionKey:
+    'This is where a budget earns its keep. Actuals come from the ledger, so the comparison is only '
+    + 'as meaningful as the postings behind it — a variance is often a coding error rather than a '
+    + 'performance problem, and it is worth checking which before acting.',
+  actionKeys: [
+    'Compare a period against its budget',
+    'Find the accounts with the largest variances',
+    'Drill from a variance into the postings behind it',
+  ],
+  dependsOnKeys: ['Budgets', 'Journal Entries'],
+  businessRuleKeys: [
+    'Actuals are read from posted journals, so an unposted or mis-coded entry shows as a variance.',
+    'An account with no budget shows its full actual as a variance — that is missing data, not overspend.',
+    'Comparing an open period is provisional; entries can still land in it.',
+  ],
+  tipKeys: [
+    'Investigate the largest variances by value, not by percentage. A 400% variance on a trivial account rarely matters.',
+    'Check the coding before concluding anything — a cost posted to the wrong account creates two variances, not one.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
+
 @Component({
   selector: 'app-budget-vs-actual',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -44,6 +72,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-bv-controls">
         <label>
@@ -385,6 +415,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class BudgetVsActualComponent implements OnInit {
+  readonly guide = BUDGET_VS_ACTUAL_GUIDE;
+
   data = signal<any>(null);
   loading = signal(true);
   year: number = new Date().getFullYear();

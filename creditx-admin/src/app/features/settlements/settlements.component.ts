@@ -9,6 +9,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } from '../../shared/components/data-table/data-table.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Settlements queue — outbound bank transfers that pay disbursed loans to
@@ -16,13 +18,47 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  * filter and a retry action for failed/reversed ones. Gated by loans.disburse
  * (menu + backend RbacMiddleware).
  */
+const SETTLEMENTS_GUIDE: PageGuide = {
+  id: 'settlements',
+  titleKey: 'Settlements',
+  purposeKey: 'The actual outbound transfers paying disbursed loans out to customers.',
+  descriptionKey:
+    'Disbursement records that a loan has been released and posts the accounting; settlement is the '
+    + 'money genuinely leaving the bank. Keeping them separate is what lets you see loans that are '
+    + 'disbursed in the books but not yet paid — which is exactly the gap customers ring about.',
+  actionKeys: [
+    'See disbursed loans awaiting transfer',
+    'Mark a transfer as sent, or record a failure',
+    'Investigate a customer who says they have not been paid',
+  ],
+  workflowKeys: [
+    'Loan disbursed and journals posted',
+    'Appears here awaiting transfer',
+    'Transfer sent to the customer\'s bank',
+    'Marked settled, or retried on failure',
+  ],
+  dependsOnKeys: ['Disbursement Queue'],
+  businessRuleKeys: [
+    'Disbursed and settled are different states. A loan can be fully disbursed in the books while the transfer is still pending.',
+    'A failed transfer does not undo the disbursement — the loan remains disbursed and the transfer is retried.',
+    'Bank details come from the customer record; a wrong account number fails here, not at disbursement.',
+  ],
+  tipKeys: [
+    'When a customer says they have not been paid, this page answers it — not the loan status.',
+    'Chase failed transfers the same day. They are usually a wrong account number, and the customer is waiting.',
+  ],
+  permissionKeys: ['loans.disburse'],
+};
+
 @Component({
   selector: 'app-settlements',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, DataTableComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, RouterLink, LucideAngularModule, PageHeaderComponent, DataTableComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Settlements" subtitle="Outbound transfers paying disbursed loans to customers" eyebrow="Finance"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-st-toolbar">
         <label class="cx-st-toolbar-label">Status</label>
@@ -62,6 +98,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class SettlementsComponent implements OnInit {
+  readonly guide = SETTLEMENTS_GUIDE;
+
   private api = inject(ApiService);
   private toast = inject(ToastService);
   auth = inject(AuthService);

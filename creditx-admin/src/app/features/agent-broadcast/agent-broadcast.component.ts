@@ -8,22 +8,52 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Agent Broadcast — admin sends a message to field agents over the selected
  * channels (Email, Push). It always appears in each agent's in-app
  * notification list. Gated by notifications.manage.
  */
+const AGENT_BROADCAST_GUIDE: PageGuide = {
+  id: 'agent-broadcast',
+  titleKey: 'Agent Broadcast',
+  purposeKey: 'Sends one message to the field force, in-app and by email or push.',
+  descriptionKey:
+    'For things every agent needs to know at once — a product change, a rate change, a system '
+    + 'pause. It reaches agents wherever they are working rather than relying on them opening the '
+    + 'admin app, which makes it the right channel for anything time-sensitive.',
+  actionKeys: [
+    'Compose a message to all agents, or a subset',
+    'Choose the channels it goes out on',
+    'Send, and see what was sent before',
+  ],
+  dependsOnKeys: ['Users', 'Notification templates'],
+  businessRuleKeys: [
+    'A broadcast cannot be recalled once sent. Push notifications in particular land immediately on people\'s phones.',
+    'It reaches active agents; deactivated staff do not receive it.',
+    'Sent broadcasts are kept, so there is a record of what the field force was told and when.',
+  ],
+  tipKeys: [
+    'Write it so it makes sense on a phone lock screen. Most agents will read the first line and nothing else.',
+    'Reserve broadcasts for things that genuinely affect everyone; a channel used for noise stops being read.',
+  ],
+  permissionKeys: ['agents.broadcast'],
+};
+
 @Component({
   selector: 'app-agent-broadcast',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, ConfirmDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, ConfirmDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Agent Broadcast"
         subtitle="Send a message to field agents (in-app + email / push)"
         eyebrow="Notifications"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-bc-form">
         <label class="cx-label">Subject</label>
@@ -97,6 +127,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class AgentBroadcastComponent {
+  readonly guide = AGENT_BROADCAST_GUIDE;
+
   form: any = { subject: '', message: '', email: true, push: true, recipient_type: 'all', location_id: '' };
   locations = signal<any[]>([]);
   busy = signal(false);

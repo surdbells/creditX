@@ -9,6 +9,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * GL Reconciliation Report — double-entry integrity check.
@@ -32,10 +34,37 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by accounting.view.
  */
+const GL_RECONCILIATION_GUIDE: PageGuide = {
+  id: 'gl-reconciliation',
+  titleKey: 'GL Reconciliation',
+  purposeKey: 'Checks that each control account agrees with the detail behind it.',
+  descriptionKey:
+    'The ledger holds one Customer Deposits figure; the deposit accounts page holds hundreds of '
+    + 'individual balances. Those two must agree, and the same is true for loans and investments. '
+    + 'This page compares each control account against the sum of its sub-ledger and reports any '
+    + 'difference — which always means something posted wrongly, never a rounding quirk to be ignored.',
+  actionKeys: [
+    'Compare each control account against its sub-ledger',
+    'See the size and direction of any difference',
+    'Investigate before closing the period',
+  ],
+  dependsOnKeys: ['Journal Entries', 'Loans', 'Deposit Accounts', 'Investments'],
+  usedByKeys: ['Period Close', 'Audit'],
+  businessRuleKeys: [
+    'A control account must equal its sub-ledger exactly. A difference is an error, not a tolerance.',
+    'Differences usually come from a manual journal posted straight to a control account, bypassing the sub-ledger that feeds it.',
+    'Run it before closing the period — after close, fixing it means reopening.',
+  ],
+  tipKeys: [
+    'Post to control accounts through the module that owns them, never by hand. Almost every difference here starts as a well-meant manual journal.',
+  ],
+  permissionKeys: ['accounting.reconcile'],
+};
+
 @Component({
   selector: 'app-gl-reconciliation',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -47,6 +76,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>{{ loading() ? 'Refreshing…' : 'Refresh' }}</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Summary strip -->
       @if (!loading() && summary(); as s) {
@@ -585,6 +616,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class GlReconciliationComponent implements OnInit {
+  readonly guide = GL_RECONCILIATION_GUIDE;
+
   accounts = signal<any[]>([]);
   summary = signal<any>(null);
   loading = signal(true);

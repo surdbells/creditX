@@ -7,6 +7,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Statement of Cash Flows (IAS 7 indirect method).
@@ -32,10 +34,37 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.view at both menu and backend.
  */
+const CASH_FLOW_GUIDE: PageGuide = {
+  id: 'cash-flow',
+  titleKey: 'Statement of Cash Flows',
+  purposeKey: 'Where cash actually came from and went, as distinct from profit.',
+  descriptionKey:
+    'Profit and cash are not the same thing — interest can be earned without being received, and '
+    + 'disbursing loans consumes cash without being an expense. This statement starts from the '
+    + 'result for the period and adjusts it back to real money moved, split into operating, '
+    + 'investing and financing activity, following the IAS 7 indirect method.',
+  actionKeys: [
+    'Run the cash flow for a period',
+    'See which activity consumed or generated cash',
+    'Export for the board or the auditor',
+  ],
+  dependsOnKeys: ['Income Statement', 'Balance Sheet', 'Journal Entries'],
+  businessRuleKeys: [
+    'It is derived, not posted — it is a rearrangement of the same journals behind the other statements.',
+    'Disbursing loans consumes cash but is not an expense; collecting them generates cash but is not income. That is exactly the gap this statement explains.',
+    'Non-cash charges such as provisions and depreciation are added back, because no money left.',
+    'The closing cash figure must agree with the bank balances on the balance sheet.',
+  ],
+  tipKeys: [
+    'A profitable institution can still run out of cash by lending faster than it collects. This is the statement that shows it coming.',
+  ],
+  permissionKeys: ['reports.financial'],
+};
+
 @Component({
   selector: 'app-cash-flow',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -52,6 +81,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Period selector (same shape as IS) -->
       <div class="cx-cf-period">
@@ -490,6 +521,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class CashFlowComponent implements OnInit {
+  readonly guide = CASH_FLOW_GUIDE;
+
   loading = signal(false);
   data = signal<any>(null);
 

@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Bank Reconciliation — import a bank statement and reconcile it against the
@@ -15,16 +17,54 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by reports.reconciliation.
  */
+const BANK_REC_GUIDE: PageGuide = {
+  id: 'bank-reconciliation',
+  titleKey: 'Bank Reconciliation',
+  purposeKey: 'Proves the bank ledger in the books agrees with what the bank itself says.',
+  descriptionKey:
+    'The books record what the institution believes happened; the bank statement records what '
+    + 'actually cleared. Reconciling matches the two and explains every difference — timing, '
+    + 'unrecorded charges, or genuine errors. An unreconciled bank account is the single largest '
+    + 'blind spot a lender can have, and auditors treat it as such.',
+  actionKeys: [
+    'Load a bank statement for a period',
+    'Match statement lines to ledger postings',
+    'Explain or post the differences that remain',
+    'Complete the reconciliation for the month',
+  ],
+  workflowKeys: [
+    'Obtain the bank statement',
+    'Match it against the BANK general ledger',
+    'Post anything the bank knows about and the books do not',
+    'Reconcile, then close the period',
+  ],
+  dependsOnKeys: ['Journal Entries', 'Chart of accounts'],
+  usedByKeys: ['Period Close', 'Balance Sheet', 'Audit'],
+  businessRuleKeys: [
+    'Reconcile before closing the period. A month closed on an unreconciled bank account has to be reopened.',
+    'Differences are explained, never forced. Adjusting the ledger to agree with the bank without understanding why defeats the purpose entirely.',
+    'Bank charges and interest usually appear on the statement first — they need posting, not matching.',
+    'Timing differences are legitimate; unexplained ones are not.',
+  ],
+  tipKeys: [
+    'Reconcile monthly at least. Differences compound and become far harder to unpick.',
+    'A recurring unexplained difference is usually a process problem, not a bookkeeping one.',
+  ],
+  permissionKeys: ['accounting.reconcile'],
+};
+
 @Component({
   selector: 'app-bank-reconciliation',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Bank Reconciliation"
         subtitle="Reconcile a bank statement against the BANK general ledger"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       @if (!current()) {
         <!-- Session list + create -->
@@ -184,6 +224,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class BankReconciliationComponent {
+  readonly guide = BANK_REC_GUIDE;
+
   form: any = { gl_code: 'BANK', statement_date: new Date().toISOString().slice(0, 10), opening_balance: 0, closing_balance: 0 };
   sessions = signal<any[]>([]);
   current = signal<string | null>(null);

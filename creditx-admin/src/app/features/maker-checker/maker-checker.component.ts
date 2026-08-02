@@ -12,6 +12,8 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { BulkActionBarComponent } from '../../shared/components/bulk-action-bar/bulk-action-bar.component';
 import { BatchConfirmDialogComponent } from '../../shared/components/batch-confirm-dialog/batch-confirm-dialog.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Maker-Checker queue — dedicated page for users with maker_checker.check.
@@ -28,16 +30,47 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated at menu + route + backend endpoint (RbacMiddleware).
  */
+const MAKER_CHECKER_GUIDE: PageGuide = {
+  id: 'maker-checker',
+  titleKey: 'Maker-Checker Queue',
+  purposeKey: 'Sensitive operations held until a second person approves them.',
+  descriptionKey:
+    'Some actions are too consequential for one person acting alone. Maker-checker holds them: the '
+    + 'maker requests, a different checker approves, and only then does the operation take effect. '
+    + 'It is a control against both error and fraud, and it is why the person who made a request '
+    + 'can never approve it themselves.',
+  actionKeys: [
+    'Review operations waiting on a second pair of eyes',
+    'Approve or reject a pending operation',
+    'See who requested what, and when',
+  ],
+  dependsOnKeys: ['Roles & Permissions'],
+  usedByKeys: ['Audit Logs'],
+  businessRuleKeys: [
+    'The maker can never be the checker. That separation is the entire point of the control.',
+    'Nothing happens until the check is given — a pending operation has not taken effect.',
+    'Both the request and the decision are recorded, with who and when.',
+    'Rejecting does not delete the request; it closes it with a reason.',
+  ],
+  tipKeys: [
+    'Clear this queue daily. Pending items are real operations somebody is waiting on.',
+    'Check what is being asked, not just who asked. A trusted colleague can still make a mistake.',
+  ],
+  permissionKeys: ['maker_checker.approve'],
+};
+
 @Component({
   selector: 'app-maker-checker',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, BulkActionBarComponent, BatchConfirmDialogComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Maker-Checker Queue"
         subtitle="Operations awaiting second-eye approval"
         eyebrow="Compliance"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [pagination]="pagination()"
@@ -718,6 +751,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class MakerCheckerComponent implements OnInit {
+  readonly guide = MAKER_CHECKER_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'operation_type', label: 'Operation' },
     { key: 'entity_type', label: 'Entity' },

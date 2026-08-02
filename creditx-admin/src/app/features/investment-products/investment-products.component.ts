@@ -10,6 +10,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DataTableComponent, TableColumn } from '../../shared/components/data-table/data-table.component';
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Investment Products — templates an investment is placed against.
@@ -25,10 +27,39 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by investments.view (read) + investments.create (write).
  */
+const INVESTMENT_PRODUCTS_GUIDE: PageGuide = {
+  id: 'investment-products',
+  titleKey: 'Investment Products',
+  purposeKey: 'The investment offerings — their rate, tenor, payout pattern and tax treatment.',
+  descriptionKey:
+    'An investment product is the template an investor\'s placement is created from. Fixed-term '
+    + 'products run to a maturity date; open-ended ones continue until the investor withdraws. The '
+    + 'product also fixes how often interest is paid out and how withholding tax is handled, both of '
+    + 'which change what the investor actually receives.',
+  actionKeys: [
+    'Create a fixed-term or open-ended product',
+    'Set the rate, tenor and payout frequency',
+    'Set the withholding tax treatment',
+    'Deactivate a product no longer offered',
+  ],
+  dependsOnKeys: ['GL Mappings', 'Tax rates'],
+  usedByKeys: ['Investments', 'Investment Accrual'],
+  businessRuleKeys: [
+    'Investments are a LIABILITY — the placement is the investor\'s money, and the interest is the institution\'s cost of it.',
+    'Fixed-term and open-ended behave differently at every stage: maturity, early withdrawal and accrual all follow from this choice.',
+    'Withholding tax is deducted from investor interest and remitted; the investor receives the net.',
+    'Placements copy their terms at creation, so changing a product never reprices existing investments.',
+  ],
+  tipKeys: [
+    'Be explicit about early-withdrawal treatment before launching a fixed-term product — it is the commonest source of investor dispute.',
+  ],
+  permissionKeys: ['investments.view'],
+};
+
 @Component({
   selector: 'app-investment-products',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -42,6 +73,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           </button>
         }
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()"
                      [searchPlaceholder]="''" [hasActions]="true" trackBy="id">
@@ -221,6 +254,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class InvestmentProductsComponent implements OnInit {
+  readonly guide = INVESTMENT_PRODUCTS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'name', label: 'Product' },
     { key: 'code', label: 'Code' },

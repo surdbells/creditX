@@ -10,10 +10,38 @@ import { DataTableComponent, TableColumn, TablePagination, TableQueryEvent } fro
 import { FormDialogComponent } from '../../shared/components/form-dialog/form-dialog.component';
 import { SearchableSelectComponent, SelectOption } from '../../shared/components/searchable-select/searchable-select.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const NOTIFICATIONS_GUIDE: PageGuide = {
+  id: 'notifications',
+  titleKey: 'Notifications',
+  purposeKey: 'The templates behind every automatic email, SMS and push the system sends.',
+  descriptionKey:
+    'Customers and staff receive messages automatically as things happen — an application '
+    + 'submitted, a loan approved, a repayment due. The wording lives here, so what your customers '
+    + 'read is under your control rather than fixed by the software.',
+  actionKeys: [
+    'Edit the wording of a notification',
+    'Turn a notification on or off',
+    'See which events send what',
+  ],
+  usedByKeys: ['Customer portal', 'Agent app', 'Loan lifecycle events'],
+  businessRuleKeys: [
+    'Templates use placeholders for names, amounts and dates. Removing or mistyping one leaves a gap in the message the customer receives.',
+    'Changes apply to messages sent afterwards; nothing already delivered changes.',
+    'Turning a notification off means customers stop being told about that event — including things they may need to act on.',
+  ],
+  tipKeys: [
+    'Send yourself a test after editing. Placeholder mistakes are invisible in the template and obvious in the message.',
+    'Keep SMS short and specific; it is the channel customers actually read.',
+  ],
+  permissionKeys: ['settings.view'],
+};
 
 @Component({
   selector: 'app-notifications', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, DataTableComponent, FormDialogComponent, SearchableSelectComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -33,6 +61,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <cx-data-table [allColumns]="columns" [rows]="rows()" [loading]="loading()" [pagination]="pagination()"
         searchPlaceholder="Search notifications..." [hasActions]="true" (query)="onQuery($event)">
@@ -122,6 +152,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class NotificationsComponent implements OnInit {
+  readonly guide = NOTIFICATIONS_GUIDE;
+
   columns: TableColumn[] = [
     { key: 'name', label: 'Template Name' },
     { key: 'subject', label: 'Subject' },

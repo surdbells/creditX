@@ -10,10 +10,38 @@ import { SearchableSelectComponent, SelectOption } from '../../shared/components
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SettingsService } from '../../core/services/settings.service';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
+
+const AUDIT_LOGS_GUIDE: PageGuide = {
+  id: 'audit-logs',
+  titleKey: 'Audit Trail',
+  purposeKey: 'A permanent record of who did what, and when, across the whole system.',
+  descriptionKey:
+    'Every consequential action writes an entry here — approvals, postings, settings changes, '
+    + 'permission changes. It cannot be edited by anyone, which is precisely what gives it value: '
+    + 'it is the evidence an auditor, a regulator or an internal investigation relies on.',
+  actionKeys: [
+    'Search events by user, date or type of action',
+    'Trace the history of a particular record',
+    'Evidence a change for audit',
+  ],
+  dependsOnKeys: ['Users'],
+  businessRuleKeys: [
+    'Audit entries are written by the system and can never be edited or deleted, by anyone, including administrators.',
+    'It records the action, the person and the time — it is not a full before-and-after of every field.',
+    'A missing entry is itself informative: if an action left no trace, it did not happen in this system.',
+  ],
+  tipKeys: [
+    'Start from the record or the user, not the date. Date-first searches over a busy system return more than anyone can read.',
+    'When something looks wrong, check here before assuming a bug — most surprises turn out to be a person.',
+  ],
+  permissionKeys: ['audit.view'],
+};
 
 @Component({
   selector: 'app-audit-logs', standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, SearchableSelectComponent, EmptyStateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -44,6 +72,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           }
         </div>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filters -->
       <div class="cx-audit-filters">
@@ -507,6 +537,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class AuditLogsComponent implements OnInit {
+  readonly guide = AUDIT_LOGS_GUIDE;
+
   rows = signal<any[]>([]); loading = signal(true);
   users = signal<any[]>([]);
   userOptions = computed<SelectOption[]>(() =>

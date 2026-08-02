@@ -11,6 +11,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * General Loan Report — the legacy-compatible monthly export migrated
@@ -33,10 +35,32 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
 type ChartLabelValue = { label: string; value: number };
 type BranchPerformanceRow = { label: string; value: number; count: number };
 
+const GENERAL_LOAN_REPORT_GUIDE: PageGuide = {
+  id: 'general-loan-report',
+  titleKey: 'General Loan Report',
+  purposeKey: 'The full loan listing, in the layout the legacy monthly export used.',
+  descriptionKey:
+    'A comprehensive row-per-loan extract kept deliberately in the familiar format, so figures can '
+    + 'be compared against historic exports and handed to people who already know how to read it.',
+  actionKeys: [
+    'Run the listing for a period and filters',
+    'Export it for circulation or reconciliation',
+  ],
+  dependsOnKeys: ['Loans'],
+  businessRuleKeys: [
+    'The layout is fixed to match the legacy export — that compatibility is the point of this report.',
+    'It lists loans, not ledger postings, so it will not tie exactly to the financial statements.',
+  ],
+  tipKeys: [
+    'Use this when someone needs the familiar monthly file; use Reports & Analytics when they need to explore.',
+  ],
+  permissionKeys: ['reports.general_loans'],
+};
+
 @Component({
   selector: 'app-general-loan-report',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, LoadingSpinnerComponent, EmptyStateComponent, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -48,6 +72,8 @@ type BranchPerformanceRow = { label: string; value: number; count: number };
           <span>{{ exporting() ? 'Exporting...' : 'Export CSV' }}</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Filter bar -->
       <div class="cx-glr-filter-bar">
@@ -507,6 +533,8 @@ type BranchPerformanceRow = { label: string; value: number; count: number };
   `],
 })
 export class GeneralLoanReportComponent implements OnInit {
+  readonly guide = GENERAL_LOAN_REPORT_GUIDE;
+
   // ─── Filter state ───
   filterDateFrom = '';
   filterDateTo = '';

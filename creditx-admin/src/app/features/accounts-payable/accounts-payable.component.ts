@@ -8,21 +8,52 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Accounts Payable — vendors, bills, approve/pay, and AP aging.
  * Reads gated by accounting.view; writes by accounting.journal.
  */
+const ACCOUNTS_PAYABLE_GUIDE: PageGuide = {
+  id: 'accounts-payable',
+  titleKey: 'Accounts Payable',
+  purposeKey: 'What the institution owes its suppliers, and what has been paid.',
+  descriptionKey:
+    'A bill is recognised when it is incurred, not when it is paid — that is what puts the expense '
+    + 'in the right month and creates a liability until settled. This page holds vendors, their '
+    + 'bills, the payments made against them, and how overdue the balance is.',
+  actionKeys: [
+    'Record a vendor and their bills',
+    'Pay a bill, in part or in full',
+    'Review the payables ageing',
+  ],
+  workflowKeys: ['Bill received', 'Recorded as payable', 'Paid', 'Liability cleared'],
+  dependsOnKeys: ['Chart of accounts', 'GL Mappings'],
+  usedByKeys: ['Balance Sheet', 'Cash Flow'],
+  businessRuleKeys: [
+    'Recording a bill creates a liability and an expense; paying it clears the liability and moves cash. They are two separate postings.',
+    'Part payments reduce the balance without closing the bill.',
+    'A paid bill is not deleted — the history of what was owed and settled must survive.',
+  ],
+  tipKeys: [
+    'Record bills as they arrive rather than when they are paid, or the month they belong to will be wrong.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
+
 @Component({
   selector: 'app-accounts-payable',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Accounts Payable"
         subtitle="Vendors, bills, payments, and AP aging"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-ap-tabs">
         <button class="cx-ap-tab" [class.on]="tab() === 'bills'" (click)="tab.set('bills')">Bills</button>
@@ -168,6 +199,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class AccountsPayableComponent {
+  readonly guide = ACCOUNTS_PAYABLE_GUIDE;
+
   tab = signal<'bills' | 'vendors' | 'aging'>('bills');
   vendors = signal<any[]>([]);
   bills = signal<any[]>([]);

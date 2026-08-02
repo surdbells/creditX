@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Loan Interest Accrual — preview and post the monthly accrual-basis
@@ -18,16 +20,53 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.provision (a month-end accounting activity).
  */
+const INTEREST_ACCRUAL_GUIDE: PageGuide = {
+  id: 'interest-accrual',
+  titleKey: 'Loan Interest Accrual',
+  purposeKey: 'Recognises interest income in the month it is earned, rather than when it is collected.',
+  descriptionKey:
+    'A loan earns interest daily, but the customer pays monthly or later. Accounting standards say '
+    + 'the income belongs to the period it was earned in, so this run posts the interest earned in a '
+    + 'month even where nothing has been collected. Without it, income lands lumpily in collection '
+    + 'months and the monthly result is meaningless.',
+  actionKeys: [
+    'Preview the interest earned in a month before posting',
+    'Post the accrual for that month',
+    'Review previous runs',
+  ],
+  workflowKeys: [
+    'Loans run through the month',
+    'Preview the accrual',
+    'Post it',
+    'Close the period',
+  ],
+  dependsOnKeys: ['GL Mappings', 'Accounting period being open'],
+  usedByKeys: ['Income Statement', 'Journal Entries'],
+  businessRuleKeys: [
+    'Run it once per month, before closing that month. It cannot be posted into a closed period without reopening.',
+    'Accrued interest is income earned, not cash received — it will not match collections.',
+    'Interest on non-performing loans is where accrual and prudence collide; check your provisioning policy before accruing on badly overdue loans.',
+    'The posting is a journal like any other: wrong runs are reversed, never edited.',
+  ],
+  tipKeys: [
+    'Always preview first. The preview shows what will post without committing anything.',
+    'Do accrual, then provisioning, then close — in that order, every month.',
+  ],
+  permissionKeys: ['accounting.journal'],
+};
+
 @Component({
   selector: 'app-interest-accrual',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Loan Interest Accrual"
         subtitle="Recognise loan interest income on an accrual basis, one month at a time"
         eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-ia-controls">
         <div class="cx-ia-control-group">
@@ -229,6 +268,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class InterestAccrualComponent {
+  readonly guide = INTEREST_ACCRUAL_GUIDE;
+
   period = new Date().toISOString().slice(0, 7);
   loading = signal(false);
   running = signal(false);

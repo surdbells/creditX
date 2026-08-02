@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Income Statement (P&L) report.
@@ -23,10 +25,38 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.view at both menu and backend.
  */
+const INCOME_STATEMENT_GUIDE: PageGuide = {
+  id: 'income-statement',
+  titleKey: 'Income Statement',
+  purposeKey: 'What was earned and what was spent over a chosen period, and the profit left over.',
+  descriptionKey:
+    'Where the balance sheet is a snapshot, this covers a stretch of time. Interest and fee income '
+    + 'sit at the top, operating costs and loan-loss provisions come off, and what remains is the '
+    + 'result for the period. Because income is recognised as it is earned rather than when cash '
+    + 'arrives, profit here will not equal cash movement.',
+  actionKeys: [
+    'Run the result for a month, quarter or year',
+    'Compare periods to see what changed',
+    'Export for the board or the regulator',
+  ],
+  dependsOnKeys: ['Journal Entries', 'Interest Accrual', 'Provisions'],
+  businessRuleKeys: [
+    'Income is recognised when earned, not when received. Accrued interest counts even where the customer has not yet paid.',
+    'Provisions are a charge against profit. A rising portfolio at risk reduces the result even with no cash lost yet.',
+    'The period must be complete for the figure to be final — an open period can still receive entries.',
+    'Profit here will not match cash in the bank. The cash flow statement is what reconciles the two.',
+  ],
+  tipKeys: [
+    'Read this next to Portfolio at Risk. Strong interest income against a rising PAR often means income is being accrued on loans that will not pay.',
+    'Compare like periods. A month against a quarter tells you nothing.',
+  ],
+  permissionKeys: ['reports.financial'],
+};
+
 @Component({
   selector: 'app-income-statement',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -43,6 +73,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Period selector -->
       <div class="cx-is-period">
@@ -387,6 +419,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class IncomeStatementComponent implements OnInit {
+  readonly guide = INCOME_STATEMENT_GUIDE;
+
   data = signal<any>(null);
   loading = signal(true);
   from = '';

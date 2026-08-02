@@ -8,18 +8,50 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Tax (VAT/WHT) — rates config, raise a tax liability/reclaim, remit, and a
  * tax summary. Reads gated by accounting.view; writes by accounting.journal.
  */
+const TAX_GUIDE: PageGuide = {
+  id: 'tax',
+  titleKey: 'Tax',
+  purposeKey: 'Tax rates, what has been withheld, and what must be remitted to the authorities.',
+  descriptionKey:
+    'Tax withheld — most commonly on investor interest — is not the institution\'s money. It is '
+    + 'collected on behalf of the tax authority and held as a liability until remitted. This page '
+    + 'holds the rates, what has accumulated, and the record of remittances made.',
+  actionKeys: [
+    'Configure tax rates',
+    'See what has been withheld and is outstanding',
+    'Record a remittance to the authority',
+    'Produce a report for filing',
+  ],
+  dependsOnKeys: ['GL Mappings', 'Investment Products'],
+  usedByKeys: ['Investments', 'Balance Sheet', 'Statutory filings'],
+  businessRuleKeys: [
+    'Withheld tax is a LIABILITY, not income. It is held on behalf of the authority until paid over.',
+    'Changing a rate affects future withholding only; it does not restate what has already been withheld.',
+    'Remitting clears the liability and moves cash — it is not an expense.',
+    'Deadlines are set by the authority, and penalties for late remittance are real.',
+  ],
+  tipKeys: [
+    'Reconcile what is held against what has been remitted every month. This balance should never quietly grow.',
+  ],
+  permissionKeys: ['accounting.view'],
+};
+
 @Component({
   selector: 'app-tax',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header title="Tax (VAT / WHT)" subtitle="Configure rates, record tax, remit, and report" eyebrow="Accounting"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <!-- Summary -->
       @if (summary(); as s) {
@@ -122,6 +154,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class TaxComponent {
+  readonly guide = TAX_GUIDE;
+
   rates = signal<any[]>([]);
   txns = signal<any[]>([]);
   summary = signal<any>(null);

@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Deposit Interest Run — preview and post the monthly interest accrual for
@@ -16,16 +18,45 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by deposits.interest.
  */
+const DEPOSIT_INTEREST_GUIDE: PageGuide = {
+  id: 'deposit-interest',
+  titleKey: 'Deposit Interest Run',
+  purposeKey: 'Calculates and posts the interest owed to savings customers for a month.',
+  descriptionKey:
+    'Interest-bearing deposit products earn the customer interest each month. This run computes it '
+    + 'per account using the product\'s method, and posts it as an expense to the institution and a '
+    + 'credit to the customer. It is the deposit-side mirror of loan interest accrual.',
+  actionKeys: [
+    'Preview the interest due for a month',
+    'Post the run',
+    'Review previous runs',
+  ],
+  workflowKeys: ['Month of balances', 'Preview', 'Post', 'Close the period'],
+  dependsOnKeys: ['Deposit Products', 'Deposit Accounts', 'GL Mappings'],
+  businessRuleKeys: [
+    'Run once per month, before closing that month.',
+    'Interest paid to depositors is an expense, and it reduces the result for the period.',
+    'Each account is computed on its own product\'s method — a single run can mix methods.',
+    'A wrong run is corrected by reversal, not by editing balances.',
+  ],
+  tipKeys: [
+    'Preview before posting, every time. The preview is exactly what will post.',
+  ],
+  permissionKeys: ['deposits.interest.run'],
+};
+
 @Component({
   selector: 'app-deposit-interest',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
         title="Deposit Interest Run"
         subtitle="Preview and post the monthly interest accrual for interest-bearing deposit products"
         eyebrow="Deposits"></cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-di-controls">
         <div class="cx-di-control-group">
@@ -170,6 +201,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class DepositInterestComponent {
+  readonly guide = DEPOSIT_INTEREST_GUIDE;
+
   period = new Date().toISOString().slice(0, 7);
   loading = signal(false);
   running = signal(false);

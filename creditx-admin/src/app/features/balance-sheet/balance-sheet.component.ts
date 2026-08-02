@@ -7,6 +7,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Balance Sheet — Assets / Liabilities / Equity snapshot as of a
@@ -25,10 +27,42 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  *
  * Gated by accounting.view.
  */
+const BALANCE_SHEET_GUIDE: PageGuide = {
+  id: 'balance-sheet',
+  titleKey: 'Balance Sheet',
+  purposeKey: 'What the institution owns, owes and is worth, at one moment in time.',
+  descriptionKey:
+    'A balance sheet is a snapshot, not a period — it answers "where do we stand today", where the '
+    + 'income statement answers "how did we do this month". Assets must equal liabilities plus '
+    + 'equity; that identity is what makes double-entry bookkeeping self-checking.',
+  actionKeys: [
+    'Produce the position as at any date',
+    'Compare against an earlier date to see what moved',
+    'Export for the board, the auditor or the regulator',
+  ],
+  workflowKeys: ['Journals posted', 'Period closed', 'Balance sheet produced', 'Reported'],
+  dependsOnKeys: ['Chart of accounts', 'Journal Entries', 'Period Close'],
+  businessRuleKeys: [
+    'Assets always equal liabilities plus equity. If they do not, a posting is wrong — the report is not.',
+    'It is produced as at a date, so it includes everything posted up to that date and nothing after.',
+    'Running it over an open period gives a moving figure, because entries can still be posted into that period.',
+    'Loan balances shown here are net of provisions, which is what prudential reporting expects.',
+  ],
+  tipKeys: [
+    'Report from closed periods where you can. A closed period cannot change under you after the number has been circulated.',
+    'If the sheet does not balance, look at the most recent manual journals first — automatic postings balance by construction.',
+  ],
+  permissionKeys: ['reports.financial'],
+  faq: [
+    { questionKey: 'Why does this month differ from the figure I circulated last week?',
+      answerKey: 'Entries dated into an open period will have been posted since. Close the period to fix the figure.' },
+  ],
+};
+
 @Component({
   selector: 'app-balance-sheet',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -45,6 +79,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-bs-period">
         <label>
@@ -389,6 +425,8 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
   `],
 })
 export class BalanceSheetComponent implements OnInit {
+  readonly guide = BALANCE_SHEET_GUIDE;
+
   data = signal<any>(null);
   loading = signal(true);
   asOf = '';

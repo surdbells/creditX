@@ -8,6 +8,8 @@ import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { MoneyPipe } from '../../shared/pipes/money.pipe';
 import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { PageGuide } from '../../shared/guide/page-guide.model';
 
 /**
  * Portfolio At Risk (PAR) Report — PAR30/60/90 loan-level metrics.
@@ -21,10 +23,39 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
  *
  * Gated by reports.par.
  */
+const PAR_GUIDE: PageGuide = {
+  id: 'portfolio-at-risk',
+  titleKey: 'Portfolio At Risk',
+  purposeKey: 'The share of the loan book that is overdue — the sector\'s primary measure of credit quality.',
+  descriptionKey:
+    'PAR30 is the outstanding balance of every loan with a payment more than 30 days late, as a '
+    + 'proportion of the total book. It counts the WHOLE outstanding balance of an affected loan, '
+    + 'not just the late instalment, because a borrower who has stopped paying puts the entire '
+    + 'balance at risk. PAR60 and PAR90 apply the same logic at longer delays.',
+  actionKeys: [
+    'See PAR30, PAR60 and PAR90 for the book',
+    'Break the exposure down by product, branch or officer',
+    'Identify the loans driving the number',
+  ],
+  dependsOnKeys: ['Repayment schedules', 'Loans'],
+  usedByKeys: ['Provisions', 'CBN returns', 'Board reporting'],
+  businessRuleKeys: [
+    'The full outstanding balance of a late loan is counted, not the overdue instalment alone.',
+    'A loan one day late does not appear in PAR30 — the bands are 30, 60 and 90 days precisely.',
+    'PAR is measured today. It is not a period figure and cannot be run "for last month" after the fact.',
+    'Restructuring a loan resets its arrears, which improves PAR without any money having been collected. Watch that this is not what is driving an improvement.',
+  ],
+  tipKeys: [
+    'A rising PAR30 with a flat PAR90 is early deterioration; the reverse is an old problem not being resolved.',
+    'Break it down by officer and branch before concluding anything about the product.',
+  ],
+  permissionKeys: ['reports.par'],
+};
+
 @Component({
   selector: 'app-portfolio-at-risk',
   standalone: true,
-  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe],
+  imports: [SearchableSelectDirective, CommonModule, FormsModule, LucideAngularModule, PageHeaderComponent, MoneyPipe, PageGuideComponent],
   template: `
     <div class="cx-animate-in">
       <cx-page-header
@@ -40,6 +71,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
           <span>Export CSV</span>
         </button>
       </cx-page-header>
+
+      <cx-page-guide [guide]="guide"></cx-page-guide>
 
       <div class="cx-par-controls">
         <label>
@@ -284,6 +317,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   `],
 })
 export class PortfolioAtRiskComponent implements OnInit {
+  readonly guide = PAR_GUIDE;
+
   data = signal<any>(null);
   loading = signal(true);
   asOf = '';
