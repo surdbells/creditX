@@ -14,9 +14,10 @@ interface Rect { top: number; left: number; width: number; height: number; }
  *                and centre the card.
  *   - spotlight — the target resolves: dim everything EXCEPT a padded cut-out
  *                around it, achieved with a huge box-shadow on a transparent
- *                clone rect. The real element stays visible and clickable
- *                underneath, which matters when a step points at something the
- *                user should actually try.
+ *                clone rect. The backdrop goes transparent and is clipped
+ *                around the same rect, so the real element stays undimmed AND
+ *                clickable underneath — which matters when a step points at
+ *                something the user should actually try.
  *
  * Positions are recomputed on step change, resize and scroll, because the page
  * underneath is live and can move.
@@ -28,8 +29,12 @@ interface Rect { top: number; left: number; width: number; height: number; }
   template: `
     @if (tour.isActive() && tour.current(); as step) {
       <div class="cx-tg-root" role="dialog" aria-modal="true" [attr.aria-label]="step.title">
-        <!-- Backdrop. Dismissing counts as completing (see skip()). -->
-        <div class="cx-tg-backdrop" (click)="tour.skip()"></div>
+        <!-- Backdrop. Dismissing counts as completing (see skip()).
+             On a spotlight step it is TRANSPARENT — the spot's box-shadow
+             paints the dim — and clipped so the hole is not merely undimmed
+             but genuinely click-through to the page beneath. -->
+        <div class="cx-tg-backdrop" [class.is-clear]="!!spot()"
+             [style.clipPath]="backdropClip()" (click)="tour.skip()"></div>
 
         @if (spot(); as r) {
           <!-- Cut-out: the shadow paints the dim, the hole stays clear. -->
@@ -84,7 +89,10 @@ interface Rect { top: number; left: number; width: number; height: number; }
   styles: [`
     .cx-tg-root { position:fixed; inset:0; z-index:var(--cx-z-modal, 1000); }
     .cx-tg-backdrop { position:absolute; inset:0; background:rgba(15,28,22,.55); }
-    /* The shadow IS the dim for spotlight steps, so the backdrop stays clear there. */
+    /* The shadow IS the dim for spotlight steps, so the backdrop must go clear
+       there. Without this it painted its own 55% dim OVER the spotlit element,
+       so the "highlighted" region looked exactly as dimmed as everything else. */
+    .cx-tg-backdrop.is-clear { background:transparent; }
     .cx-tg-spot {
       position:absolute; border-radius:10px; pointer-events:none;
       box-shadow:0 0 0 9999px rgba(15,28,22,.55); border:2px solid var(--cx-primary-600);
@@ -140,6 +148,28 @@ export class TourOverlayComponent {
 
   paragraphs(body: string): string[] {
     return body.split('\n\n').map(p => p.trim()).filter(Boolean);
+  }
+
+  /**
+   * Punches the spotlit rect out of the backdrop, so a click on the highlighted
+   * element reaches the page instead of hitting the backdrop and ending the
+   * tour — which matters for steps pointing at something the user should try.
+   *
+   * Purely a hit-testing device: on a spotlight step the backdrop is already
+   * transparent, so the square corners of this polygon are invisible and the
+   * ring keeps its rounded corners from the box-shadow.
+   */
+  backdropClip(): string | null {
+    const r = this.spot();
+    if (!r) {
+      return null;
+    }
+    const x1 = Math.round(r.left), y1 = Math.round(r.top);
+    const x2 = Math.round(r.left + r.width), y2 = Math.round(r.top + r.height);
+    // Outer ring, then the hole; evenodd makes the inner ring subtractive.
+    return 'polygon(evenodd,'
+      + ' 0px 0px, 100% 0px, 100% 100%, 0px 100%, 0px 0px,'
+      + ` ${x1}px ${y1}px, ${x2}px ${y1}px, ${x2}px ${y2}px, ${x1}px ${y2}px, ${x1}px ${y1}px)`;
   }
 
   @HostListener('window:resize')
