@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { PortalService } from '../../core/services/portal.service';
+import { ToastService } from '../../core/services/toast.service';
 import { Loan } from '../../core/models';
 import { money, statusLabel, statusBadge } from '../../shared/format';
 
@@ -85,6 +86,7 @@ import { money, statusLabel, statusBadge } from '../../shared/format';
 })
 export class MyLoansComponent implements OnInit {
   private portal = inject(PortalService);
+  private toast = inject(ToastService);
 
   money = money;
   statusLabel = statusLabel;
@@ -100,12 +102,21 @@ export class MyLoansComponent implements OnInit {
   private readonly perPage = 10;
   private total = 0;
 
+  /**
+   * Each tab is a SET of statuses, lower-case to match the backend enum.
+   *
+   * They used to be single UPPERCASE values, which hid loans: "In review"
+   * missed under_review (a loan vanished the moment review actually started),
+   * "Active" missed disbursed and overdue, and the casing only matched at all
+   * because MySQL collates case-insensitively.
+   */
   filters = [
     { label: 'All', value: '' },
-    { label: 'In review', value: 'SUBMITTED' },
-    { label: 'Approved', value: 'APPROVED' },
-    { label: 'Active', value: 'ACTIVE' },
-    { label: 'Rejected', value: 'REJECTED' },
+    { label: 'In review', value: 'submitted,under_review' },
+    { label: 'Approved', value: 'approved' },
+    { label: 'Active', value: 'disbursed,active,overdue,restructured' },
+    { label: 'Closed', value: 'closed' },
+    { label: 'Rejected', value: 'rejected,cancelled' },
   ];
 
   ngOnInit(): void {
@@ -154,6 +165,13 @@ export class MyLoansComponent implements OnInit {
       error: () => {
         this.loading.set(false);
         this.loadingMore.set(false);
+        // Roll the page back so a retry re-requests the page that failed
+        // instead of silently skipping it, and say something — the empty
+        // state otherwise reads as "you have no loans" after a network error.
+        if (!reset) {
+          this.page--;
+        }
+        this.toast.error('Could not load your loans. Please try again.');
       },
     });
   }

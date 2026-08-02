@@ -6,10 +6,11 @@ import { AuthService } from '../../core/services/auth.service';
 import { PortalService } from '../../core/services/portal.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Customer } from '../../core/models';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 
 @Component({
   selector: 'app-profile',
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, SearchableSelectDirective],
   template: `
     <div class="flex flex-col gap-6 max-w-2xl">
       <div>

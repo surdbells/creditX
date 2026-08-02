@@ -91,15 +91,25 @@ class LoanRepository extends BaseRepository
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    /** @return array{items: Loan[], total: int} */
+    /**
+     * @param string|string[]|null $status One status, or a set of them. A set is
+     *        needed because a single UI filter often spans several statuses —
+     *        "Active" covers disbursed/active/overdue, "In review" covers
+     *        submitted/under_review — and matching only one hid those loans.
+     * @return array{items: Loan[], total: int}
+     */
     public function paginated(
         int $offset, int $limit, string $sortBy = 'createdAt', string $sortDir = 'DESC',
-        ?string $search = null, ?string $status = null, ?string $productId = null,
+        ?string $search = null, string|array|null $status = null, ?string $productId = null,
         ?string $branchId = null, ?string $agentId = null, ?string $customerId = null,
     ): array {
         $qb = $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c');
-        if ($status) $qb->andWhere('l.status = :status')->setParameter('status', $status);
+        if (is_array($status)) {
+            if ($status !== []) $qb->andWhere('l.status IN (:statuses)')->setParameter('statuses', $status);
+        } elseif ($status) {
+            $qb->andWhere('l.status = :status')->setParameter('status', $status);
+        }
         if ($productId) $qb->andWhere('l.product = :pid')->setParameter('pid', $productId);
         if ($branchId) $qb->andWhere('l.branch = :bid')->setParameter('bid', $branchId);
         if ($agentId) $qb->andWhere('l.agent = :aid')->setParameter('aid', $agentId);

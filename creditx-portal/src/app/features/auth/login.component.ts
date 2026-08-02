@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { AuthShell } from './auth-shell';
 
 type Mode = 'password' | 'otp';
@@ -87,7 +88,7 @@ type Mode = 'password' | 'otp';
       }
 
       <p class="text-center text-sm mt-6" style="color: var(--cx-text-secondary)">
-        New to CreditX?
+        New to {{ settings.companyName() }}?
         <a routerLink="/auth/register" class="font-semibold" style="color: var(--cx-primary-600)">Create an account</a>
       </p>
       <p class="text-center text-sm mt-2" style="color: var(--cx-text-secondary)">
@@ -101,6 +102,8 @@ export class LoginComponent {
   private auth = inject(AuthService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  /** Public: the sign-up prompt names the institution, not "CreditX". */
+  settings = inject(SettingsService);
 
   mode = signal<Mode>('password');
   otpStep = signal<'request' | 'verify'>('request');
@@ -116,7 +119,18 @@ export class LoginComponent {
     this.otpStep.set('request');
   }
 
+  /**
+   * Mobile keyboards and autocomplete routinely append a space to an email or
+   * a pasted code. Untrimmed, the address failed server-side validation with an
+   * unhelpful message and a 6-digit code failed the length check outright.
+   */
+  private normalise(): void {
+    this.email = this.email.trim();
+    this.code = this.code.trim();
+  }
+
   passwordLogin(): void {
+    this.normalise();
     if (!this.email || !this.password) {
       this.toast.error('Please enter your email and password.');
       return;
@@ -155,6 +169,7 @@ export class LoginComponent {
   }
 
   requestOtp(): void {
+    this.normalise();
     if (!this.email) {
       this.toast.error('Please enter your email.');
       return;
@@ -174,6 +189,7 @@ export class LoginComponent {
   }
 
   verifyOtp(): void {
+    this.normalise();
     if (this.code.length !== 6) {
       this.toast.error('Enter the 6-digit code.');
       return;

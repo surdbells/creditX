@@ -37,6 +37,12 @@ export class SettingsService {
       const s = this.settings();
       applyBrandColors(s['brand.primary_color'], s['brand.accent_color']);
       applyFavicon(s['brand.logo_url']);
+      // The favicon was already white-labelled here; the tab title was not, so
+      // every institution's customers still saw "CreditX" in the browser tab.
+      const name = s['general.company_name'];
+      if (name) {
+        document.title = `${name} — Customer Portal`;
+      }
     } catch {
       // Keep CreditX fallbacks; the portal must still boot.
     }

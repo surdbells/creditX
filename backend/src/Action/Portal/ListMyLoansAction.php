@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Action\Portal;
 
+use App\Domain\Enum\LoanStatus;
 use App\Domain\Repository\LoanRepository;
 use App\Infrastructure\Service\ApiResponse;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -27,7 +28,7 @@ final class ListMyLoansAction
         $customerId = (string) $request->getAttribute('customer_id');
         $params = $this->getPaginationParams($request->getQueryParams());
 
-        $status = trim((string) ($request->getQueryParams()['status'] ?? '')) ?: null;
+        $status = $this->parseStatuses((string) ($request->getQueryParams()['status'] ?? ''));
 
         $result = $this->loanRepo->paginated(
             $params['offset'], $params['per_page'], $params['sort_by'], $params['sort_dir'],
@@ -37,5 +38,28 @@ final class ListMyLoansAction
         $items = array_map(fn($l) => $l->toArray(), $result['items']);
 
         return $this->paginated($items, $result['total'], $params['page'], $params['per_page']);
+    }
+
+    /**
+     * A portal filter tab maps to a SET of statuses, so `status` is accepted as
+     * a comma-separated list. Values are lower-cased (the enum is stored
+     * lowercase; matching only worked before because MySQL collates
+     * case-insensitively) and anything not a real LoanStatus is dropped, so a
+     * hand-edited query string can never reach the query.
+     *
+     * @return string[]|null
+     */
+    private function parseStatuses(string $raw): ?array
+    {
+        $wanted = array_filter(array_map(
+            static fn(string $s) => strtolower(trim($s)),
+            explode(',', $raw),
+        ));
+        $valid = array_values(array_filter(
+            $wanted,
+            static fn(string $s) => LoanStatus::tryFrom($s) !== null,
+        ));
+
+        return $valid === [] ? null : $valid;
     }
 }

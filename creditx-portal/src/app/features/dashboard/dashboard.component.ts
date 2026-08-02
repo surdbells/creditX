@@ -123,7 +123,9 @@ export class DashboardComponent implements OnInit {
   totalOutstanding = signal(0);
 
   private inProgress = ['DRAFT', 'CAPTURED', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED'];
-  private active = ['DISBURSED', 'ACTIVE', 'OVERDUE'];
+  // RESTRUCTURED is still a live, owed loan — leaving it out under-counted the
+  // summary and under-stated the outstanding balance.
+  private active = ['DISBURSED', 'ACTIVE', 'OVERDUE', 'RESTRUCTURED'];
 
   firstName = computed(() => {
     const c = this.auth.customer();

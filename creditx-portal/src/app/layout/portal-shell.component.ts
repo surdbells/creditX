@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../core/services/auth.service';
+import { SettingsService } from '../core/services/settings.service';
 
 interface NavItem {
   label: string;
@@ -19,11 +20,8 @@ interface NavItem {
       <aside class="hidden lg:flex flex-col w-[var(--cx-sidebar-width)] shrink-0 border-r"
         style="background: var(--cx-surface); border-color: var(--cx-border)">
         <div class="h-[var(--cx-topbar-height)] flex items-center gap-2.5 px-5 border-b" style="border-color: var(--cx-border)">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center"
-            style="background: var(--cx-primary-600); color: #fff">
-            <lucide-icon name="wallet" [size]="20"></lucide-icon>
-          </div>
-          <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">CreditX</span>
+          <img [src]="settings.logoUrl() || 'creditx-logo.png'" alt="" class="w-9 h-9 rounded-lg object-contain" />
+          <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">{{ settings.companyName() }}</span>
         </div>
         <nav class="flex-1 p-3 flex flex-col gap-1">
           @for (item of nav; track item.route) {
@@ -50,10 +48,8 @@ interface NavItem {
             style="background: var(--cx-surface); border-color: var(--cx-border)" (click)="$event.stopPropagation()">
             <div class="h-[var(--cx-topbar-height)] flex items-center justify-between px-5 border-b" style="border-color: var(--cx-border)">
               <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: var(--cx-primary-600); color: #fff">
-                  <lucide-icon name="wallet" [size]="20"></lucide-icon>
-                </div>
-                <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">CreditX</span>
+                <img [src]="settings.logoUrl() || 'creditx-logo.png'" alt="" class="w-9 h-9 rounded-lg object-contain" />
+                <span class="text-lg font-bold tracking-tight" style="color: var(--cx-text)">{{ settings.companyName() }}</span>
               </div>
               <button (click)="drawerOpen.set(false)" class="cx-btn-ghost !p-1.5 rounded-md">
                 <lucide-icon name="x" [size]="18"></lucide-icon>
@@ -117,6 +113,8 @@ interface NavItem {
 })
 export class PortalShellComponent {
   private auth = inject(AuthService);
+  /** Public: the header wordmark and logo are white-labelled per institution. */
+  settings = inject(SettingsService);
 
   drawerOpen = signal(false);
   customer = this.auth.customer;

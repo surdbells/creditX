@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -6,6 +6,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { PortalService } from '../../core/services/portal.service';
 import { ToastService } from '../../core/services/toast.service';
 import { LoanProduct } from '../../core/models';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { AuthShell } from '../auth/auth-shell';
 import { money } from '../../shared/format';
 
@@ -19,7 +20,7 @@ import { money } from '../../shared/format';
 @Component({
   selector: 'app-loan-calculator',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, AuthShell],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, AuthShell, SearchableSelectDirective],
   template: `
     <app-auth-shell
       title="Loan calculator"
@@ -38,7 +39,7 @@ import { money } from '../../shared/format';
         <form (ngSubmit)="calculate()" class="cx-form-stack">
           <div>
             <label class="cx-label" for="product">Loan product</label>
-            <select id="product" name="product" class="cx-input" [(ngModel)]="productId" (ngModelChange)="onProductChange()" required>
+            <select id="product" name="product" class="cx-select" [(ngModel)]="productId" (ngModelChange)="onProductChange()" required>
               <option [ngValue]="null" disabled>Select a product</option>
               @for (p of products(); track p.id) {
                 <option [ngValue]="p.id">{{ p.name }}</option>
@@ -162,7 +163,19 @@ export class LoanCalculatorComponent {
   amount: number | null = null;
   tenure: number | null = null;
 
-  selected = computed(() => this.products().find(p => p.id === this.productId) ?? null);
+  /**
+   * The chosen product.
+   *
+   * A METHOD, not a computed(). productId is a plain property driven by
+   * [(ngModel)], and computed() only re-evaluates when a SIGNAL it read
+   * changes — so as a computed this evaluated once (while productId was still
+   * null), never updated when the user picked a product, and left calculate()
+   * reporting "select a product and enter an amount and tenure" no matter what
+   * had been filled in.
+   */
+  selected(): LoanProduct | null {
+    return this.products().find(p => p.id === this.productId) ?? null;
+  }
 
   constructor() {
     this.portal.calculatorProducts().subscribe({

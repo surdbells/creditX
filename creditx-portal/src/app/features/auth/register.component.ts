@@ -70,6 +70,11 @@ export class RegisterComponent {
   password = '';
 
   submit(): void {
+    // Mobile keyboards and autocomplete routinely append a space; untrimmed,
+    // the server rejected the address with an unhelpful message.
+    this.fullName = this.fullName.trim();
+    this.email = this.email.trim();
+    this.phone = this.phone.trim();
     if (!this.fullName || !this.email || !this.phone || !this.password) {
       this.toast.error('Please fill in all fields.');
       return;

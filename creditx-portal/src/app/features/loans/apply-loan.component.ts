@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -6,11 +6,12 @@ import { LucideAngularModule } from 'lucide-angular';
 import { PortalService } from '../../core/services/portal.service';
 import { ToastService } from '../../core/services/toast.service';
 import { EmploymentType, LoanProduct } from '../../core/models';
+import { SearchableSelectDirective } from '../../shared/directives/searchable-select.directive';
 import { money } from '../../shared/format';
 
 @Component({
   selector: 'app-apply-loan',
-  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, SearchableSelectDirective],
   template: `
     <div class="flex flex-col gap-6 max-w-2xl">
       <div class="flex items-center gap-2 text-sm" style="color: var(--cx-text-muted)">
@@ -193,12 +194,27 @@ export class ApplyLoanComponent implements OnInit {
     { value: 'OTHER', label: 'Other' },
   ];
 
-  selected = computed(() => this.products().find(p => p.id === this.productId) ?? null);
+  /**
+   * The chosen product.
+   *
+   * A METHOD, not a computed(), for the same reason as the calculator:
+   * productId is a plain [(ngModel)] property, and computed() only tracks
+   * SIGNAL reads. As a computed this never updated after the product list
+   * loaded, so submit() always saw null and refused every application with
+   * "Please complete all required fields" — customers could not apply at all.
+   */
+  selected(): LoanProduct | null {
+    return this.products().find(p => p.id === this.productId) ?? null;
+  }
 
   /** Rough flat-rate estimate of the monthly repayment (principal/tenure +
    *  monthly-rate × amount). Fees and amortised schedules aren't modelled —
-   *  this is a preview; the backend computes the authoritative figure. */
-  estMonthly = computed<number | null>(() => {
+   *  this is a preview; the backend computes the authoritative figure.
+   *
+   *  A method, not a computed(), for the same reason as selected(): amount and
+   *  tenure are plain [(ngModel)] properties, so a computed only re-ran when
+   *  products() changed — once, at load — and the estimate never appeared. */
+  estMonthly(): number | null {
     const p = this.selected();
     if (!p || this.amount == null || this.tenure == null || this.tenure <= 0) {
       return null;
@@ -209,16 +225,16 @@ export class ApplyLoanComponent implements OnInit {
     }
     const rate = p.interest_rate != null ? Number(p.interest_rate) : 0;
     return Math.ceil(amt / this.tenure + (rate / 100) * amt);
-  });
+  }
 
-  estDsr = computed<number | null>(() => {
+  estDsr(): number | null {
     const m = this.estMonthly();
     const inc = this.monthlyIncome;
     if (m == null || !inc || inc <= 0) {
       return null;
     }
     return m / inc;
-  });
+  }
 
   ngOnInit(): void {
     this.portal.listProducts().subscribe({

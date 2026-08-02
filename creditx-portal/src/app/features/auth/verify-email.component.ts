@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { AuthShell } from './auth-shell';
 
 @Component({
@@ -43,6 +44,7 @@ export class VerifyEmailComponent implements OnInit {
   private toast = inject(ToastService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private settings = inject(SettingsService);
 
   loading = signal(false);
   resending = signal(false);
@@ -57,7 +59,15 @@ export class VerifyEmailComponent implements OnInit {
     }
   }
 
+  /** Trim: a pasted code or an autocompleted email often carries a space,
+   *  which failed the 6-digit length check or server-side email validation. */
+  private normalise(): void {
+    this.email = this.email.trim();
+    this.code = this.code.trim();
+  }
+
   verify(): void {
+    this.normalise();
     if (!this.email || this.code.length !== 6) {
       this.toast.error('Enter your email and the 6-digit code.');
       return;
@@ -67,7 +77,7 @@ export class VerifyEmailComponent implements OnInit {
       next: res => {
         this.loading.set(false);
         if (res.status === 'success') {
-          this.toast.success('Email verified. Welcome to CreditX!');
+          this.toast.success(`Email verified. Welcome to ${this.settings.companyName()}!`);
           this.router.navigate(['/dashboard']);
         } else {
           this.toast.error(res.message || 'Verification failed.');
@@ -81,6 +91,7 @@ export class VerifyEmailComponent implements OnInit {
   }
 
   resend(): void {
+    this.normalise();
     if (!this.email) {
       this.toast.error('Enter your email first.');
       return;
