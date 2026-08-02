@@ -15,15 +15,22 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
  *
  * Response data shape:
  *   {
- *     portfolio_by_status: [{label, value, amount}, ...],
- *     disbursement_trend:  [{label, value, count}, ...],   // 12 months
- *     collection_trend:    [{label, value}, ...],          // 12 months
- *     overdue_aging:       [{label, value, count}, ...],   // 4 buckets
- *     top_products:        [{label, value, amount}, ...]   // top 5
+ *     portfolio_by_status:  [{label, value, amount}, ...],
+ *     portfolio_by_product: [{label, value, amount}, ...],
+ *     disbursement_trend:   [{label, value, count}, ...],  // period-bucketed
+ *     collection_trend:     [{label, value}, ...],         // period-bucketed
+ *     overdue_aging:        [{label, value, count}, ...],  // 4 buckets
+ *     top_products:         [{label, value, amount}, ...], // top 5
+ *     period:               {date_from, date_to, grain}
  *   }
  *
- * No filters — the dashboard is unfiltered, tenant-wide. Operators
- * wanting filtered analytics use /reports.
+ * Accepts date_from / date_to (Y-m-d, inclusive). Omitted, the service
+ * defaults to the current month — the same period the dashboard opens
+ * on, so an unparameterised call and the first paint agree.
+ *
+ * overdue_aging deliberately ignores the range: aging is measured
+ * against today by definition, so scoping it to a past window would
+ * report bucket ages that no longer hold.
  *
  * Permission: reports.portfolio (X2a decision — same gate as the
  * existing /reports/portfolio endpoint that already feeds the
@@ -39,6 +46,11 @@ final class DashboardChartsAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->success($this->service->dashboardCharts());
+        $p = $request->getQueryParams();
+
+        return $this->success($this->service->dashboardCharts(
+            $p['date_from'] ?? null,
+            $p['date_to'] ?? null,
+        ));
     }
 }

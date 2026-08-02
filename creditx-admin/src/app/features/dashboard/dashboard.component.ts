@@ -1,5 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { LucideAngularModule } from 'lucide-angular';
@@ -17,29 +18,38 @@ import { MoneyPipe } from '../../shared/pipes/money.pipe';
  * Home dashboard with five SVG chart visualisations.
  *
  * Sections (top to bottom):
- *   1. Hero greeting + agent-accepting toggle (preserved from prior version)
- *   2. KPI tiles (Active Loans / Disbursed / Collected / Collection Rate)
- *   3. Charts grid — five SVG charts in a responsive 2-col layout
- *   4. Recent applications table — last 5 loans
+ *   1. Hero greeting + agent-accepting toggle
+ *   2. Period filter — governs every figure below it
+ *   3. KPI tiles (Active Loans / Disbursed / Collected / Collection Rate)
+ *   4. Recent applications table — last 5 loans in the period
+ *   5. Charts grid — six SVG charts in a responsive 2-col layout
  *
- * Charts (J decision):
- *   - Portfolio by status (donut, full-width hero)
- *   - Disbursement trend (12-month bar)
- *   - Collection trend (12-month line)
+ * Charts:
+ *   - Portfolio by status  (donut) ─┐ share a row; same population,
+ *   - Portfolio by product (donut) ─┘ so both reconcile to one total
+ *   - Disbursement trend (bar, bucketed to the period)
+ *   - Collection trend (line, bucketed to the period)
  *   - Overdue aging buckets (horizontal bar)
  *   - Top 5 products (horizontal bar)
  *
+ * PERIOD: defaults to the current month. Presets cover 30/60/90 days and a
+ * custom from–to range. Every request below carries date_from/date_to, with
+ * ONE deliberate exception — Overdue Aging is an as-of-today snapshot, since
+ * aging is measured against today by definition and a past window would
+ * report bucket ages that no longer hold. Its subtitle says so.
+ *
  * Data sources:
- *   - /reports/portfolio (KPI tiles — unchanged)
- *   - /reports/dashboard-charts (5 chart series — new in Phase 3.3.a)
- *   - /loans?per_page=5 (recent applications — trimmed from 10)
- *   - /settings (agent-accepting toggle — unchanged)
+ *   - /reports/portfolio        (KPI tiles)
+ *   - /reports/dashboard-charts (chart series)
+ *   - /loans?per_page=5         (recent applications)
+ *   - /settings                 (agent-accepting toggle — not period-scoped)
  *
  * SVG renderers are hand-rolled and intentionally local — they share
  * the visual aesthetic of general-loan-report.component.ts but the two
  * components stay independent. If a third chart-heavy view ever lands,
  * the patterns will get extracted into a shared service.
  */
+type PresetKey = 'month' | '30d' | '60d' | '90d' | 'custom';
 type StatusChartItem = { label: string; value: number; amount: number };
 type AgingChartItem = { label: string; value: number; count: number };
 type TrendChartItem = { label: string; value: number; count?: number };
@@ -48,7 +58,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
+  imports: [CommonModule, FormsModule, RouterLink, LucideAngularModule, StatCardComponent, StatusBadgeComponent, LoadingSpinnerComponent, EmptyStateComponent, MoneyPipe],
   template: `
     <div class="cx-dash cx-animate-in">
       <!-- ─── Hero greeting + agent-accepting toggle ─── -->
@@ -62,7 +72,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
           <h1 class="cx-dash-hero-title">
             Good {{ greeting }}, <span class="cx-dash-hero-name">{{ auth.user()?.first_name }}</span>.
           </h1>
-          <p class="cx-dash-hero-subtitle">Here's your portfolio pulse for today.</p>
+          <p class="cx-dash-hero-subtitle">Here's your portfolio pulse for {{ periodLabel() }}.</p>
         </div>
         <!-- Agent-intake toggle reads and writes system settings, so only show
              it to users who can actually do that. Without this it rendered for
@@ -84,6 +94,23 @@ type ProductChartItem = { label: string; value: number; amount: number };
           </div>
         </div>
         }
+      </div>
+
+      <!-- ─── Period filter — governs every figure on this page ─── -->
+      <div class="cx-dash-filter">
+        <div class="cx-dash-filter-presets">
+          @for (p of presets; track p.key) {
+            <button type="button" class="cx-dash-preset" [class.is-active]="activePreset() === p.key"
+              (click)="applyPreset(p.key)">{{ p.label }}</button>
+          }
+        </div>
+        <div class="cx-dash-filter-range">
+          <input type="date" class="cx-input" [(ngModel)]="dateFrom"
+            (change)="applyCustomRange()" aria-label="From date" />
+          <span class="cx-dash-filter-sep">to</span>
+          <input type="date" class="cx-input" [(ngModel)]="dateTo"
+            (change)="applyCustomRange()" aria-label="To date" />
+        </div>
       </div>
 
       <!-- ─── KPI tiles ─── -->
@@ -121,7 +148,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
         <div class="cx-dash-panel-header">
           <div>
             <h2 class="cx-dash-panel-title">Recent Applications</h2>
-            <span class="cx-dash-panel-subtitle">Latest 5 loans captured</span>
+            <span class="cx-dash-panel-subtitle">Latest 5 captured in {{ periodLabel() }}</span>
           </div>
           <div class="cx-dash-panel-actions">
             <a routerLink="/approval-queue" class="cx-btn cx-btn-primary cx-btn-sm">
@@ -172,11 +199,11 @@ type ProductChartItem = { label: string; value: number; amount: number };
 
       <!-- ─── Charts grid ─── -->
       <div class="cx-dash-charts">
-        <!-- 1. Portfolio by status (donut, wide) -->
-        <div class="cx-dash-chart-card cx-dash-chart-wide">
+        <!-- 1. Portfolio by status (donut) -->
+        <div class="cx-dash-chart-card">
           <div class="cx-dash-chart-head">
             <h3 class="cx-dash-chart-title">Portfolio by Status</h3>
-            <span class="cx-dash-chart-sub">Breakdown of all loan applications</span>
+            <span class="cx-dash-chart-sub">Applications in {{ periodLabel() }}</span>
           </div>
           @if (chartsLoading()) {
             <cx-loading size="sm" message="Loading..."></cx-loading>
@@ -194,7 +221,34 @@ type ProductChartItem = { label: string; value: number; amount: number };
               </ul>
             </div>
           } @else {
-            <cx-empty-state title="No data" description="Loans will appear once captured." icon="inbox"></cx-empty-state>
+            <cx-empty-state title="No data" description="No applications in this period." icon="inbox"></cx-empty-state>
+          }
+        </div>
+
+        <!-- 1b. Portfolio by product (donut) — same population, cut by product,
+             so the two cards in this row always reconcile to the same total. -->
+        <div class="cx-dash-chart-card">
+          <div class="cx-dash-chart-head">
+            <h3 class="cx-dash-chart-title">Portfolio by Product</h3>
+            <span class="cx-dash-chart-sub">Applications in {{ periodLabel() }}</span>
+          </div>
+          @if (chartsLoading()) {
+            <cx-loading size="sm" message="Loading..."></cx-loading>
+          } @else if (portfolioByProduct().length) {
+            <div class="cx-dash-chart-with-legend">
+              <div class="cx-dash-chart-svg" [innerHTML]="productDonutSvg()"></div>
+              <ul class="cx-dash-chart-legend">
+                @for (p of portfolioByProduct(); track p.label; let i = $index) {
+                  <li>
+                    <span class="cx-dash-legend-swatch" [style.background]="palette(i)"></span>
+                    <span class="cx-dash-legend-label">{{ p.label }}</span>
+                    <span class="cx-dash-legend-value tabular-nums">{{ p.value }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          } @else {
+            <cx-empty-state title="No data" description="No applications in this period." icon="inbox"></cx-empty-state>
           }
         </div>
 
@@ -202,7 +256,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
         <div class="cx-dash-chart-card">
           <div class="cx-dash-chart-head">
             <h3 class="cx-dash-chart-title">Disbursement Trend</h3>
-            <span class="cx-dash-chart-sub">Last 12 months · Net amount</span>
+            <span class="cx-dash-chart-sub">{{ periodLabel() }} · Net amount</span>
           </div>
           @if (chartsLoading()) {
             <cx-loading size="sm" message="Loading..."></cx-loading>
@@ -217,7 +271,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
         <div class="cx-dash-chart-card">
           <div class="cx-dash-chart-head">
             <h3 class="cx-dash-chart-title">Collection Trend</h3>
-            <span class="cx-dash-chart-sub">Last 12 months · Successful payments</span>
+            <span class="cx-dash-chart-sub">{{ periodLabel() }} · Successful payments</span>
           </div>
           @if (chartsLoading()) {
             <cx-loading size="sm" message="Loading..."></cx-loading>
@@ -232,7 +286,10 @@ type ProductChartItem = { label: string; value: number; amount: number };
         <div class="cx-dash-chart-card">
           <div class="cx-dash-chart-head">
             <h3 class="cx-dash-chart-title">Overdue Aging</h3>
-            <span class="cx-dash-chart-sub">Outstanding by age</span>
+            <!-- Deliberately NOT period-scoped: aging is measured against today
+                 by definition, so a past window would report ages that no
+                 longer hold. Labelled so the difference is visible. -->
+            <span class="cx-dash-chart-sub">Outstanding by age · as of today</span>
           </div>
           @if (chartsLoading()) {
             <cx-loading size="sm" message="Loading..."></cx-loading>
@@ -247,7 +304,7 @@ type ProductChartItem = { label: string; value: number; amount: number };
         <div class="cx-dash-chart-card">
           <div class="cx-dash-chart-head">
             <h3 class="cx-dash-chart-title">Top Products</h3>
-            <span class="cx-dash-chart-sub">By disbursed loan count</span>
+            <span class="cx-dash-chart-sub">Disbursed in {{ periodLabel() }} · by loan count</span>
           </div>
           @if (chartsLoading()) {
             <cx-loading size="sm" message="Loading..."></cx-loading>
@@ -363,7 +420,48 @@ type ProductChartItem = { label: string; value: number; amount: number };
       gap: 1rem;
     }
     @media (max-width: 900px) { .cx-dash-charts { grid-template-columns: 1fr; } }
-    .cx-dash-chart-wide { grid-column: 1 / -1; }
+
+    /* ─── Period filter ─── */
+    .cx-dash-filter {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem;
+      background: var(--cx-surface);
+      border: 1px solid var(--cx-border);
+      border-radius: var(--cx-radius-xl);
+      padding: 0.6rem 0.85rem;
+    }
+    .cx-dash-filter-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .cx-dash-preset {
+      border: 1px solid var(--cx-border);
+      background: transparent;
+      color: var(--cx-text-secondary);
+      border-radius: 999px;
+      padding: 0.3rem 0.8rem;
+      font-size: var(--cx-text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .cx-dash-preset:hover { background: var(--cx-surface-hover); color: var(--cx-text); }
+    .cx-dash-preset.is-active {
+      background: var(--cx-primary-600);
+      border-color: var(--cx-primary-600);
+      color: #fff;
+    }
+    .cx-dash-filter-range { display: flex; align-items: center; gap: 0.4rem; }
+    /* No shared small-input class exists, so size the date fields here rather
+       than leaning on a class that isn't defined anywhere. */
+    .cx-dash-filter-range .cx-input {
+      width: auto; min-width: 0;
+      padding: 0.3rem 0.55rem;
+      font-size: var(--cx-text-sm);
+    }
+    .cx-dash-filter-sep { font-size: var(--cx-text-sm); color: var(--cx-text-muted); }
+    @media (max-width: 640px) {
+      .cx-dash-filter { align-items: stretch; }
+      .cx-dash-filter-range { justify-content: space-between; }
+      .cx-dash-filter-range .cx-input { flex: 1; }
+    }
 
     .cx-dash-chart-card {
       background: var(--cx-surface);
@@ -403,18 +501,11 @@ type ProductChartItem = { label: string; value: number; amount: number };
     @media (max-width: 700px) {
       .cx-dash-chart-with-legend { grid-template-columns: 1fr; }
     }
-    /* Wide (portfolio) card: keep the donut compact instead of stretching it
-       across the full-width card. Fixed donut column, legend beside it. */
-    .cx-dash-chart-wide { min-height: 0; }
-    .cx-dash-chart-wide .cx-dash-chart-with-legend {
-      grid-template-columns: 200px auto;
-      justify-content: start;
-      gap: 2rem;
-    }
-    .cx-dash-chart-wide .cx-dash-chart-svg { max-width: 200px; }
+    /* The two Portfolio donuts share a row, so cap the donut column and let
+       the legend take the rest — otherwise the donut stretches and crowds it. */
+    .cx-dash-chart-with-legend .cx-dash-chart-svg { max-width: 200px; }
     @media (max-width: 700px) {
-      .cx-dash-chart-wide .cx-dash-chart-with-legend { grid-template-columns: 1fr; }
-      .cx-dash-chart-wide .cx-dash-chart-svg { margin-inline: auto; }
+      .cx-dash-chart-with-legend .cx-dash-chart-svg { margin-inline: auto; }
     }
     .cx-dash-chart-legend {
       list-style: none; margin: 0; padding: 0;
@@ -509,8 +600,24 @@ export class DashboardComponent implements OnInit {
   greeting = '';
   today = '';
 
+  // ─── Period filter ───
+  // Every figure on this page is scoped to this range. Plain properties (not
+  // signals) because [(ngModel)] drives them; periodLabel() is a method for
+  // the same reason — a computed() would never see them change.
+  dateFrom = '';
+  dateTo = '';
+  activePreset = signal<PresetKey>('month');
+
+  readonly presets: { key: PresetKey; label: string }[] = [
+    { key: 'month', label: 'This month' },
+    { key: '30d', label: '30 days' },
+    { key: '60d', label: '60 days' },
+    { key: '90d', label: '90 days' },
+  ];
+
   // Chart signals — populated from /reports/dashboard-charts
   portfolioByStatus = signal<StatusChartItem[]>([]);
+  portfolioByProduct = signal<ProductChartItem[]>([]);
   disbursementTrend = signal<TrendChartItem[]>([]);
   collectionTrend = signal<TrendChartItem[]>([]);
   overdueAging = signal<AgingChartItem[]>([]);
@@ -525,6 +632,12 @@ export class DashboardComponent implements OnInit {
   ];
   palette(i: number): string {
     return this.chartPalette[i % this.chartPalette.length];
+  }
+
+  /** Show at most ~8 x-axis labels regardless of how many buckets the
+   *  selected period produced (a 30-day range yields 30). */
+  private labelStride(count: number): number {
+    return Math.max(1, Math.ceil(count / 8));
   }
 
   /** Safe short date for the recent-applications table ("Jul 5"). Handles the
@@ -542,25 +655,8 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // KPI portfolio (existing endpoint)
-    this.api.get('/reports/portfolio').subscribe({
-      next: res => { this.portfolio = res.data; this.loading.set(false); },
-      error: () => this.loading.set(false),
-    });
-
-    // Charts (new endpoint from Phase 3.3.a)
-    this.api.get('/reports/dashboard-charts').subscribe({
-      next: res => {
-        const d = res.data || {};
-        this.portfolioByStatus.set(d.portfolio_by_status || []);
-        this.disbursementTrend.set(d.disbursement_trend || []);
-        this.collectionTrend.set(d.collection_trend || []);
-        this.overdueAging.set(d.overdue_aging || []);
-        this.topProducts.set(d.top_products || []);
-        this.chartsLoading.set(false);
-      },
-      error: () => this.chartsLoading.set(false),
-    });
+    // Open on the current month, then load everything against it.
+    this.applyPreset('month');
 
     // Agent-accepting toggle setting. /settings requires settings.view, so
     // only fetch when the user has it — otherwise this 403'd on every
@@ -578,9 +674,88 @@ export class DashboardComponent implements OnInit {
       });
     }
 
-    // Recent applications (X3a: trimmed from 10 to 5)
-    this.api.get('/loans', { per_page: 5, sort_by: 'createdAt', sort_dir: 'DESC' }).subscribe({
+  }
+
+  // ─── Period filter ───
+
+  /** Local Y-m-d. toISOString() would shift the date in any timezone behind
+   *  UTC, which for WAT (+1) silently reported the wrong day boundary. */
+  private ymd(d: Date): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  applyPreset(key: PresetKey): void {
+    const today = new Date();
+    let from: Date;
+    if (key === 'month') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else {
+      // Inclusive of today, so "30 days" spans 30 days rather than 31.
+      const days = key === '30d' ? 30 : key === '60d' ? 60 : 90;
+      from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1));
+    }
+    this.dateFrom = this.ymd(from);
+    this.dateTo = this.ymd(today);
+    this.activePreset.set(key);
+    this.load();
+  }
+
+  applyCustomRange(): void {
+    if (!this.dateFrom || !this.dateTo) {
+      return;
+    }
+    if (this.dateFrom > this.dateTo) {
+      [this.dateFrom, this.dateTo] = [this.dateTo, this.dateFrom];
+    }
+    this.activePreset.set('custom');
+    this.load();
+  }
+
+  /** Human label for the active period, reused across every card subtitle. */
+  periodLabel(): string {
+    const preset = this.activePreset();
+    if (preset === 'month') return 'this month';
+    if (preset !== 'custom') return `the last ${preset.replace('d', ' days')}`;
+    const fmt = (s: string) => {
+      const d = new Date(s + 'T00:00:00');
+      return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+    };
+    return `${fmt(this.dateFrom)} – ${fmt(this.dateTo)}`;
+  }
+
+  /**
+   * Reload every period-scoped figure: KPI tiles, all charts and the recent
+   * applications table. Overdue Aging is the one exception — the backend keeps
+   * it as an as-of-today snapshot because aging is defined against today.
+   */
+  private load(): void {
+    const range = { date_from: this.dateFrom, date_to: this.dateTo };
+
+    this.loading.set(true);
+    this.api.get('/reports/portfolio', range).subscribe({
+      next: res => { this.portfolio = res.data; this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
+
+    this.chartsLoading.set(true);
+    this.api.get('/reports/dashboard-charts', range).subscribe({
+      next: res => {
+        const d = res.data || {};
+        this.portfolioByStatus.set(d.portfolio_by_status || []);
+        this.portfolioByProduct.set(d.portfolio_by_product || []);
+        this.disbursementTrend.set(d.disbursement_trend || []);
+        this.collectionTrend.set(d.collection_trend || []);
+        this.overdueAging.set(d.overdue_aging || []);
+        this.topProducts.set(d.top_products || []);
+        this.chartsLoading.set(false);
+      },
+      error: () => this.chartsLoading.set(false),
+    });
+
+    this.api.get('/loans', { ...range, per_page: 5, sort_by: 'createdAt', sort_dir: 'DESC' }).subscribe({
       next: res => this.recentLoans = res.data || [],
+      error: () => this.recentLoans = [],
     });
   }
 
@@ -632,12 +807,40 @@ export class DashboardComponent implements OnInit {
 
   /** Portfolio donut — center shows total count. */
   portfolioDonutSvg(): SafeHtml {
-    const data = this.portfolioByStatus();
+    return this.donutSvg(this.portfolioByStatus(), 'Total Loans');
+  }
+
+  /** Portfolio by product — same donut, cut by product instead of status. */
+  productDonutSvg(): SafeHtml {
+    return this.donutSvg(this.portfolioByProduct(), 'Total Loans');
+  }
+
+  /**
+   * Shared donut renderer for the two Portfolio cards.
+   *
+   * The single-slice case is handled separately: with one datum the start and
+   * end angles are identical, so the arc path collapses and the chart renders
+   * blank — which is exactly what a tenant with one product would have seen.
+   */
+  private donutSvg(data: { label: string; value: number }[], centerLabel: string): SafeHtml {
     if (!data.length) return this.trustSvg('');
     const total = data.reduce((s, d) => s + d.value, 0);
     if (total === 0) return this.trustSvg('');
 
     const cx = 110, cy = 110, r = 90, ir = 55;
+    const centre = `
+      <text x="110" y="106" text-anchor="middle" font-size="28" font-weight="700" fill="#111827">${total}</text>
+      <text x="110" y="124" text-anchor="middle" font-size="11" fill="#6b7280">${this.escapeXml(centerLabel)}</text>`;
+
+    if (data.length === 1) {
+      const mid = (r + ir) / 2;
+      return this.trustSvg(`<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${cx}" cy="${cy}" r="${mid}" fill="none"
+          stroke="${this.palette(0)}" stroke-width="${r - ir}"/>
+        ${centre}
+      </svg>`);
+    }
+
     let acc = 0;
     const slices = data.map((d, i) => {
       const start = acc;
@@ -656,8 +859,7 @@ export class DashboardComponent implements OnInit {
 
     return this.trustSvg(`<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
       ${slices}
-      <text x="110" y="106" text-anchor="middle" font-size="28" font-weight="700" fill="#111827">${total}</text>
-      <text x="110" y="124" text-anchor="middle" font-size="11" fill="#6b7280">Total Loans</text>
+      ${centre}
     </svg>`);
   }
 
@@ -686,9 +888,12 @@ export class DashboardComponent implements OnInit {
       return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${this.chartPalette[0]}" rx="2"/>`;
     }).join('');
 
-    // Show every 2nd label to avoid crowding; always show first & last.
+    // Thin the labels to roughly eight. This was a fixed "every 2nd", which
+    // was fine for a 12-month grid but unreadable once the period filter could
+    // produce ~30 daily buckets.
+    const stride = this.labelStride(data.length);
     const xLabels = data.map((d, i) => {
-      const showLabel = i % 2 === 0 || i === data.length - 1;
+      const showLabel = i % stride === 0 || i === data.length - 1;
       if (!showLabel) return '';
       const cx = padL + i * stepX + stepX / 2;
       return `<text x="${cx}" y="${h - padB + 16}" text-anchor="middle" font-size="9" fill="#6b7280">${this.escapeXml(d.label)}</text>`;
@@ -725,8 +930,9 @@ export class DashboardComponent implements OnInit {
       `<circle cx="${padL + i * stepX}" cy="${scaleY(d.value)}" r="3" fill="${this.chartPalette[5]}"/>`
     ).join('');
 
+    const stride = this.labelStride(data.length);
     const xLabels = data.map((d, i) => {
-      const showLabel = i % 2 === 0 || i === data.length - 1;
+      const showLabel = i % stride === 0 || i === data.length - 1;
       if (!showLabel) return '';
       return `<text x="${padL + i * stepX}" y="${h - padB + 16}" text-anchor="middle" font-size="9" fill="#6b7280">${this.escapeXml(d.label)}</text>`;
     }).join('');

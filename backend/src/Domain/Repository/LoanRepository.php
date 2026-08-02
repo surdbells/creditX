@@ -96,12 +96,15 @@ class LoanRepository extends BaseRepository
      *        needed because a single UI filter often spans several statuses —
      *        "Active" covers disbursed/active/overdue, "In review" covers
      *        submitted/under_review — and matching only one hid those loans.
+     * @param string|null $dateFrom Y-m-d, filters on creation date (inclusive).
+     * @param string|null $dateTo   Y-m-d, inclusive of the whole day.
      * @return array{items: Loan[], total: int}
      */
     public function paginated(
         int $offset, int $limit, string $sortBy = 'createdAt', string $sortDir = 'DESC',
         ?string $search = null, string|array|null $status = null, ?string $productId = null,
         ?string $branchId = null, ?string $agentId = null, ?string $customerId = null,
+        ?string $dateFrom = null, ?string $dateTo = null,
     ): array {
         $qb = $this->em->createQueryBuilder()->select('l')->from(Loan::class, 'l')
             ->innerJoin('l.customer', 'c');
@@ -114,6 +117,13 @@ class LoanRepository extends BaseRepository
         if ($branchId) $qb->andWhere('l.branch = :bid')->setParameter('bid', $branchId);
         if ($agentId) $qb->andWhere('l.agent = :aid')->setParameter('aid', $agentId);
         if ($customerId) $qb->andWhere('l.customer = :cid')->setParameter('cid', $customerId);
+        // createdAt is a timestamp, so the end date is taken to the last second
+        // of that day — a bare date would drop everything captured after
+        // midnight on the final day of the range.
+        if ($dateFrom) $qb->andWhere('l.createdAt >= :dfrom')
+            ->setParameter('dfrom', new \DateTimeImmutable($dateFrom . ' 00:00:00'));
+        if ($dateTo) $qb->andWhere('l.createdAt <= :dto')
+            ->setParameter('dto', new \DateTimeImmutable($dateTo . ' 23:59:59'));
 
         // Search across loan and customer fields
         if ($search && $search !== '') {

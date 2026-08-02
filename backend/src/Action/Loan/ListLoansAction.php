@@ -37,7 +37,8 @@ final class ListLoansAction
         }
 
         $result = $this->repo->paginated($p['offset'], $p['per_page'], $p['sort_by'], $p['sort_dir'], $p['search'] ?: null,
-            $params['status'] ?? null, $params['product_id'] ?? null, $branchId, $agentId, $params['customer_id'] ?? null);
+            $params['status'] ?? null, $params['product_id'] ?? null, $branchId, $agentId, $params['customer_id'] ?? null,
+            $params['date_from'] ?? null, $params['date_to'] ?? null);
         $items = array_map(fn($l) => $l->toArray(), $result['items']);
         return $this->paginated($items, $result['total'], $p['page'], $p['per_page']);
     }

@@ -1168,9 +1168,33 @@ final class ReportingService
      *
      * @return array<string, mixed>
      */
-    public function dashboardCharts(): array
+    /**
+     * @param string|null $dateFrom Y-m-d inclusive. Defaults to the 1st of the
+     *        current month, matching the dashboard's default period.
+     * @param string|null $dateTo   Y-m-d inclusive (the whole day is covered).
+     */
+    public function dashboardCharts(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $conn = $this->em->getConnection();
+
+        // Default to the current month so an unparameterised call (and the
+        // dashboard's first paint) agree on the period.
+        $today    = new \DateTimeImmutable('today');
+        $fromDate = $dateFrom !== null && $dateFrom !== ''
+            ? new \DateTimeImmutable($dateFrom)
+            : $today->modify('first day of this month');
+        $toDate = $dateTo !== null && $dateTo !== ''
+            ? new \DateTimeImmutable($dateTo)
+            : $today;
+        if ($toDate < $fromDate) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
+        }
+
+        $from = $fromDate->format('Y-m-d');
+        // Inclusive of the whole end day: the columns filtered here are
+        // timestamps, so a bare date would silently drop everything that
+        // happened after midnight on the last day of the range.
+        $to = $toDate->format('Y-m-d') . ' 23:59:59';
 
         // ── 1. portfolio_by_status ──
         $statusRows = $conn->fetchAllAssociative(
@@ -1179,8 +1203,10 @@ final class ReportingService
                     COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) AS amount
              FROM loans l
              WHERE l.status NOT IN ('draft','cancelled')
+               AND l.created_at >= :from AND l.created_at <= :to
              GROUP BY l.status
-             ORDER BY count DESC"
+             ORDER BY count DESC",
+            ['from' => $from, 'to' => $to]
         );
         $portfolioByStatus = array_map(
             fn(array $r): array => [
@@ -1191,62 +1217,89 @@ final class ReportingService
             $statusRows
         );
 
-        // ── 2. disbursement_trend (12-month rolling) ──
-        $now = new \DateTimeImmutable('now');
-        $start = $now->modify('first day of -11 months')->setTime(0, 0, 0);
+        // ── 1b. portfolio_by_product ──
+        // Same population and period as portfolio_by_status, cut by product
+        // instead of status, so the two cards in that row always reconcile to
+        // the same total. Distinct from top_products below, which counts only
+        // loans that actually disbursed.
+        $byProductRows = $conn->fetchAllAssociative(
+            "SELECT lp.name AS product_name,
+                    COUNT(*) AS count,
+                    COALESCE(SUM(CAST(l.amount_requested AS NUMERIC)), 0) AS amount
+             FROM loans l
+             INNER JOIN loan_products lp ON l.product_id = lp.id
+             WHERE l.status NOT IN ('draft','cancelled')
+               AND l.created_at >= :from AND l.created_at <= :to
+             GROUP BY lp.name
+             ORDER BY count DESC",
+            ['from' => $from, 'to' => $to]
+        );
+        $portfolioByProduct = array_map(
+            fn(array $r): array => [
+                'label'  => (string) $r['product_name'],
+                'value'  => (int) $r['count'],
+                'amount' => (float) $r['amount'],
+            ],
+            $byProductRows
+        );
+
+        // ── 2 & 3. Trends, bucketed to suit the selected period ──
+        // A fixed 12-month grid was wrong once the dashboard became filterable:
+        // for a one-month period it drew eleven empty bars and one real one.
+        // Granularity now follows the span — daily for a month or less, weekly
+        // up to a quarter, monthly beyond — so every preset reads well.
+        $buckets = $this->trendBuckets($fromDate, $toDate);
+        $trunc   = "DATE_TRUNC('{$buckets['grain']}', %s)";
+        $keyExpr = fn(string $col): string => "TO_CHAR(" . sprintf($trunc, $col) . ", 'YYYY-MM-DD')";
+
         $disbRows = $conn->fetchAllAssociative(
-            "SELECT TO_CHAR(DATE_TRUNC('month', l.disbursed_at), 'YYYY-MM') AS month_key,
+            "SELECT {$keyExpr('l.disbursed_at')} AS bucket_key,
                     COALESCE(SUM(CAST(l.net_disbursed AS NUMERIC)), 0) AS value,
                     COUNT(*) AS count
              FROM loans l
              WHERE l.disbursed_at IS NOT NULL
-               AND l.disbursed_at >= :start
-             GROUP BY month_key
-             ORDER BY month_key ASC",
-            ['start' => $start->format('Y-m-d')]
+               AND l.disbursed_at >= :from AND l.disbursed_at <= :to
+             GROUP BY bucket_key
+             ORDER BY bucket_key ASC",
+            ['from' => $from, 'to' => $to]
         );
-        $disbByMonth = [];
+        $disbByBucket = [];
         foreach ($disbRows as $r) {
-            $disbByMonth[$r['month_key']] = [
+            $disbByBucket[$r['bucket_key']] = [
                 'value' => (float) $r['value'],
                 'count' => (int) $r['count'],
             ];
         }
-        $disbursementTrend = [];
-        for ($i = 0; $i < 12; $i++) {
-            $m = $start->modify("+{$i} months");
-            $key = $m->format('Y-m');
-            $disbursementTrend[] = [
-                'label' => $m->format('M Y'),
-                'value' => $disbByMonth[$key]['value'] ?? 0.0,
-                'count' => $disbByMonth[$key]['count'] ?? 0,
-            ];
-        }
+        $disbursementTrend = array_map(
+            fn(array $b): array => [
+                'label' => $b['label'],
+                'value' => $disbByBucket[$b['key']]['value'] ?? 0.0,
+                'count' => $disbByBucket[$b['key']]['count'] ?? 0,
+            ],
+            $buckets['points']
+        );
 
-        // ── 3. collection_trend (12-month rolling) ──
         $payRows = $conn->fetchAllAssociative(
-            "SELECT TO_CHAR(DATE_TRUNC('month', p.created_at), 'YYYY-MM') AS month_key,
+            "SELECT {$keyExpr('p.created_at')} AS bucket_key,
                     COALESCE(SUM(CAST(p.amount AS NUMERIC)), 0) AS value
              FROM payments p
              WHERE p.status = 'success'
-               AND p.created_at >= :start
-             GROUP BY month_key
-             ORDER BY month_key ASC",
-            ['start' => $start->format('Y-m-d')]
+               AND p.created_at >= :from AND p.created_at <= :to
+             GROUP BY bucket_key
+             ORDER BY bucket_key ASC",
+            ['from' => $from, 'to' => $to]
         );
-        $payByMonth = [];
+        $payByBucket = [];
         foreach ($payRows as $r) {
-            $payByMonth[$r['month_key']] = (float) $r['value'];
+            $payByBucket[$r['bucket_key']] = (float) $r['value'];
         }
-        $collectionTrend = [];
-        for ($i = 0; $i < 12; $i++) {
-            $m = $start->modify("+{$i} months");
-            $key = $m->format('Y-m');
-            $collectionTrend[] = [
-                'label' => $m->format('M Y'),
-                'value' => $payByMonth[$key] ?? 0.0,
-            ];
-        }
+        $collectionTrend = array_map(
+            fn(array $b): array => [
+                'label' => $b['label'],
+                'value' => $payByBucket[$b['key']] ?? 0.0,
+            ],
+            $buckets['points']
+        );
 
         // ── 4. overdue_aging ──
         // Reuses parReport's bucket logic minus the 'current' bucket.
@@ -1304,7 +1357,8 @@ final class ReportingService
         // ── 5. top_products (top 5 by disbursed loan count) ──
         // Uses 'disbursed-or-after' status set so the chart reflects
         // products that actually moved money, not products with lots
-        // of approvals stuck in disbursement queue.
+        // of approvals stuck in disbursement queue. Scoped by the
+        // disbursement date so it answers "in this period", not "ever".
         $productRows = $conn->fetchAllAssociative(
             "SELECT lp.id AS product_id, lp.name AS product_name,
                     COUNT(*) AS count,
@@ -1312,9 +1366,12 @@ final class ReportingService
              FROM loans l
              INNER JOIN loan_products lp ON l.product_id = lp.id
              WHERE l.status IN ('disbursed','active','overdue','closed','restructured')
+               AND l.disbursed_at IS NOT NULL
+               AND l.disbursed_at >= :from AND l.disbursed_at <= :to
              GROUP BY lp.id, lp.name
              ORDER BY count DESC
-             LIMIT 5"
+             LIMIT 5",
+            ['from' => $from, 'to' => $to]
         );
         $topProducts = array_map(
             fn(array $r): array => [
@@ -1326,11 +1383,58 @@ final class ReportingService
         );
 
         return [
-            'portfolio_by_status' => $portfolioByStatus,
-            'disbursement_trend'  => $disbursementTrend,
-            'collection_trend'    => $collectionTrend,
-            'overdue_aging'       => $overdueAging,
-            'top_products'        => $topProducts,
+            'portfolio_by_status'  => $portfolioByStatus,
+            'portfolio_by_product' => $portfolioByProduct,
+            'disbursement_trend'   => $disbursementTrend,
+            'collection_trend'     => $collectionTrend,
+            'overdue_aging'        => $overdueAging,
+            'top_products'         => $topProducts,
+            'period'               => [
+                'date_from' => $fromDate->format('Y-m-d'),
+                'date_to'   => $toDate->format('Y-m-d'),
+                'grain'     => $buckets['grain'],
+            ],
         ];
+    }
+
+    /**
+     * Densified time buckets spanning [$from, $to] inclusive.
+     *
+     * Granularity is picked from the span so a chart never draws hundreds of
+     * bars or a single one: day up to ~a month, week up to ~a quarter, month
+     * beyond. Buckets are pre-generated (not taken from the result set) so a
+     * period with no activity still renders a continuous axis instead of
+     * collapsing to nothing.
+     *
+     * @return array{grain: string, points: list<array{key: string, label: string}>}
+     */
+    private function trendBuckets(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $spanDays = (int) $from->diff($to)->days;
+        $grain = $spanDays <= 31 ? 'day' : ($spanDays <= 92 ? 'week' : 'month');
+
+        // Align the cursor to the same boundary Postgres' DATE_TRUNC uses,
+        // or the generated keys would never match the grouped rows.
+        $cursor = match ($grain) {
+            'day'   => $from->setTime(0, 0, 0),
+            'week'  => $from->modify('monday this week')->setTime(0, 0, 0),
+            default => $from->modify('first day of this month')->setTime(0, 0, 0),
+        };
+        $step = match ($grain) {
+            'day'   => '+1 day',
+            'week'  => '+7 days',
+            default => '+1 month',
+        };
+        $labelFmt = $grain === 'month' ? 'M Y' : 'j M';
+
+        $points = [];
+        $end = $to->setTime(23, 59, 59);
+        // Hard stop: a pathological range can't spin here forever.
+        while ($cursor <= $end && count($points) < 400) {
+            $points[] = ['key' => $cursor->format('Y-m-d'), 'label' => $cursor->format($labelFmt)];
+            $cursor = $cursor->modify($step);
+        }
+
+        return ['grain' => $grain, 'points' => $points];
     }
 }
