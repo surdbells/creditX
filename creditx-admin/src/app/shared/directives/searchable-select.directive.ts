@@ -1,4 +1,4 @@
-import { Directive, ElementRef, OnDestroy, AfterViewInit, inject, NgZone } from '@angular/core';
+import { Directive, DoCheck, ElementRef, OnDestroy, AfterViewInit, inject, NgZone } from '@angular/core';
 
 /**
  * Makes every native <select> searchable without changing any template markup
@@ -16,7 +16,7 @@ import { Directive, ElementRef, OnDestroy, AfterViewInit, inject, NgZone } from 
   selector: 'select:not([multiple]):not([data-no-search])',
   standalone: true,
 })
-export class SearchableSelectDirective implements AfterViewInit, OnDestroy {
+export class SearchableSelectDirective implements AfterViewInit, DoCheck, OnDestroy {
   private select = inject(ElementRef).nativeElement as HTMLSelectElement;
   private zone = inject(NgZone);
 
@@ -27,6 +27,8 @@ export class SearchableSelectDirective implements AfterViewInit, OnDestroy {
   private optionMo?: MutationObserver;
   private attrMo?: MutationObserver;
   private destroyed = false;
+  /** Last value we painted, so ngDoCheck only repaints on a real change. */
+  private lastValue: string | null = null;
 
   ngAfterViewInit(): void {
     // Run all DOM plumbing outside Angular to avoid extra change detection.
@@ -72,6 +74,29 @@ export class SearchableSelectDirective implements AfterViewInit, OnDestroy {
     });
   }
 
+  /**
+   * Catch PROGRAMMATIC value changes.
+   *
+   * Angular's SelectControlValueAccessor writes the model by setting
+   * select.value / selectedIndex. That fires no `change` event and mutates no
+   * attribute or child node, so neither the change listener nor either
+   * MutationObserver sees it — and it happens after the one-shot init sync.
+   * The visible result was an edit dialog opening with its selects blank while
+   * the underlying control held the right value (interest method, product
+   * status, and every other select in every edit form).
+   *
+   * DoCheck runs per change-detection pass; the guard is a string compare, so
+   * this repaints only when the value actually moved.
+   */
+  ngDoCheck(): void {
+    if (this.destroyed || !this.labelEl) return;
+    const v = this.select.value;
+    if (v !== this.lastValue) {
+      this.lastValue = v;
+      this.syncLabel();
+    }
+  }
+
   ngOnDestroy(): void {
     this.destroyed = true;
     this.closePanel();
@@ -91,6 +116,9 @@ export class SearchableSelectDirective implements AfterViewInit, OnDestroy {
   };
 
   private syncLabel = (): void => {
+    // Keep the DoCheck watermark aligned however the repaint was triggered
+    // (user pick, option list change, or programmatic write).
+    this.lastValue = this.select.value;
     const opt = this.select.selectedOptions[0];
     const text = opt ? (opt.textContent || '').trim() : '';
     const isPlaceholder = !opt || opt.value === '' || opt.disabled;

@@ -18,8 +18,8 @@ import { SearchableSelectDirective } from '../../shared/directives/searchable-se
   template: `
     <div class="cx-animate-in">
       <cx-page-header
-        title="Government Records"
-        [subtitle]="'Unified employee records database · ' + (totalRecords | number) + ' total'"
+        title="Institutions"
+        [subtitle]="'Unified institution employee records · ' + (totalRecords | number) + ' total'"
         eyebrow="Master Data">
         <div class="flex items-center gap-2">
           <div class="relative">
