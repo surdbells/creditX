@@ -308,6 +308,13 @@ return function (App $app): void {
                 ->add(new RbacMiddleware('products.view'));
             $group->put('/{id}', LoanProduct\UpdateProductAction::class)
                 ->add(new RbacMiddleware('products.edit'));
+            // Per-product document requirements. GET is products.view so field
+            // agents (who hold it) can build their upload checklist from the
+            // live configuration rather than a hardcoded list.
+            $group->get('/{id}/documents', LoanProduct\GetProductDocumentsAction::class)
+                ->add(new RbacMiddleware('products.view'));
+            $group->put('/{id}/documents', LoanProduct\SetProductDocumentsAction::class)
+                ->add(new RbacMiddleware('products.edit'));
         });
 
         // ─── Loans ───

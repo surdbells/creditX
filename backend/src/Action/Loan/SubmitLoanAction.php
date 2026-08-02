@@ -4,8 +4,8 @@ namespace App\Action\Loan;
 
 use App\Domain\Entity\LoanTrail;
 use App\Domain\Enum\LoanStatus;
-use App\Domain\Repository\{DocumentRepository, DocumentTypeConfigRepository, LoanRepository};
-use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService, NotificationDispatchService};
+use App\Domain\Repository\{DocumentRepository, LoanRepository};
+use App\Infrastructure\Service\{ApiResponse, ApprovalEngineService, AuditService, DocumentRequirementService, NotificationDispatchService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 
 final class SubmitLoanAction
@@ -19,7 +19,7 @@ final class SubmitLoanAction
         private readonly NotificationDispatchService $notifService,
         private readonly DocumentRepository $documentRepo,
         private readonly \Doctrine\ORM\EntityManagerInterface $em,
-        private readonly DocumentTypeConfigRepository $docTypeRepo,
+        private readonly DocumentRequirementService $docRequirements,
     ) {}
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -37,18 +37,21 @@ final class SubmitLoanAction
         }
 
         // Enforce required documents at submit-for-approval (they can be
-        // skipped during capture, but not at this gate). Which documents are
-        // mandatory is configured per document type (document_types.is_required)
-        // and applies globally — no hardcoded list, so operations can change
-        // what blocks submission without a deploy.
+        // skipped during capture, but not at this gate).
+        //
+        // What is mandatory is resolved PER PRODUCT: a product that defines its
+        // own document list governs itself, otherwise the global catalogue
+        // applies. Resolution lives in DocumentRequirementService so this gate,
+        // the agent app's checklist and back-office capture can never disagree
+        // about what a loan needs.
         $present = array_map(
             fn($d) => $d->getType(),
             $this->documentRepo->findByLoan($loan->getId()),
         );
         $missing = [];
-        foreach ($this->docTypeRepo->findRequiredActive() as $required) {
-            if (!in_array($required->getCode(), $present, true)) {
-                $missing[] = $required->getLabel();
+        foreach ($this->docRequirements->requiredForProduct($loan->getProduct()?->getId()) as $code => $label) {
+            if (!in_array($code, $present, true)) {
+                $missing[] = $label;
             }
         }
         if (!empty($missing)) {

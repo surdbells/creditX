@@ -178,6 +178,15 @@ return [
     \App\Domain\Repository\PostingAuditRepository::class => function (ContainerInterface $c): \App\Domain\Repository\PostingAuditRepository {
         return new \App\Domain\Repository\PostingAuditRepository($c->get(EntityManagerInterface::class));
     },
+    \App\Domain\Repository\ProductDocumentRepository::class => function (ContainerInterface $c): \App\Domain\Repository\ProductDocumentRepository {
+        return new \App\Domain\Repository\ProductDocumentRepository($c->get(EntityManagerInterface::class));
+    },
+    \App\Infrastructure\Service\DocumentRequirementService::class => function (ContainerInterface $c): \App\Infrastructure\Service\DocumentRequirementService {
+        return new \App\Infrastructure\Service\DocumentRequirementService(
+            $c->get(\App\Domain\Repository\ProductDocumentRepository::class),
+            $c->get(\App\Domain\Repository\DocumentTypeConfigRepository::class),
+        );
+    },
     \App\Infrastructure\Service\EndOfDayService::class => function (ContainerInterface $c): \App\Infrastructure\Service\EndOfDayService {
         return new \App\Infrastructure\Service\EndOfDayService(
             $c->get(EntityManagerInterface::class),
