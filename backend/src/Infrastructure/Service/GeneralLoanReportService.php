@@ -61,19 +61,78 @@ final class GeneralLoanReportService
         return ['rows' => $rows, 'total' => $total];
     }
 
+    /** Hard ceiling on an export, to bound the work a single click can cause. */
+    public const EXPORT_MAX_ROWS = 50000;
+
+    /** Rows pulled per round-trip while exporting. */
+    private const EXPORT_CHUNK = 2000;
+
     /**
      * Unpaginated rows for CSV export. Same filter signature as listLoans.
      *
+     * @deprecated Loads the whole result set into memory — with the export
+     *             ceiling at 50k rows of a 44-column join that alone could
+     *             exhaust the PHP memory limit and kill the request. Use
+     *             exportLoansChunked(); kept only for callers outside the
+     *             report that pass a narrow filter.
      * @param array<string, mixed> $filters
      * @return array<int, array<string, mixed>>
      */
     public function exportLoans(array $filters): array
     {
         [$where, $params] = $this->buildWhereClause($filters);
-        // Hard ceiling — operators running this monthly should not be
-        // pulling 100k+ rows in one shot. If a tenant ever needs more,
-        // we'll add date-range chunking server-side.
-        return $this->fetchRows($where, $params, 0, 50000);
+        return $this->fetchRows($where, $params, 0, self::EXPORT_MAX_ROWS);
+    }
+
+    /**
+     * Export rows in batches, so neither the database result nor the CSV is
+     * ever held whole in memory.
+     *
+     * The report page loads 50 rows at a time and worked fine; the export
+     * asked for up to 50,000 of the same wide LATERAL join in ONE array, then
+     * copied the rendered CSV twice more. That is the whole reason exports
+     * failed while the table beside them rendered — nothing to do with the
+     * filters, which both paths share.
+     *
+     * @param array<string, mixed> $filters
+     * @return \Generator<int, array<int, array<string, mixed>>> batches of rows
+     */
+    public function exportLoansChunked(array $filters): \Generator
+    {
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        $fetched = 0;
+        while ($fetched < self::EXPORT_MAX_ROWS) {
+            $limit = min(self::EXPORT_CHUNK, self::EXPORT_MAX_ROWS - $fetched);
+            $batch = $this->fetchRows($where, $params, $fetched, $limit);
+            if ($batch === []) {
+                return;
+            }
+
+            $fetched += count($batch);
+            yield $batch;
+
+            // A short batch means the result set is exhausted; asking again
+            // would be a wasted round-trip against a heavy join.
+            if (count($batch) < $limit) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Whether an export would hit the ceiling and silently lose rows.
+     * Callers surface this rather than handing over a truncated file that
+     * looks complete.
+     *
+     * @param array<string, mixed> $filters
+     */
+    public function exportWouldTruncate(array $filters): bool
+    {
+        [$where, $params] = $this->buildWhereClause($filters);
+
+        return (int) $this->em->getConnection()
+            ->fetchOne("SELECT COUNT(*) FROM loans l WHERE {$where}", $params) > self::EXPORT_MAX_ROWS;
     }
 
     /**

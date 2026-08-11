@@ -775,11 +775,43 @@ export class GeneralLoanReportComponent implements OnInit {
         this.exporting.set(false);
         this.toast.success('CSV exported');
       },
-      error: () => {
+      error: async (err: any) => {
         this.exporting.set(false);
-        this.toast.error('Export failed');
+        this.toast.error(await this.exportErrorMessage(err));
       },
     });
+  }
+
+  /**
+   * Turn a failed export into something actionable.
+   *
+   * This used to discard the error entirely and toast a bare "Export failed",
+   * so a report nobody could diagnose was all anyone had — and because the
+   * request asks for a blob, the server's JSON error arrives AS a blob and
+   * has to be read back before it says anything.
+   */
+  private async exportErrorMessage(err: any): Promise<string> {
+    if (err?.status === 0) {
+      return 'Export failed — the connection dropped. Narrow the date range and try again.';
+    }
+    if (err?.status === 504 || err?.status === 408) {
+      return 'Export timed out. Narrow the date range or filter by branch, then retry.';
+    }
+
+    let detail = '';
+    if (err?.error instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await err.error.text());
+        detail = parsed?.message ?? '';
+      } catch {
+        // Not JSON — a truncated body or a gateway's HTML error page.
+      }
+    } else if (typeof err?.error?.message === 'string') {
+      detail = err.error.message;
+    }
+
+    const status = err?.status ? ` (${err.status})` : '';
+    return detail ? `Export failed${status}: ${detail}` : `Export failed${status}. Please try a narrower date range.`;
   }
 
   // ─── Number formatting ───

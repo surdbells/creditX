@@ -6,6 +6,7 @@ namespace App\Action\Report;
 
 use App\Infrastructure\Service\{ApiResponse, ExportService, GeneralLoanReportService};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
+use Slim\Psr7\Stream;
 
 /**
  * General Loan Report endpoint.
@@ -94,7 +95,8 @@ final class GeneralLoanReportAction
      */
     private function respondCsv(ResponseInterface $response, array $filters): ResponseInterface
     {
-        $rows = $this->service->exportLoans($filters);
+        // Checked before streaming, while the count is still cheap.
+        $truncated = $this->service->exportWouldTruncate($filters);
 
         // Legacy column order — see MONTHLY_GENERAL_REPORT.csv. Headers
         // are quoted in the exact case the legacy export used so that
@@ -115,12 +117,33 @@ final class GeneralLoanReportAction
             'dsa', 'channel', 'status',
         ];
 
-        $csv = $this->export->toCsv($headers, $rows);
-        $response->getBody()->write($csv);
+        // Streamed in batches. Building this in one pass meant holding up to
+        // 50,000 rows of a 44-column LATERAL join in an array, then the whole
+        // rendered CSV as a string, then a copy of it in the response body —
+        // enough to exhaust the memory limit and kill the request outright,
+        // which is what operators saw as a bare "Export failed".
+        $body = new Stream($this->export->streamCsv(
+            $headers,
+            $this->service->exportLoansChunked($filters),
+        ));
 
         $ts = date('Ymd-His');
-        return $response
+        $response = $response
+            ->withBody($body)
             ->withHeader('Content-Type', 'text/csv')
-            ->withHeader('Content-Disposition', "attachment; filename=\"general_loan_report_{$ts}.csv\"");
+            ->withHeader('Content-Disposition', "attachment; filename=\"general_loan_report_{$ts}.csv\"")
+            // Let the browser show real progress instead of an unbounded spinner.
+            ->withHeader('Content-Length', (string) $body->getSize());
+
+        // The ceiling silently dropped rows from a file that looked complete.
+        // Say so, so the client can warn rather than let it pass as the truth.
+        if ($truncated) {
+            $response = $response
+                ->withHeader('X-Export-Truncated', 'true')
+                ->withHeader('X-Export-Max-Rows', (string) GeneralLoanReportService::EXPORT_MAX_ROWS)
+                ->withHeader('Access-Control-Expose-Headers', 'X-Export-Truncated, X-Export-Max-Rows');
+        }
+
+        return $response;
     }
 }
