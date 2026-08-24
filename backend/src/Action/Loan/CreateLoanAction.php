@@ -101,7 +101,24 @@ final class CreateLoanAction
                 // Patch any updated fields. This is how the wizard keeps the
                 // customer record fresh when an existing customer's info has
                 // changed since their last loan (new address, new phone, etc).
+                //
+                // A patch may NOT change the Staff ID. The client sends a
+                // customer_id it resolved earlier; if that selection is stale
+                // the patch would rewrite a real customer's payroll identity —
+                // on a record that may already own live loans.
                 if ($customerPayload !== null) {
+                    $storedStaffId   = trim((string) ($customer->getStaffId() ?? ''));
+                    $incomingStaffId = trim((string) ($customerPayload['staff_id'] ?? ''));
+                    if ($storedStaffId !== '' && $incomingStaffId !== ''
+                        && strcasecmp($storedStaffId, $incomingStaffId) !== 0) {
+                        $this->em->rollback();
+                        return $this->error(
+                            'This application is for Staff ID ' . $incomingStaffId . ', but the selected'
+                            . ' customer record belongs to Staff ID ' . $storedStaffId . ' ('
+                            . $customer->getFullName() . '). Go back and look the Staff ID up again.',
+                            409
+                        );
+                    }
                     $customer->fillFromArray($customerPayload);
                 }
             } else {
@@ -123,12 +140,37 @@ final class CreateLoanAction
                 // duplicate. This mirrors the customer_id path: one person,
                 // one Customer row. The in-progress / owing guards below then
                 // apply correctly against the canonical customer.
+                $incomingStaffId = trim((string) ($customerPayload['staff_id'] ?? ''));
                 $existing = null;
-                if (!empty($customerPayload['staff_id'])) {
-                    $existing = $this->customerRepo->findByStaffId($customerPayload['staff_id']);
+                if ($incomingStaffId !== '') {
+                    $existing = $this->customerRepo->findByStaffId($incomingStaffId);
                 }
+
+                // BVN fallback, but ONLY where it cannot change who this
+                // customer is. A BVN match against a record carrying a
+                // DIFFERENT Staff ID is not the same lending relationship:
+                // reusing it silently rewrote that customer's Staff ID (so a
+                // record owning live loans quietly became someone else) and
+                // made the per-customer guards below fire against a stranger —
+                // agents saw 'already has a loan pending' naming a loan under
+                // a Staff ID they had never touched. Surface the clash instead.
                 if ($existing === null && !empty($customerPayload['bvn'])) {
-                    $existing = $this->customerRepo->findByBvn($customerPayload['bvn']);
+                    $byBvn = $this->customerRepo->findByBvn($customerPayload['bvn']);
+                    if ($byBvn !== null) {
+                        $bvnStaffId = trim((string) ($byBvn->getStaffId() ?? ''));
+                        if ($bvnStaffId === '' || $incomingStaffId === '' || strcasecmp($bvnStaffId, $incomingStaffId) === 0) {
+                            $existing = $byBvn;
+                        } else {
+                            $this->em->rollback();
+                            return $this->error(
+                                'This BVN is already registered to Staff ID ' . $bvnStaffId
+                                . ' (' . $byBvn->getFullName() . '), but this application is for Staff ID '
+                                . $incomingStaffId . '. Check the BVN. If both Staff IDs really belong to'
+                                . ' the same person, have the back office merge the records first.',
+                                409
+                            );
+                        }
+                    }
                 }
 
                 if ($existing !== null) {
@@ -222,10 +264,15 @@ final class CreateLoanAction
             if (!empty($pending)) {
                 $existing = $pending[0];
                 $this->em->rollback();
+                // Name the holder. The message used to give only the loan ref,
+                // so when the guard fired against the wrong record an agent had
+                // no way to see that the blocking loan belonged to someone else.
+                $holder = trim((string) ($customer->getStaffId() ?? ''));
                 return $this->error(
                     'This customer already has a loan pending a decision (' . $existing->getApplicationId()
-                    . ', ' . $existing->getStatus()->value . '). Another loan cannot be created until it is'
-                    . ' decided, rejected, or cancelled.',
+                    . ', ' . $existing->getStatus()->value . ')'
+                    . ($holder !== '' ? ', held under Staff ID ' . $holder . ' (' . $customer->getFullName() . ')' : '')
+                    . '. Another loan cannot be created until it is decided, rejected, or cancelled.',
                     409
                 );
             }
